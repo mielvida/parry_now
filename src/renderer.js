@@ -135,9 +135,10 @@
 
     // 보스 체력: 머리마다 막대 (맞을 수 있는 머리는 노랗게)
     _drawBossBars(ctx, boss) {
-      const bw = 250;
+      const n = boss.heads.length;
+      const bw = n === 1 ? 420 : 250;
       const gap = 24;
-      const x0 = (this.viewW - (bw * 3 + gap * 2)) / 2;
+      const x0 = (this.viewW - (bw * n + gap * (n - 1))) / 2;
       const y = 84;
       ctx.textAlign = 'center';
       ctx.font = 'bold 12px sans-serif';
@@ -152,7 +153,7 @@
           ctx.fillRect(x, y, (bw * h.hp) / h.maxHp, 16);
         }
         ctx.fillStyle = '#fff';
-        ctx.fillText(h.hp > 0 ? `용머리 ${i + 1}   ${h.hp} / ${h.maxHp}` : `용머리 ${i + 1}   쓰러짐`, x + bw / 2, y + 13);
+        ctx.fillText(h.hp > 0 ? `${boss.name}${n > 1 ? ' ' + (i + 1) : ''}   ${h.hp} / ${h.maxHp}` : `${boss.name}${n > 1 ? ' ' + (i + 1) : ''}   쓰러짐`, x + bw / 2, y + 13);
       });
       ctx.textAlign = 'left';
     }
@@ -687,6 +688,7 @@
     _paintMonster(ctx, m) {
       if (m.kind === 'bat') this._paintBat(ctx, m);
       else if (m.kind === 'crab') this._paintCrab(ctx, m);
+      else if (m.kind === 'golem') this._paintGolem(ctx, m);
       else this._paintSlime(ctx, m);
       if (m.staggered > 0) this._drawDazed(ctx, m);
       if (m.poison) this._drawPoisoned(ctx, m);
@@ -896,6 +898,59 @@
     }
 
     // 꽃게: 옆걸음 다리, 눈자루, 두 집게. 예비동작엔 집게를 번쩍 들고 눈이 붉어지며, 돌진 땐 집게를 앞으로 내민다
+    // 흙괴물: 진흙과 바위로 된 몸. 몸을 던지기 전에 팔을 번쩍 든다. 머리와 어깨에 눈이 쌓여 있다
+    _paintGolem(ctx, g) {
+      const windup = g.state === 'windup';
+      const lunge = g.state === 'lunge';
+      const flash = g.flying && Math.floor(g.flightTime / 0.05) % 2 === 0;
+      const mud = flash ? '#ffffff' : windup || lunge ? '#8a5a38' : '#7a5232';
+      const dark = flash ? '#ffffff' : '#4a2e1a';
+      const rock = flash ? '#ffffff' : '#a58a6e';
+      const walking = Math.abs(g.vx) > 5;
+      const bob = walking ? Math.abs(Math.sin(g.time * 6)) * 1.5 : 0;
+      ctx.save();
+      ctx.translate(sp(g.x + g.w / 2), sp(g.y + g.h));
+      ctx.scale(g.dir >= 0 ? 1 : -1, 1);
+      ctx.translate(lunge ? 4 : 0, -bob);
+      const lean = lunge ? 0.18 : 0;
+      ctx.rotate(lean);
+      // 다리
+      ctx.fillStyle = dark;
+      ctx.fillRect(-11, -10, 9, 10);
+      ctx.fillRect(2, -10, 9, 10);
+      // 몸통
+      ctx.fillStyle = mud;
+      ctx.beginPath();
+      ctx.moveTo(-15, -8); ctx.lineTo(-17, -26); ctx.lineTo(-10, -34); ctx.lineTo(10, -34); ctx.lineTo(17, -26); ctx.lineTo(15, -8);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.stroke();
+      // 바위 조각
+      ctx.fillStyle = rock;
+      ctx.fillRect(-9, -26, 6, 5); ctx.fillRect(4, -20, 7, 5); ctx.fillRect(-4, -14, 5, 4);
+      // 팔: 예비동작에선 위로 번쩍
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 15, -28);
+        if (windup) ctx.lineTo(side * 19, -46); else if (lunge) ctx.lineTo(18, -22 + side * 0); else ctx.lineTo(side * 20, -16 + Math.sin(g.time * 3 + side) * 1.5);
+        ctx.stroke();
+        ctx.fillStyle = mud;
+        ctx.beginPath();
+        if (windup) ctx.arc(side * 19, -48, 5.5, 0, Math.PI * 2); else if (lunge) ctx.arc(18, -22, 5.5, 0, Math.PI * 2); else ctx.arc(side * 20, -14, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.lineCap = 'butt';
+      // 머리 위 눈과 눈(발광)
+      ctx.fillStyle = flash ? '#ffffff' : '#f2f7fc';
+      ctx.beginPath(); ctx.moveTo(-14, -33); ctx.lineTo(-6, -40); ctx.lineTo(6, -40); ctx.lineTo(14, -33); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : (windup || lunge ? '#ff6a3a' : '#ffd96a');
+      ctx.fillRect(-1, -29, 5, 4);
+      ctx.fillRect(7, -29, 5, 4);
+      ctx.restore();
+    }
+
     _paintCrab(ctx, c) {
       const windup = c.state === 'windup';
       const dash = c.state === 'dash';
@@ -1012,7 +1067,7 @@
       ctx.font = '16px sans-serif';
       if (!hud) return;
       const test = '   [테스트] 0: 해변  9: 마을  7: 마을 동굴  8: 코인+1000   1: 장비';
-      if (hud.summon) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리   - 키: 슬라임 소환${test}`, 12, 32);
+      if (hud.summon) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리${test}`, 12, 32);
       else if (hud.monsterless) this._text(ctx, `몬스터가 없는 평화로운 마을${test}`, 12, 32);
       else if (hud.crabCount !== undefined) this._text(ctx, `꽃게 ${hud.crabCount}마리${test}`, 12, 32);
 

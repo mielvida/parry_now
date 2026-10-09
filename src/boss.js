@@ -130,13 +130,19 @@
   class Boss {
     // left/width: 경기장 가로 범위(px), groundY: 바닥 윗면 y
     constructor(left, width, groundY, ev) {
+      this.kind = 'dragon';
+      this.name = '용머리';
+      this.defeatText = '용을 쓰러뜨렸다!';
+      this.weak = 'ice'; // 약점 속성 (그 속성 무기는 더 아프게 때린다)
+      this.hurtDmg = 1;
+      this.patterns = ['fire', 'tail', 'slam', 'meteor', 'lava'];
       this.left = left;
       this.right = left + width;
       this.groundY = groundY;
       this.ev = ev;
       this.baseX = left + width / 2;
-      this.heads = [0, 1, 2].map((i) => {
-        const h = new Head(i, left + width * (1 + i * 2) / 6, groundY, left + width / 2);
+      this.heads = [1 / 6, 3 / 6, 5 / 6].map((u, i) => {
+        const h = new Head(i, left + width * u, groundY, left + width / 2);
         h.boss = this;
         return h;
       });
@@ -252,7 +258,7 @@
     _startPattern() {
       const live = this.alive;
       if (live.length === 0) return;
-      const type = ['fire', 'tail', 'slam', 'meteor', 'lava'][Math.floor(Math.random() * 5)];
+      const type = this.patterns[Math.floor(Math.random() * this.patterns.length)];
       this.pat = { type, t: 0 };
       if (type === 'fire') {
         this.pat.shots = [];
@@ -490,7 +496,7 @@
         for (const h of this.heads) {
           if (h.state === 'slamDown' && player.overlaps({ x: h.x + 8, y: h.y + 4, w: h.w - 16, h: h.h - 8 }) && player.x + player.w > h.x && player.x < h.x + h.w) hurt = true;
         }
-        if (hurt) this.ev.hurt();
+        if (hurt) this.ev.hurt(this.hurtDmg);
       }
     }
 
@@ -546,7 +552,7 @@
       const blink = locked ? (Math.floor(this.time * 14) % 2 ? 1 : 0.45) : 0.85;
       const al = (0.35 + 0.5 * Math.min(1, a)) * blink;
       const g = ctx.createLinearGradient(0, 0, 0, gy);
-      g.addColorStop(0, 'rgba(255,60,20,0)');
+      g.addColorStop(0, `rgba(255,60,20,0)`);
       g.addColorStop(1, `rgba(255,70,20,${0.62 * al})`);
       ctx.fillStyle = g;
       ctx.fillRect(x - w / 2, 0, w, gy);

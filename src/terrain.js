@@ -14,6 +14,7 @@
       this.slimeSpawns = [];
       this.batSpawns = [];
       this.crabSpawns = [];
+      this.golemSpawns = []; // 흙괴물 (G)
       this.treasure = null; // 보물 상자 위치 {col,row}
       this.houses = [];     // 해변 집 위치 {col,row} (장식)
       this.luggage = [];    // 짐더미 위치 {col,row} (장식)
@@ -32,6 +33,7 @@
           if (ch === 'S') this.slimeSpawns.push({ col: c, row: r });
           if (ch === 'B') this.batSpawns.push({ col: c, row: r });
           if (ch === 'C') this.crabSpawns.push({ col: c, row: r });
+          if (ch === 'G') this.golemSpawns.push({ col: c, row: r });
           if (ch === 'T') this.treasure = { col: c, row: r };
           if (ch === 'H') this.houses.push({ col: c, row: r });
           if (ch === 'L') this.luggage.push({ col: c, row: r });

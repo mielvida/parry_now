@@ -82,8 +82,6 @@ Game.Config = {
   MINE_COINS: 100,         // 마을 동굴 보물 상자의 코인 (첫 탐험)
   MINE_COINS_PER_RUN: 25,  // 탐험을 거듭할수록 상자 코인이 이만큼씩 늘어난다
   TREASURE_COINS: 50,      // 동굴 보물 상자에서 얻는 코인
-  SLIME_SPAWN_BATCH: 30,   // - 키를 한 번 누를 때 소환되는 슬라임 수
-  SLIME_MAX: 300,          // 슬라임 총 수 상한 (성능 보호)
   SLIME_SAFE_DROP: 3,      // 추적 중 이 타일 수 안에 바닥이 있으면 낭떠러지로 보지 않음
 
   // 패링
@@ -132,6 +130,25 @@ Game.Config = {
   BOSS_ICE_BONUS: 3,       // 얼음 속성 무기는 보스(불의 용)에게 한 대당 이만큼 더 큰 피해
   BOSS_LAVA_HEIGHT: 60,    // 용암 패턴: 바닥에서 용암이 이만큼 차오른다 (위 발판으로 올라가 피한다)
   BOSS_REFLECT_DAMAGE: 6,  // 패링으로 되튕긴 화염구가 머리에 주는 피해
+
+  // 설산: 몬스터가 느리지만 한 방이 아프다. 끝에는 하얀 털복숭이 보스
+  SNOW_MOB_SPEED: 0.6,     // 설산에서는 모든 몬스터의 이동 속도가 이 배수로 느려진다
+  SNOW_MOB_DAMAGE: 2,      // 설산 몬스터에게 닿으면 목숨이 이만큼 깎인다
+  BOSS_YETI_HP: 1000,       // 털복숭이 침팬지 보스 체력
+  BOSS_FIRE_BONUS: 3,      // 불 속성 무기는 털복숭이 침팬지에게 한 대당 이만큼 더 큰 피해
+  // 흙괴물 (설산)
+  GOLEM_W: 34,
+  GOLEM_H: 38,
+  GOLEM_WALK_SPEED: 32,
+  GOLEM_CHASE_SPEED: 58,
+  GOLEM_SIGHT_X: 224,
+  GOLEM_SIGHT_Y: 72,
+  GOLEM_ATTACK_RANGE: 110, // 가로 거리가 이 안이면 몸 던지기 예비동작
+  GOLEM_WINDUP: 0.6,
+  GOLEM_LUNGE_SPEED: 280,
+  GOLEM_LUNGE_TIME: 0.35,
+  GOLEM_COOLDOWN: 2.0,
+  GOLEM_COIN: 10,          // 흙괴물을 쓰러뜨리면 떨어뜨리는 코인
 
   COYOTE_TIME: 0.1,    // 발판을 떠난 직후에도 점프 허용 (초)
   JUMP_BUFFER: 0.1,     // 착지 직전에 누른 점프 입력 기억 (초)

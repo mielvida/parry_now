@@ -51,9 +51,10 @@
     },
     snow: {
       music: 'cave', label: '얼음 산', level: G.Levels.snow, theme: G.Snow, summon: true, repeatChest: true, returnNear: 'snow', slimeVariant: 'ice', slippery: true,
-      goal: '목표: 설산 맨 끝의 보물 상자 (+250 G). 바닥이 미끄럽다! 돌아가려면 처음의 출구에서 E',
+      monsterSpeed: C.SNOW_MOB_SPEED, monsterDamage: C.SNOW_MOB_DAMAGE, boss: { col: 164, kind: 'ape' }, // 몬스터는 느리지만 한 방에 목숨 2개. 맨 끝 경기장(164칸~)에서 털복숭이 침팬지와 대결
+      goal: '목표: 설산 끝의 털복숭이 침팬지를 쓰러뜨리고 보물 상자 (+250 G). 몬스터에게 맞으면 -2! 바닥이 미끄럽다',
       chest: { mode: 'mine', coins: 250, next: 'village', near: 'snow' },
-      banner: { title: '얼음 산', sub: '바닥이 미끄러운 설산', dur: 3.5, caption: '…발밑이 꽁꽁 얼어 있다. 멈추려 해도 쭉 미끄러진다!' },
+      banner: { title: '얼음 산', sub: '바닥이 미끄러운 설산', dur: 3.5, caption: '…발밑이 꽁꽁 얼어 있다. 몬스터는 굼뜨지만, 한 번 맞으면 크게 다친다!' },
     },
     volcano: {
       music: 'cave', label: '불꽃 화산', level: G.Levels.volcano, theme: G.Volcano, summon: true, repeatChest: true, returnNear: 'volcano', slimeVariant: 'lava',
@@ -116,7 +117,7 @@
 
   // 보스 이벤트: 보스 모듈은 판정만 하고, 피해/이펙트/소리는 여기서 처리한다
   const bossEv = {
-    hurt() { loseLife(player.x + player.w / 2, player.y + player.h / 2); },
+    hurt(d) { loseLife(player.x + player.w / 2, player.y + player.h / 2, d || 1); },
     sound(n) { G.Audio.play(n); },
     shake(m, d) { effects.shake(m, d); },
     fx(type, x, y) {
@@ -125,22 +126,24 @@
       else { effects.fireBurst(x, y); effects.shake(type === 'boom' ? 14 : 8, 0.5); G.Audio.play(type === 'boom' ? 'shatter' : 'vanish'); }
     },
     slamImpact(x, y) { effects.quakeDust(x, y, 96); effects.shake(10, 0.3); G.Audio.play('vanish'); },
-    stunned() { popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '용머리 기절! 지금이다!', t: 2, color: 'rgba(255,230,120,A)' }); G.Audio.play('pickup'); },
+    stunned() { popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: `${boss.name} 기절! 지금이다!`, t: 2, color: 'rgba(255,230,120,A)' }); G.Audio.play('pickup'); },
     defeated() { // 용머리를 모두 쓰러뜨림: 보물 상자가 나타난다
       chest = makeChest();
       effects.treasure(chest.x + chest.w / 2, chest.y);
       G.Audio.play('treasure');
-      popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '용을 쓰러뜨렸다!', t: 2.5, color: 'rgba(255,213,74,A)' });
+      popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: boss.defeatText, t: 2.5, color: 'rgba(255,213,74,A)' });
     },
   };
   function setupBoss() {
     const st = STAGES[stageName];
     camera.minX = 0;
-    boss = st.boss ? new G.Boss(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv) : null;
+    const Cls = st.boss && st.boss.kind === 'ape' ? G.ApeBoss : G.Boss;
+    boss = st.boss ? new Cls(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv) : null;
   }
   const bossOn = () => !!(boss && boss.started);
   const magicTargets = () => (bossOn() ? monsters.concat(boss.targets()) : monsters);
-  const bossDamage = () => (killsInOne() ? 2 : 1) + (G.Shop.ITEMS[inv.equipped.weapon].elem === 'ice' ? C.BOSS_ICE_BONUS : 0); // 얼음 무기는 불의 용에게 더 아프다
+  // 약점 속성 무기는 보스에게 더 아프다 (불의 용은 얼음, 눈의 털복숭이는 불)
+  const bossDamage = () => (killsInOne() ? 2 : 1) + (boss && G.Shop.ITEMS[inv.equipped.weapon].elem === boss.weak ? (boss.weak === 'ice' ? C.BOSS_ICE_BONUS : C.BOSS_FIRE_BONUS) : 0);
 
   function loadStage(name, keepLives = false, near = null) {
     stageName = name;
@@ -176,7 +179,14 @@
       const p = terrain.placeOnTile(cr.col, cr.row, C.CRAB_W, C.CRAB_H);
       monsters.push(new G.Crab(p.x, p.y));
     }
-    for (const mo of monsters) mo.stageSpeed = st.monsterSpeed || 1;
+    for (const gl of terrain.golemSpawns) {
+      const p = terrain.placeOnTile(gl.col, gl.row, C.GOLEM_W, C.GOLEM_H);
+      monsters.push(new G.Golem(p.x, p.y));
+    }
+    for (const mo of monsters) {
+      mo.stageSpeed = st.monsterSpeed || 1;
+      mo.contactDmg = st.monsterDamage || 1; // 설산 몬스터는 한 번에 목숨 2개
+    }
     baseMonsterCount = monsters.length;
     spots = terrain.standingSpots();
 
@@ -266,32 +276,6 @@
     }
   });
 
-  // 슬라임 대량 소환: 서 있을 수 있는 바닥 중 플레이어 시야 밖인 곳에 무작위로 배치
-  function spawnSlimes(n) {
-    const px = player.x + player.w / 2;
-    const py = player.y + player.h / 2;
-    const pool = spots.filter((s) => {
-      const p = terrain.placeOnTile(s.col, s.row, C.SLIME_W, C.SLIME_H);
-      return Math.abs(p.x - px) > C.SLIME_SIGHT_X + C.TILE * 2 || Math.abs(p.y - py) > C.SLIME_SIGHT_Y + C.TILE * 2;
-    });
-    if (pool.length === 0) return 0;
-    const count = Math.min(n, C.SLIME_MAX - slimeCount());
-    for (let i = 0; i < count; i++) {
-      const s = pool[Math.floor(Math.random() * pool.length)];
-      const p = terrain.placeOnTile(s.col, s.row, C.SLIME_W, C.SLIME_H);
-      const slime = new G.Slime(p.x, p.y);
-      slime.appear = C.SLIME_APPEAR_TIME;
-      slime.noCoin = true; // 소환한 슬라임은 코인을 주지 않는다 (코인 노가다 방지)
-      slime.variant = STAGES[stageName].slimeVariant || 'green';
-      slime.stageSpeed = STAGES[stageName].monsterSpeed || 1;
-      slime.dir = Math.random() < 0.5 ? -1 : 1;
-      monsters.push(slime);
-      effects.spawn(p.x + C.SLIME_W / 2, p.y + C.SLIME_H);
-    }
-    if (count > 0) G.Audio.play('spawn');
-    return count;
-  }
-
   function respawn() {
     player.respawn(spawn.x, spawn.y);
     sword = null;
@@ -301,11 +285,11 @@
   }
 
   // 목숨 하나를 잃는다. 그 자리에 그대로 있고 잠시 무적. 목숨이 없으면 게임오버
-  function loseLife(cx, cy) {
+  function loseLife(cx, cy, dmg = 1) {
     if (player.cancelCharge()) effects.chargeBreak(cx, cy); // 맞으면 충전 게이지가 풀린다
     effects.playerHit(cx, cy);
     effects.shake(9, 0.3);
-    lives -= 1;
+    lives -= dmg;
     G.Audio.play('hurt');
     if (lives <= 0) {
       G.Audio.play('gameover');
@@ -687,7 +671,6 @@
       else G.Audio.play('deny');
       popups.push({ x: player.x + player.w / 2, y: player.y - 14, text, t: 1.2, color: id ? 'rgba(125,255,160,A)' : 'rgba(255,170,170,A)' });
     }
-    if (input.spawnPressed && STAGES[stageName].summon) spawnSlimes(C.SLIME_SPAWN_BATCH);
     if (input.down.has('KeyR')) respawn(); // 막혔을 때 쓰는 무료 리스폰 (목숨 소모 없음)
     player.update(dt, input, terrain);
     if (player.dashFx) { // 대시 시작: 먼지 + 바람 소리
@@ -757,7 +740,7 @@
           G.Audio.play('vanish');
         }
         if (s.golden) effects.treasure(s.x + s.w / 2, s.y + s.h / 2); // 황금박쥐는 금화가 쏟아진다
-        const base = s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
+        const base = s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'golem' ? C.GOLEM_COIN : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
         const drop = Math.round(base * (G.Shop.ITEMS[inv.equipped.weapon].elem === 'gold' ? 1.5 : 1)); // 황금 검은 코인 +50%
         if (drop) {
           coins += drop;
@@ -786,19 +769,20 @@
         effects.shake(finisher ? 8 : 6, 0.18);
         hitStop = C.HIT_STOP;
       } else if (player.invuln === 0 && !player.dashing && !s.staggered && s.overlaps(player)) { // 기절한 몬스터는 해롭지 않다
-        loseLife(player.x + player.w / 2, player.y + player.h / 2); // 패링하지 못하고 닿으면 목숨 -1
+        loseLife(player.x + player.w / 2, player.y + player.h / 2, s.contactDmg || 1); // 패링하지 못하고 닿으면 목숨 -1 (설산은 -2)
         break;
       }
     }
     if (boss && !boss.started && !boss.done && player.x > boss.left + 100) { // 경기장에 들어섰다: 용머리 등장, 화면과 길이 막힌다
       boss.started = true;
+      if (boss.onStart) boss.onStart(terrain); // (침팬지 경기장: 입구가 벽으로 막힌다)
       camera.minX = camera.x;
-      popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '용머리 출현!', t: 2.4, color: 'rgba(255,120,80,A)' });
+      popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: `${boss.name} 출현!`, t: 2.4, color: 'rgba(255,120,80,A)' });
       effects.shake(8, 0.8);
       G.Audio.play('spawn');
     }
     if (bossOn() && !won) {
-      camera.minX = Math.min(boss.left, camera.minX + 520 * dt);
+      camera.minX = Math.min(boss.camLeft || boss.left, camera.minX + 520 * dt);
       if (player.x < boss.left) { player.x = boss.left; player.vx = Math.max(0, player.vx); }
       const box = parryBox(player);
       if (player.parrying && boss.deflect(box) > 0) { // 화염구를 쳐냈다: 쏜 머리에게 되돌아간다
