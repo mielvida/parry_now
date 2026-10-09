@@ -12,11 +12,19 @@
   let gameOver = false;
   let gameOverTime = 0;
   let sword = null; // 던진 검 (없으면 null)
+  let won = false;       // 보물을 찾았다 (엔딩)
+  let wonTime = 0;
   let hitStop = 0; // >0 이면 게임 로직을 잠시 멈춤 (패링 타격감)
 
   const spawn = terrain.spawnFor(C.PLAYER_W, C.PLAYER_H);
   const player = new G.Player(spawn.x, spawn.y);
   camera.follow(player, terrain, C.DT, true);
+
+  // 보물 상자: 지도의 X. 닿으면 엔딩
+  const chest = terrain.treasure ? Object.assign(terrain.placeOnTile(terrain.treasure.col, terrain.treasure.row, C.CHEST_W, C.CHEST_H), { w: C.CHEST_W, h: C.CHEST_H, open: 0 }) : null;
+
+  // 오프닝 컷신 (처음 한 번만. 끝나거나 건너뛰면 null)
+  let cutscene = C.INTRO_CUTSCENE ? new G.Cutscene(terrain, player) : null;
 
   // 몬스터 전체(슬라임 + 박쥐). 패링·검·접촉 판정은 종류와 무관하게 똑같이 적용된다
   const monsters = [];
@@ -78,6 +86,8 @@
   function restart() {
     lives = C.PLAYER_LIVES;
     gameOver = false;
+    won = false;
+    if (chest) chest.open = 0;
     monsters.length = baseMonsterCount; // 새 게임이면 소환한 슬라임은 정리
     respawn();
   }
@@ -112,6 +122,22 @@
     if (hitStop > 0) {
       hitStop -= dt;
       return; // 입력 플래그를 지우지 않는다: 히트스톱 중에 누른 키(다음 패링 등)가 멈춤이 끝난 뒤 반영되도록
+    }
+    if (cutscene) { // 컷신: 플레이어는 가상 입력으로 움직이고 몬스터는 멈춰 있다
+      cutscene.update(dt, input, effects);
+      player.update(dt, cutscene.inputFor(), terrain);
+      player.swingFx = false;
+      if (cutscene.done) cutscene = null;
+      camera.follow(player, terrain, dt);
+      input.endFrame();
+      return;
+    }
+    if (won) { // 엔딩: 상자가 열리고 화면은 정지, 잠시 뒤 Enter로 다시 시작
+      wonTime += dt;
+      if (chest) chest.open = Math.min(1, chest.open + dt * 3);
+      if (wonTime >= C.GAME_OVER_DELAY + 0.5 && input.parryPressed) restart();
+      input.endFrame();
+      return;
     }
     if (gameOver) { // 게임오버: 화면은 정지, 잠시 뒤 Enter로 새로 시작
       gameOverTime += dt;
@@ -162,6 +188,12 @@
         break;
       }
     }
+    if (chest && !won && player.overlaps(chest)) { // 보물 발견!
+      won = true;
+      wonTime = 0;
+      effects.treasure(chest.x + chest.w / 2, chest.y);
+      effects.shake(8, 0.35);
+    }
     if (!gameOver && player.y > terrain.height + C.TILE * 2) { // 구덩이 낙사: 마지막으로 서 있던 바닥에서 이어감
       const g = player.lastGround;
       loseLife(g.x + player.w / 2, g.y + player.h / 2);
@@ -189,7 +221,7 @@
   }
 
   function render() {
-    renderer.draw(terrain, player, camera, monsters, effects, { lives, maxLives: C.PLAYER_LIVES, gameOver, slimeCount: monsters.filter((m) => m.kind === 'slime' && m.alive).length, batCount: monsters.filter((m) => m.kind === 'bat' && m.alive).length, canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY }, sword);
+    renderer.draw(terrain, player, camera, monsters, effects, { lives, maxLives: C.PLAYER_LIVES, gameOver, slimeCount: monsters.filter((m) => m.kind === 'slime' && m.alive).length, batCount: monsters.filter((m) => m.kind === 'bat' && m.alive).length, canRestart: (gameOver && gameOverTime >= C.GAME_OVER_DELAY) || (won && wonTime >= C.GAME_OVER_DELAY + 0.5), won, cutscene: !!cutscene }, sword, { cutscene, chest });
   }
   requestAnimationFrame(frame);
 
@@ -201,5 +233,8 @@
     get lives() { return lives; },
     get gameOver() { return gameOver; },
     get sword() { return sword; },
+    get won() { return won; },
+    get cutscene() { return cutscene; },
+    chest,
   };
 })(window.Game);

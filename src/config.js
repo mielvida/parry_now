@@ -7,6 +7,9 @@ Game.Config = {
   VIEW_H: 576,
   DT: 1 / 60,          // 고정 시간 스텝 (초)
 
+  INTRO_CUTSCENE: true, // 처음 시작할 때 보물 지도 컷신을 재생 (Enter/Space로 건너뛰기)
+  CHEST_W: 28,
+  CHEST_H: 24,
   PLAYER_LIVES: 3,     // 시작 목숨 수
   PLAYER_INVULN: 1.5,  // 피격 후 무적 시간 (초). 같은 슬라임에게 연속으로 맞는 것을 막는다
   GAME_OVER_DELAY: 1,  // 게임오버 후 재시작 입력을 받기 시작하는 시간 (연타로 건너뛰기 방지)

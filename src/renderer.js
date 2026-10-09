@@ -12,7 +12,7 @@
       this.viewH = viewH;
     }
 
-    draw(terrain, player, camera, monsters = [], effects = null, hud = null, sword = null) {
+    draw(terrain, player, camera, monsters = [], effects = null, hud = null, sword = null, extras = {}) {
       const ctx = this.ctx;
       const time = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
       G.Cave.drawBackground(ctx, this.viewW, this.viewH, camera, time);
@@ -21,14 +21,20 @@
       ctx.translate(-Math.round(camera.x - sh.x), -Math.round(camera.y - sh.y));
       G.Cave.drawCeiling(ctx, camera, this.viewW);
       this._drawTerrain(ctx, terrain, camera);
+      if (extras.chest) this._drawChest(ctx, extras.chest);
       for (const m of monsters) if (m.alive && this._inView(m, camera)) this._drawMonster(ctx, m); // 화면 밖은 그리지 않음 (대량 소환 대비)
       this._drawPlayer(ctx, player);
+      if (extras.cutscene) extras.cutscene.drawWorld(ctx); // 땅 위/들어 올린 병
       G.Hero.drawCharge(ctx, player);
       if (sword) G.Hero.drawThrownSword(ctx, sword);
       if (effects) effects.draw(ctx);
       ctx.restore();
       G.Cave.drawVignette(ctx, this.viewW, this.viewH);
       if (effects) effects.drawOverlay(ctx, this.viewW, this.viewH);
+      if (extras.cutscene) { // 컷신: 자막·확대 화면·암전. 게임 HUD는 숨긴다
+        extras.cutscene.drawOverlay(ctx, this.viewW, this.viewH);
+        return;
+      }
       this._drawHud(ctx, hud);
     }
 
@@ -43,6 +49,59 @@
         for (let c = c0; c <= c1; c++) {
           if (terrain.grid[r][c]) G.Cave.drawTile(ctx, terrain, c, r);
         }
+      }
+    }
+
+    // 보물 상자: 열리면 뚜껑이 젖혀지고 금빛이 새어 나온다 (open 0~1)
+    _drawChest(ctx, ch) {
+      const x = Math.round(ch.x);
+      const y = Math.round(ch.y);
+      const t = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+      if (ch.open > 0) { // 금빛 후광
+        const g = ctx.createRadialGradient(x + ch.w / 2, y + 4, 0, x + ch.w / 2, y + 4, 90);
+        g.addColorStop(0, `rgba(255,225,110,${0.55 * ch.open})`);
+        g.addColorStop(1, 'rgba(255,225,110,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - 70, y - 90, ch.w + 140, 180);
+      } else { // 닫혀 있을 땐 은은하게 깜빡이는 빛으로 위치를 알린다
+        const a = 0.18 + 0.1 * Math.sin(t * 3);
+        const g = ctx.createRadialGradient(x + ch.w / 2, y + 8, 0, x + ch.w / 2, y + 8, 60);
+        g.addColorStop(0, `rgba(255,215,90,${a})`);
+        g.addColorStop(1, 'rgba(255,215,90,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - 40, y - 50, ch.w + 80, 110);
+      }
+      // 몸통
+      ctx.fillStyle = '#7a4a22';
+      ctx.fillRect(x, y + 8, ch.w, ch.h - 8);
+      ctx.fillStyle = '#935d2b';
+      ctx.fillRect(x, y + 8, ch.w, 4);
+      ctx.fillStyle = '#e0b12f'; // 금속 띠
+      ctx.fillRect(x + 4, y + 8, 3, ch.h - 8);
+      ctx.fillRect(x + ch.w - 7, y + 8, 3, ch.h - 8);
+      if (ch.open > 0.2) { // 안의 금화
+        ctx.fillStyle = '#ffd54a';
+        ctx.fillRect(x + 3, y + 7, ch.w - 6, 4);
+        ctx.fillStyle = '#fff4b8';
+        ctx.fillRect(x + 7, y + 5, 5, 3);
+        ctx.fillRect(x + 16, y + 6, 4, 3);
+      }
+      // 뚜껑: 힌지(뒤쪽 위)를 축으로 열림
+      ctx.save();
+      ctx.translate(x + ch.w, y + 8);
+      ctx.rotate(ch.open * 1.9);
+      ctx.translate(-ch.w, -8);
+      ctx.fillStyle = '#8a5428';
+      ctx.fillRect(0, 0, ch.w, 8);
+      ctx.fillStyle = '#a66a33';
+      ctx.fillRect(0, 0, ch.w, 3);
+      ctx.fillStyle = '#e0b12f';
+      ctx.fillRect(4, 0, 3, 8);
+      ctx.fillRect(ch.w - 7, 0, 3, 8);
+      ctx.restore();
+      if (ch.open === 0) { // 자물쇠
+        ctx.fillStyle = '#ffd54a';
+        ctx.fillRect(x + ch.w / 2 - 3, y + 8, 6, 6);
       }
     }
 
@@ -232,6 +291,25 @@
       // 목숨: 우측 상단 하트
       for (let i = 0; i < hud.maxLives; i++) {
         this._drawHeart(ctx, this.viewW - 28 - (hud.maxLives - 1 - i) * 34, 10, 26, i < hud.lives);
+      }
+
+      if (!hud.won && !hud.gameOver) this._text(ctx, '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 54);
+
+      if (hud.won) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, this.viewW, this.viewH);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 60px sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillText('보물을 찾았다!', this.viewW / 2 + 3, this.viewH / 2 - 17);
+        ctx.fillStyle = '#ffd54a';
+        ctx.fillText('보물을 찾았다!', this.viewW / 2, this.viewH / 2 - 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '22px sans-serif';
+        ctx.fillText('동굴의 모험을 마친 용사는 큰 부자가 되었답니다.', this.viewW / 2, this.viewH / 2 + 34);
+        if (hud.canRestart) ctx.fillText('Enter 키로 다시 시작', this.viewW / 2, this.viewH / 2 + 72);
+        ctx.textAlign = 'start';
       }
 
       if (hud.gameOver) {

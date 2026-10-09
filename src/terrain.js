@@ -13,6 +13,7 @@
       this.grid = [];
       this.slimeSpawns = [];
       this.batSpawns = [];
+      this.treasure = null; // 보물 상자 위치 {col,row}
 
       rows.forEach((line, r) => {
         const row = [];
@@ -22,6 +23,7 @@
           if (ch === 'P') this.spawn = { col: c, row: r };
           if (ch === 'S') this.slimeSpawns.push({ col: c, row: r });
           if (ch === 'B') this.batSpawns.push({ col: c, row: r });
+          if (ch === 'T') this.treasure = { col: c, row: r };
         }
         this.grid.push(row);
       });

@@ -36,6 +36,30 @@
       }
     }
 
+    // 반짝이는 작은 빛 입자 (컷신의 병, 보물 상자 등)
+    sparkle(x, y) {
+      this.particles.push({
+        kind: 'blob', x: x + rand(-8, 8), y: y + rand(-6, 6), vx: rand(-14, 14), vy: -rand(20, 60),
+        life: rand(0.5, 0.9), max: 0.9, size: rand(1.5, 3), gravity: -20,
+        color: Math.random() < 0.5 ? '255,240,170' : '255,255,255',
+      });
+    }
+
+    // 보물 상자를 여는 순간: 금화가 솟구치고 금빛 충격파
+    treasure(x, y) {
+      this.flash = 0.14;
+      this.flashColor = '255,225,120';
+      this.rings.push({ x, y, r0: 8, r1: 90, life: 0.45, max: 0.45, color: '255,215,90', width: 6 });
+      this.rings.push({ x, y, r0: 4, r1: 56, life: 0.32, max: 0.32, color: '255,255,255', width: 3 });
+      for (let i = 0; i < 34; i++) {
+        this.particles.push({
+          kind: 'blob', x: x + rand(-10, 10), y, vx: rand(-170, 170), vy: -rand(200, 520),
+          life: rand(0.7, 1.3), max: 1.3, size: rand(3, 6), gravity: 900,
+          color: i % 4 === 0 ? '255,255,255' : '255,205,60',
+        });
+      }
+    }
+
     // 검을 휘두르는 순간: 베는 방향으로 날아가는 푸른 바람 줄기
     swing(x, y, dir) {
       for (let i = 0; i < 9; i++) {
