@@ -5,6 +5,7 @@
   const DEG = Math.PI / 180;
 
   const lerp = (a, b, t) => a + (b - a) * t;
+  const sp = (v) => (C.SMOOTH_SPRITES ? v : Math.round(v)); // 움직이는 것의 좌표: 부드럽게(그대로) 또는 정수로
   const easeOut = (t) => 1 - (1 - t) * (1 - t);
   const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
@@ -193,8 +194,38 @@
     ctx.lineCap = 'butt';
   }
 
+  // 내 스프라이트(sprites.js)로 용사를 그린다. 기준점 = 발바닥 가운데. 그림이 없으면 false (기본 모습으로 그린다)
+  function drawCustom(ctx, p) {
+    const S = G.Sprites;
+    const pk = S.pick(p);
+    if (!pk) return false;
+    const cx = sp(p.x + p.w / 2);
+    const bottom = sp(p.y + p.h);
+    ctx.save();
+    ctx.translate(cx, bottom);
+    ctx.scale(p.facing >= 0 ? 1 : -1, 1);
+    ctx.imageSmoothingEnabled = false; // 그린 도트가 번지지 않게
+    ctx.drawImage(S.canvas(pk.key, pk.i), -(S.W * S.CELL) / 2, -S.H * S.CELL, S.W * S.CELL, S.H * S.CELL);
+    const f = p.swing;
+    const guard = p.guardTimer > 0;
+    const showWeapon = S.data.anims[pk.key].weapon && !p.swordOut; // '무기 겹쳐 그리기'를 켠 동작은 장착한 무기를 손에 얹는다
+    const showTrail = S.data.trail && f >= 0 && !p.swordOut && !Hero.suppressTrail;
+    if (showWeapon || showTrail || guard) {
+      ctx.save();
+      ctx.translate(6, -(p.h - 16)); // 손 위치 (기본 모습과 같다)
+      const angle = guard ? GUARD_UP : swordAngle(f);
+      if (showTrail && !guard) drawSlashTrail(ctx, f, angle);
+      if (showWeapon) drawSword(ctx, angle);
+      if (guard) drawGuardShield(ctx, p.guardTimer / C.GUARD_TIME);
+      ctx.restore();
+    }
+    ctx.restore();
+    return true;
+  }
+
   const Hero = {
     swordAngle,
+    suppressTrail: false, // true인 동안은 검기 궤적을 그리지 않는다 (기본 모습을 칸으로 옮길 때)
 
     // 던진 검: 빙글 돌며 날아가고 잔상이 따라온다
     drawThrownSword(ctx, sw) {
@@ -221,8 +252,8 @@
     drawCharge(ctx, p) {
       if (p.holdTime < 0.3 || p.swordOut) return;
       const prog = p.chargeProgress;
-      const cx = Math.round(p.x + p.w / 2);
-      const cy = Math.round(p.y + p.h / 2);
+      const cx = sp(p.x + p.w / 2);
+      const cy = sp(p.y + p.h / 2);
       const ready = prog >= 1;
       const pulse = 1 + Math.sin(p.animTime * (ready ? 36 : 24)) * (ready ? 0.1 : 0.06 * prog);
       if (ready) { // 가득 참: 금빛 후광으로 "지금 손을 떼면 던진다"를 알림
@@ -265,8 +296,9 @@
       headCol = p.helmetId ? items[p.helmetId].look : ['#c9d2dc', '#e6edf5'];
       gloveCol = p.glovesId ? items[p.glovesId].look[0] : '#e8b98a';
       bootCol = p.bootsId ? [items[p.bootsId].look[0], items[p.bootsId].look[1], true] : ['#4a3b2a', '#3a2f22'];
-      const cx = Math.round(p.x + p.w / 2);
-      const top = Math.round(p.y);
+      if (G.Sprites && G.Sprites.active() && drawCustom(ctx, p)) return; // 내 스프라이트를 켰으면 그걸로 그린다
+      const cx = sp(p.x + p.w / 2);
+      const top = sp(p.y);
       ctx.save();
       ctx.translate(cx, top);
       ctx.scale(p.facing >= 0 ? 1 : -1, 1);
@@ -282,7 +314,7 @@
       const guard = p.guardTimer > 0; // 패링 성공 직후: 검을 앞으로 세우고 막는 자세
       const angle = guard ? GUARD_UP : swordAngle(f);
       if (!p.swordOut) { // 검을 던진 동안은 손이 빈다
-        if (!guard) drawSlashTrail(ctx, f, angle);
+        if (!guard && !Hero.suppressTrail) drawSlashTrail(ctx, f, angle);
         drawSword(ctx, angle);
       }
       if (guard) drawGuardShield(ctx, p.guardTimer / C.GUARD_TIME);

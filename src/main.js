@@ -33,7 +33,7 @@
       banner: { title: 'STAGE 3', sub: '해변 마을', dur: 5, caption: '…마을이다! 몬스터는 보이지 않고, 가게들이 늘어서 있다.' },
     },
     mine: {
-      music: 'cave',
+      music: 'cave', returnNear: 'D',
       get level() { return mineLevel; },
       theme: G.Cave, summon: true, repeatChest: true, // 상자는 들어갈 때마다 다시 나온다
       get goal() { return `목표: 동굴 맨 끝의 보물 상자 (+${mineCoins()} G). 돌아가려면 입구의 출구에서 E`; },
@@ -41,6 +41,26 @@
       get banner() {
         return { title: '마을 동굴', sub: `${mineRun}번째 탐험 · 길이 ${mineLevel[0].length}칸`, dur: 3.5, caption: '…동굴 안은 어둡고, 슬라임과 박쥐의 기척이 느껴진다.' };
       },
+    },
+    // ---- 마을의 문으로 들어가는 스테이지들 (모두 끝에 보물 상자가 있고, 먹으면 코인을 받고 문 앞으로 돌아온다. 상자는 들어갈 때마다 다시 나온다) ----
+    forest: {
+      music: 'village', label: '속삭이는 숲', level: G.Levels.forest, theme: G.Forest, summon: true, repeatChest: true, returnNear: 'forest', slimeVariant: 'green',
+      goal: '목표: 숲 맨 끝의 보물 상자 (+150 G). 돌아가려면 처음의 출구에서 E',
+      chest: { mode: 'mine', coins: 150, next: 'village', near: 'forest' },
+      banner: { title: '속삭이는 숲', sub: '슬라임이 가득한 초록 숲', dur: 3.5, caption: '…숲은 고요하지만, 풀숲마다 슬라임이 꿈틀댄다.' },
+    },
+    snow: {
+      music: 'cave', label: '얼음 산', level: G.Levels.snow, theme: G.Snow, summon: true, repeatChest: true, returnNear: 'snow', slimeVariant: 'ice', slippery: true,
+      goal: '목표: 설산 맨 끝의 보물 상자 (+250 G). 바닥이 미끄럽다! 돌아가려면 처음의 출구에서 E',
+      chest: { mode: 'mine', coins: 250, next: 'village', near: 'snow' },
+      banner: { title: '얼음 산', sub: '바닥이 미끄러운 설산', dur: 3.5, caption: '…발밑이 꽁꽁 얼어 있다. 멈추려 해도 쭉 미끄러진다!' },
+    },
+    volcano: {
+      music: 'cave', label: '불꽃 화산', level: G.Levels.volcano, theme: G.Volcano, summon: true, repeatChest: true, returnNear: 'volcano', slimeVariant: 'lava',
+      monsterSpeed: C.VOLCANO_MOB_SPEED, boss: { col: 145 }, // 용암 때문에 모든 몬스터가 빠르다. 맨 끝 경기장(145칸~)에서 용머리 3개와 대결
+      goal: '목표: 화산 끝의 용머리 3개를 쓰러뜨리고 보물 상자 (+400 G). 돌아가려면 처음의 출구에서 E',
+      chest: { mode: 'mine', coins: 400, next: 'village', near: 'volcano' },
+      banner: { title: '불꽃 화산', sub: '용암이 끓는 화산', dur: 3.5, caption: '…발밑에서 용암이 끓는다. 몬스터들이 뜨겁게, 그리고 빠르게 달려든다!' },
     },
   };
 
@@ -51,6 +71,7 @@
     '마을 사람: "무기 상점엔 검 말고도 대검과 지팡이가 있다네."',
     '마을 사람: "해변의 꽃게를 잡으면 코인을 떨어뜨린다더군."',
     '마을 사람: "마을 오른쪽 끝 동굴엔 보물이 있지만, 슬라임과 박쥐가 득시글하다네."',
+    '마을 사람: "마을 곳곳의 문으로 숲, 설산, 화산에 갈 수 있다네. 갈수록 위험하지만 상자 보상도 크지."',
     '마을 사람: "갑옷 가게엔 투구와 장갑, 신발도 있지. 1 키로 장비를 바꿀 수 있다네."',
   ];
   let stageName = '';
@@ -80,6 +101,7 @@
   let won = false;       // 스테이지 클리어 연출 중
   let wonTime = 0;
   let ending = null;     // 클리어 연출 ('cave': 코인 -> 해변, 'house': 노인과 대화 -> 마을)
+  let boss = null;       // 보스전 (화산의 용머리 3개). 경기장에 들어서면 started
   let hitStop = 0; // >0 이면 게임 로직을 잠시 멈춤 (패링 타격감)
 
   const player = new G.Player(0, 0);
@@ -90,6 +112,36 @@
   // 스테이지를 처음 상태로 불러온다 (지형, 몬스터, 목숨, 플레이어, 카메라)
   // keepLives=false(기본)면 목숨을 가득 채우고 시작한다. 코인과 산 검은 항상 유지된다
   // near='D'면 마을의 동굴 입구 앞에서 시작한다 (동굴에서 돌아올 때)
+  const makeChest = () => Object.assign(terrain.placeOnTile(terrain.treasure.col, terrain.treasure.row, C.CHEST_W, C.CHEST_H), { w: C.CHEST_W, h: C.CHEST_H, open: 0 });
+
+  // 보스 이벤트: 보스 모듈은 판정만 하고, 피해/이펙트/소리는 여기서 처리한다
+  const bossEv = {
+    hurt() { loseLife(player.x + player.w / 2, player.y + player.h / 2); },
+    sound(n) { G.Audio.play(n); },
+    shake(m, d) { effects.shake(m, d); },
+    fx(type, x, y) {
+      if (type === 'fire') effects.sparkle(x, y);
+      else if (type === 'burst') effects.fireBurst(x, y);
+      else { effects.fireBurst(x, y); effects.shake(type === 'boom' ? 14 : 8, 0.5); G.Audio.play(type === 'boom' ? 'shatter' : 'vanish'); }
+    },
+    slamImpact(x, y) { effects.quakeDust(x, y, 96); effects.shake(10, 0.3); G.Audio.play('vanish'); },
+    stunned() { popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '용머리 기절! 지금이다!', t: 2, color: 'rgba(255,230,120,A)' }); G.Audio.play('pickup'); },
+    defeated() { // 용머리를 모두 쓰러뜨림: 보물 상자가 나타난다
+      chest = makeChest();
+      effects.treasure(chest.x + chest.w / 2, chest.y);
+      G.Audio.play('treasure');
+      popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '용을 쓰러뜨렸다!', t: 2.5, color: 'rgba(255,213,74,A)' });
+    },
+  };
+  function setupBoss() {
+    const st = STAGES[stageName];
+    camera.minX = 0;
+    boss = st.boss ? new G.Boss(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv) : null;
+  }
+  const bossOn = () => !!(boss && boss.started);
+  const magicTargets = () => (bossOn() ? monsters.concat(boss.targets()) : monsters);
+  const bossDamage = () => (killsInOne() ? 2 : 1) + (G.Shop.ITEMS[inv.equipped.weapon].elem === 'ice' ? C.BOSS_ICE_BONUS : 0); // 얼음 무기는 불의 용에게 더 아프다
+
   function loadStage(name, keepLives = false, near = null) {
     stageName = name;
     if (name === 'mine' && !mineLevel) { // ?stage=mine 처럼 입구를 거치지 않고 바로 온 경우
@@ -101,19 +153,20 @@
     terrain = new G.Terrain(st.level);
     renderer.theme = st.theme;
     spawn = terrain.spawnFor(C.PLAYER_W, C.PLAYER_H);
-    if (near === 'D' && terrain.caveEntrances[0]) {
-      const d = terrain.caveEntrances[0];
-      spawn = terrain.placeOnTile(d.col - 2, d.row, C.PLAYER_W, C.PLAYER_H);
-    }
+    // near: 마을로 돌아올 때 어느 입구 앞에서 시작할지 ('D' 동굴 입구, 또는 스테이지 이름 = 그 스테이지의 문)
+    const arrive = near === 'D' ? terrain.caveEntrances[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
+    if (arrive) spawn = terrain.placeOnTile(arrive.col - 2, arrive.row, C.PLAYER_W, C.PLAYER_H);
 
-    chest = terrain.treasure && !chestTaken[name] ? Object.assign(terrain.placeOnTile(terrain.treasure.col, terrain.treasure.row, C.CHEST_W, C.CHEST_H), { w: C.CHEST_W, h: C.CHEST_H, open: 0 }) : null;
+    chest = terrain.treasure && !chestTaken[name] && !st.boss ? makeChest() : null; // 보스가 있는 스테이지는 보스를 쓰러뜨려야 상자가 나온다
     const house = terrain.houses[0];
     goalBox = house && st.goalHouse ? { x: house.col * C.TILE - C.TILE / 2, y: (house.row - 1) * C.TILE, w: C.TILE * 2, h: C.TILE * 2 } : null;
 
     monsters.length = 0;
     for (const s of terrain.slimeSpawns) {
       const p = terrain.placeOnTile(s.col, s.row, C.SLIME_W, C.SLIME_H);
-      monsters.push(new G.Slime(p.x, p.y));
+      const sl = new G.Slime(p.x, p.y);
+      sl.variant = st.slimeVariant || 'green';
+      monsters.push(sl);
     }
     for (const b of terrain.batSpawns) {
       const p = terrain.centerOnTile(b.col, b.row, C.BAT_W, C.BAT_H);
@@ -123,6 +176,7 @@
       const p = terrain.placeOnTile(cr.col, cr.row, C.CRAB_W, C.CRAB_H);
       monsters.push(new G.Crab(p.x, p.y));
     }
+    for (const mo of monsters) mo.stageSpeed = st.monsterSpeed || 1;
     baseMonsterCount = monsters.length;
     spots = terrain.standingSpots();
 
@@ -139,6 +193,8 @@
     hitStop = 0;
     stageTime = 0;
     player.respawn(spawn.x, spawn.y);
+    player.slippery = !!st.slippery; // 설산은 바닥이 미끄럽다
+    setupBoss();
     camera.follow(player, terrain, C.DT, true);
   }
 
@@ -166,11 +222,19 @@
   // 오프닝 컷신 (동굴에서 처음 한 번만. 끝나거나 건너뛰면 null)
   let cutscene = C.INTRO_CUTSCENE && stageName === 'cave' ? new G.Cutscene(terrain, player) : null;
 
-  // 화면 크기: 창에 맞춰 늘어난 만큼 내부 해상도도 올린다 (최대 4배). F 키로 전체화면
+  // 화면 크기: 캔버스 내부 해상도를 "화면에 실제로 보이는 장치 픽셀 수"에 정확히 맞춘다.
+  // (브라우저가 캔버스를 늘이거나 줄이면서 흐려지는 것을 막는다. 글자와 도트가 또렷해진다)
+  // 가능하면 월드 도트 한 칸을 정수 장치 픽셀로 만들어 도트 크기가 고르게 하고, 그러면 창이 너무 비면(90% 미만) 창에 꽉 채운다. F 키로 전체화면
   function fitCanvas() {
+    const dpr = window.devicePixelRatio || 1;
     const cssW = Math.min(window.innerWidth, (window.innerHeight * C.VIEW_W) / C.VIEW_H);
-    const s = Math.max(1, Math.min(4, Math.ceil((cssW * (window.devicePixelRatio || 1)) / C.VIEW_W)));
-    if (s !== renderer.scale) renderer.setScale(s);
+    const devW = cssW * dpr;
+    const bufW = C.VIEW_W / renderer.px; // 월드 버퍼의 가로 도트 수
+    const k = Math.floor(devW / bufW);
+    const scale = k >= 1 && k * bufW >= devW * 0.9 ? (k * bufW) / C.VIEW_W : devW / C.VIEW_W;
+    renderer.setScale(scale);
+    canvas.style.width = renderer.canvas.width / dpr + 'px'; // 캔버스 픽셀이 화면 장치 픽셀과 1:1로 대응한다
+    canvas.style.height = renderer.canvas.height / dpr + 'px';
   }
   window.addEventListener('resize', fitCanvas);
   fitCanvas();
@@ -185,6 +249,15 @@
     } else if (e.code === 'Digit7' || e.code === 'Numpad7') {
       cutscene = null;
       enterMine();
+    } else if (e.code === 'KeyK') { // 내 스프라이트(editor.html에서 그린 모션) 켜기/끄기
+      const S = G.Sprites;
+      let text;
+      if (!S.hasFrames()) text = 'editor.html 에서 먼저 그려 주세요';
+      else {
+        S.setEnabled(!S.data.enabled);
+        text = S.data.enabled ? '내 스프라이트 켜짐' : '내 스프라이트 꺼짐';
+      }
+      popups.push({ x: player.x + player.w / 2, y: player.y - 14, text, t: 1.6, color: 'rgba(255,248,170,A)' });
     } else if (e.code === 'KeyF') { // 전체화면 켜기/끄기
       if (document.fullscreenElement) document.exitFullscreen();
       else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
@@ -209,6 +282,8 @@
       const slime = new G.Slime(p.x, p.y);
       slime.appear = C.SLIME_APPEAR_TIME;
       slime.noCoin = true; // 소환한 슬라임은 코인을 주지 않는다 (코인 노가다 방지)
+      slime.variant = STAGES[stageName].slimeVariant || 'green';
+      slime.stageSpeed = STAGES[stageName].monsterSpeed || 1;
       slime.dir = Math.random() < 0.5 ? -1 : 1;
       monsters.push(slime);
       effects.spawn(p.x + C.SLIME_W / 2, p.y + C.SLIME_H);
@@ -221,6 +296,7 @@
     player.respawn(spawn.x, spawn.y);
     sword = null;
     monsters.forEach((m) => m.reset());
+    if (boss && !boss.done) setupBoss(); // 보스전 중이면 보스도 처음부터 (경기장 밖으로 돌아온다)
     camera.follow(player, terrain, C.DT, true);
   }
 
@@ -259,6 +335,9 @@
     }
     for (const d of terrain.caveEntrances) {
       if (Math.abs(px - (d.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (d.row + 1) * T) < T * 2) return { type: 'enter' };
+    }
+    for (const g of terrain.gates) {
+      if (Math.abs(px - (g.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (g.row + 1) * T) < T * 2) return { type: 'gate', stage: g.stage };
     }
     for (const x of terrain.exits) {
       if (Math.abs(px - (x.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (x.row + 1) * T) < T * 2) return { type: 'exit' };
@@ -417,7 +496,10 @@
   const killsInOne = () => !!G.Shop.ITEMS[inv.equipped.weapon].oneHit; // 대검/전설의 검: 두 번 맞는 몬스터도 한 방에 처치한다
   function hitMonster(s, fromX, fallbackDir) {
     const away = Math.sign(s.x + s.w / 2 - fromX) || fallbackDir;
-    if (s.twoHit && !s.staggered && !killsInOne()) s.stagger(away);
+    if (s.golden) { // 황금박쥐: 한 방에 안 죽는다. 한 대마다 체력 1이 깎이고 움찔할 뿐이라 5대를 때려야 죽는다
+      s.damage(1);
+      if (s.alive) s.hurt(away);
+    } else if (s.twoHit && !s.staggered && !killsInOne()) s.stagger(away);
     else s.knockback(away);
     weaponElementHit(s, away, fromX);
   }
@@ -505,6 +587,13 @@
       effects.shake(5, 0.15);
       hitStop = C.HIT_STOP;
     }
+    if (bossOn()) {
+      for (const h of boss.hitHeads(sword.box, bossDamage())) {
+        G.Audio.play('parry');
+        effects.parryHit(h.cx, h.cy);
+        effects.shake(5, 0.15);
+      }
+    }
     if (sword.done) {
       sword = null;
       player.swordOut = false;
@@ -579,8 +668,12 @@
         enterMine();
         input.endFrame();
         return;
-      } else if (near && near.type === 'exit') { // 마을로 (동굴 입구 앞에서 시작)
-        loadStage('village', true, 'D');
+      } else if (near && near.type === 'gate') { // 마을의 문으로 숲/설산/화산에
+        loadStage(near.stage, true);
+        input.endFrame();
+        return;
+      } else if (near && near.type === 'exit') { // 마을로 (들어왔던 입구 앞에서 시작)
+        loadStage('village', true, STAGES[stageName].returnNear || 'D');
         input.endFrame();
         return;
       } else if (near) {
@@ -621,7 +714,7 @@
       effects.shake(3, 0.1);
     }
     if (sword) updateSword(dt);
-    G.Magic.update(magic, dt, terrain, monsters, magicHooks);
+    G.Magic.update(magic, dt, terrain, magicTargets(), magicHooks);
     if (player.swingFx) { // 검을 휘두르기 시작하는 순간 바람 이펙트
       player.swingFx = false;
       effects.swing(player.x + player.w / 2, player.y + player.h / 2, player.facing);
@@ -629,12 +722,24 @@
       if (weaponDef.element) { // 지팡이: 패링할 때마다 지팡이 끝에서 원소가 나간다
         const el = G.Magic.pickElement(weaponDef.element);
         const h = player.hand;
-        G.Magic.cast(magic, el, h.x + player.facing * 34, h.y, player.facing, terrain, monsters, magicHooks);
+        G.Magic.cast(magic, el, h.x + player.facing * 34, h.y, player.facing, terrain, magicTargets(), magicHooks);
         G.Audio.play(el === 'lightning' ? 'zap' : el);
       }
     }
     for (const s of monsters) {
       s.update(dt, player, terrain);
+      if (s.golden && s.alive) { // 황금박쥐: 반짝이는 가루를 흘리고, 가까이 오면 한 번 알려준다
+        s.sparkleT -= dt;
+        if (s.sparkleT <= 0) {
+          s.sparkleT = 0.07;
+          effects.sparkle(s.x + s.w / 2, s.y + s.h / 2);
+        }
+        if (!s.announced && Math.abs(s.x - player.x) < 420 && Math.abs(s.y - player.y) < 300) {
+          s.announced = true;
+          popups.push({ x: s.x + s.w / 2, y: s.y - 24, text: '황금박쥐 출현!', t: 2.2, color: 'rgba(255,213,74,A)' });
+          G.Audio.play('pickup');
+        }
+      }
       if (s.dmgFx) { // 마법/독으로 입은 피해를 숫자로
         popups.push({ x: s.x + s.w / 2, y: s.y - 8, text: `-${s.dmgFx}`, t: 0.8, color: 'rgba(255,107,107,A)' });
         s.dmgFx = 0;
@@ -651,7 +756,8 @@
           effects.vanish(s.x + s.w / 2, s.y + s.h / 2);
           G.Audio.play('vanish');
         }
-        const base = s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 꽃게 8
+        if (s.golden) effects.treasure(s.x + s.w / 2, s.y + s.h / 2); // 황금박쥐는 금화가 쏟아진다
+        const base = s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
         const drop = Math.round(base * (G.Shop.ITEMS[inv.equipped.weapon].elem === 'gold' ? 1.5 : 1)); // 황금 검은 코인 +50%
         if (drop) {
           coins += drop;
@@ -682,6 +788,40 @@
       } else if (player.invuln === 0 && !player.dashing && !s.staggered && s.overlaps(player)) { // 기절한 몬스터는 해롭지 않다
         loseLife(player.x + player.w / 2, player.y + player.h / 2); // 패링하지 못하고 닿으면 목숨 -1
         break;
+      }
+    }
+    if (boss && !boss.started && !boss.done && player.x > boss.left + 100) { // 경기장에 들어섰다: 용머리 등장, 화면과 길이 막힌다
+      boss.started = true;
+      camera.minX = camera.x;
+      popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '용머리 출현!', t: 2.4, color: 'rgba(255,120,80,A)' });
+      effects.shake(8, 0.8);
+      G.Audio.play('spawn');
+    }
+    if (bossOn() && !won) {
+      camera.minX = Math.min(boss.left, camera.minX + 520 * dt);
+      if (player.x < boss.left) { player.x = boss.left; player.vx = Math.max(0, player.vx); }
+      const box = parryBox(player);
+      if (player.parrying && boss.deflect(box) > 0) { // 화염구를 쳐냈다: 쏜 머리에게 되돌아간다
+        player.parrySucceeded();
+        G.Audio.play('parry');
+        effects.parryHit(player.x + player.w / 2 + player.facing * 20, player.y + player.h / 2);
+        effects.shake(6, 0.15);
+        hitStop = C.HIT_STOP;
+      }
+      if (player.parrying && player.swing >= C.SWING_SLASH_FRAME) { // 기절했거나 땅에 박힌 머리를 벤다
+        for (const h of boss.hitHeads(box, bossDamage())) {
+          G.Audio.play('parry');
+          effects.parryHit(h.cx, h.cy);
+          effects.shake(6, 0.15);
+          hitStop = C.HIT_STOP;
+        }
+      }
+      boss.update(dt, player);
+      for (const h of boss.heads) {
+        if (h.dmgFx) {
+          popups.push({ x: h.cx, y: h.y - 10, text: `-${h.dmgFx}`, t: 0.9, color: 'rgba(255,107,107,A)' });
+          h.dmgFx = 0;
+        }
       }
     }
     if (chest && !won && player.overlaps(chest)) { // 보물 발견!
@@ -718,23 +858,60 @@
   // 고정 시간 스텝: 모니터 주사율과 무관하게 물리가 동일하게 동작한다
   let last = performance.now();
   let acc = 0;
+  // 이번 스텝을 돌리기 전의 위치를 기억해 둔다. 그릴 때 이전 위치와 현재 위치를 프레임 시각 비율로 이어 붙여서
+  // 모니터가 60Hz보다 빨라도(120/144Hz) 같은 위치가 여러 프레임 반복되며 끊겨 보이지 않게 한다
+  function snapshotPrev() {
+    player.px = player.x;
+    player.py = player.y;
+    for (const mo of monsters) { mo.px = mo.x; mo.py = mo.y; }
+    camera.px = camera.x;
+    camera.py = camera.y;
+    if (sword) { sword.px = sword.x; sword.py = sword.y; }
+    for (const s of magic.shots) { s.px = s.x; s.py = s.y; }
+  }
+
   function frame(now) {
     acc += Math.min((now - last) / 1000, 0.1); // 탭 전환 후 폭주 방지
     last = now;
     while (acc >= C.DT) {
+      snapshotPrev();
       step(C.DT);
       acc -= C.DT;
     }
-    render();
+    render(acc / C.DT); // 남은 시간 비율만큼 이전 -> 현재 위치 사이에서 그린다
     requestAnimationFrame(frame);
   }
 
-  function render() {
+  // alpha(0~1)만큼 이전 위치에서 현재 위치로 옮겨 그리고, 그린 뒤 원래 위치로 되돌린다.
+  // 이전 위치가 없거나(새로 생김/순간이동) 80px 넘게 튄 것은 보간하지 않는다
+  function render(alpha = 1) {
+    const saved = [];
+    if (alpha < 1) {
+      const lerpObj = (o) => {
+        if (o.px === undefined || Math.abs(o.x - o.px) > 80 || Math.abs(o.y - o.py) > 80) return;
+        saved.push([o, o.x, o.y]);
+        o.x = o.px + (o.x - o.px) * alpha;
+        o.y = o.py + (o.y - o.py) * alpha;
+      };
+      lerpObj(player);
+      lerpObj(camera);
+      for (const mo of monsters) if (mo.alive) lerpObj(mo);
+      if (sword) lerpObj(sword);
+      for (const s of magic.shots) lerpObj(s);
+    }
+    try {
+      drawFrame();
+    } finally {
+      for (const [o, x, y] of saved) { o.x = x; o.y = y; }
+    }
+  }
+
+  function drawFrame() {
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI ? Object.assign({ t: stageTime }, st.banner) : null;
     const near = !shop && !equipUI && !dialog && !won && !cutscene ? nearbyInteract() : null;
     const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: 'E: 마을로 나가기' };
-    const prompt = near ? (near.type === 'shop' ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기` : PROMPTS[near.type]) : null;
+    const prompt = near ? (near.type === 'shop' ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기` : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : PROMPTS[near.type]) : null;
     const shopView = shop ? Object.assign({}, shop, { coins, lives, maxLives: maxLives(), inv }) : null;
     const equipView = equipUI ? Object.assign({}, equipUI, { inv, lives, maxLives: maxLives(), coins }) : null;
     const house = terrain.houses[0];
@@ -746,14 +923,14 @@
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, equip: equipView,
-    }, sword, { cutscene, chest, ending, npcs, popups, magic });
+      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, equip: equipView, boss: bossOn() ? boss : null,
+    }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null });
   }
   requestAnimationFrame(frame);
 
   // 테스트/디버그용 노출
   G.state = {
-    player, monsters, camera, input, step, effects, render, loadStage,
+    player, monsters, camera, input, step, effects, render, loadStage, renderer, snapshotPrev,
     get terrain() { return terrain; },
     get baseMonsterCount() { return baseMonsterCount; },
     get stage() { return stageName; },
@@ -776,5 +953,6 @@
     get mineRun() { return mineRun; },
     get dialog() { return dialog; },
     get chest() { return chest; },
+    get boss() { return boss; },
   };
 })(window.Game);

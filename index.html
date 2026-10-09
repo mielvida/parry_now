@@ -8,7 +8,7 @@
     html, body { margin: 0; height: 100%; background: #14161c; overflow: hidden; }
     body { display: flex; align-items: center; justify-content: center; }
     /* 게임 화면(960x576, 비율 5:3)을 창에 꽉 차게: 가로/세로 중 먼저 닿는 쪽에 맞춰 늘린다 */
-    canvas { display: block; width: min(100vw, 166.6667vh); height: auto; background: #000; }
+    canvas { display: block; width: min(100vw, 166.6667vh); height: auto; background: #000; image-rendering: pixelated; }
   </style>
 </head>
 <body>
@@ -16,6 +16,7 @@
 
   <!-- 로드 순서 = 의존 순서. file:// 에서도 동작하도록 ES 모듈 대신 네임스페이스(window.Game)를 사용 -->
   <script src="src/config.js"></script>
+  <script src="src/pixel.js"></script>
   <script src="src/input.js"></script>
   <script src="src/audio.js"></script>
   <script src="src/terrain.js"></script>
@@ -31,9 +32,12 @@
   <script src="src/camera.js"></script>
   <script src="src/effects.js"></script>
   <script src="src/magic.js"></script>
+  <script src="src/boss.js"></script>
+  <script src="src/sprites.js"></script>
   <script src="src/hero.js"></script>
   <script src="src/cave.js"></script>
   <script src="src/beach.js"></script>
+  <script src="src/themes.js"></script>
   <script src="src/cutscene.js"></script>
   <script src="src/ending.js"></script>
   <script src="src/renderer.js"></script>

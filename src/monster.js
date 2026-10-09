@@ -8,6 +8,7 @@
     constructor(x, y, w, h, kind) {
       super(x, y, w, h);
       this.kind = kind;
+      this.stageSpeed = 1;     // 스테이지가 정하는 이동 속도 배수 (화산은 더 빠르다)
       this.home = { x, y };
       this.dir = -1;
       this.chasing = false;

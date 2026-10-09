@@ -10,14 +10,27 @@
       super(x, y, C.BAT_W, C.BAT_H, 'bat');
       this.maxHp = 2; // 박쥐는 체력 2 (독이면 2초에 죽는다)
       this.hp = 2;
+      this._rollGolden();
       this.state = 'patrol';
       this.timer = 0;        // 현재 상태에서 남은 시간
       this.cooldown = 0;     // 다음 급강하까지 대기
       this.flap = 0;         // 날갯짓 위상 (그림용)
     }
 
+    // 생길 때와 부활할 때마다 낮은 확률로 황금박쥐가 된다: 체력 4, 더 빠름, 코인 200
+    _rollGolden() {
+      this.golden = Math.random() < C.GOLDEN_BAT_CHANCE;
+      this.maxHp = this.golden ? C.GOLDEN_BAT_HP : 2;
+      this.hp = this.maxHp;
+      this.speedMul = this.golden ? C.GOLDEN_BAT_SPEED : 1;
+      this.sparkleT = 0;
+      this.announced = false; // 플레이어가 가까이 와서 "황금박쥐 출현!"을 한 번 알렸는가
+      this.hurtFlash = 0;     // >0 이면 맞아서 하얗게 번쩍이는 중
+    }
+
     reset() {
       super.reset();
+      this._rollGolden();
       this.state = 'patrol';
       this.timer = 0;
       this.cooldown = 0;
@@ -28,7 +41,21 @@
       this.state = 'patrol';
     }
 
+    // 황금박쥐가 근접 공격에 맞았지만 죽지는 않았을 때: 뒤로 살짝 밀리며 번쩍이고, 하던 급강하는 끊긴다
+    hurt(dirX) {
+      this.hitGrace = C.HIT_GRACE; // 같은 휘두르기에 두 번 맞지 않게
+      if (this.state === 'windup' || this.state === 'dive') {
+        this.state = 'chase';
+        this.cooldown = C.BAT_COOLDOWN;
+      }
+      this.vx = dirX * 240;
+      this.vy = -90;
+      this.dir = -dirX;
+      this.hurtFlash = 0.18;
+    }
+
     update(dt, player, terrain) {
+      this.hurtFlash = Math.max(0, this.hurtFlash - dt);
       if (this.tickLifecycle(dt, terrain)) return;
 
       this.time += dt;
@@ -49,7 +76,7 @@
           // 둥지 주변을 느리게 8자로 맴돈다
           const tx = this.home.x + Math.sin(this.time * 0.6) * 96;
           const ty = this.home.y + Math.sin(this.time * 1.7) * 14;
-          this._flyToward(tx, ty, C.BAT_PATROL_SPEED, dt);
+          this._flyToward(tx, ty, C.BAT_PATROL_SPEED * this.speedMul * this.stageSpeed, dt);
           if (Math.abs(this.vx) > 4) this.dir = Math.sign(this.vx);
           if (sees) this.state = 'chase';
           break;
@@ -58,7 +85,7 @@
           // 플레이어 머리 위 BAT_HOVER 높이로 접근해 맴돈다
           const tx = pcx - this.w / 2 + Math.sin(this.time * 3) * 24;
           const ty = pcy - C.BAT_HOVER - this.h / 2;
-          this._flyToward(tx, ty, C.BAT_CHASE_SPEED, dt);
+          this._flyToward(tx, ty, C.BAT_CHASE_SPEED * this.speedMul * this.stageSpeed, dt);
           if (Math.abs(dx) > 4) this.dir = Math.sign(dx);
           if (!sees) this.state = 'patrol';
           else if (this.cooldown === 0 && Math.abs(dx) < 56 && cy < pcy - 24) {
@@ -75,8 +102,8 @@
           this.timer -= dt;
           if (this.timer <= 0) {
             const len = Math.hypot(dx, dy) || 1;
-            this.vx = (dx / len) * C.BAT_DIVE_SPEED;
-            this.vy = (dy / len) * C.BAT_DIVE_SPEED;
+            this.vx = (dx / len) * C.BAT_DIVE_SPEED * this.speedMul * this.stageSpeed;
+            this.vy = (dy / len) * C.BAT_DIVE_SPEED * this.speedMul * this.stageSpeed;
             this.state = 'dive';
             this.timer = C.BAT_DIVE_TIME;
           }

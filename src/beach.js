@@ -169,22 +169,12 @@
       ctx.fillRect(wx + 12, top + 18, 2, 22);
       ctx.fillRect(wx, top + 28, 26, 2);
     }
-    // 현관 등불 + 간판
+    // 현관 등불
     const glow = 0.5 + 0.2 * Math.sin(time * 3);
     ctx.fillStyle = `rgba(255,220,120,${0.3 * glow})`;
     ctx.beginPath(); ctx.arc(baseX + 22, baseY - 52, 14, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#ffd54a';
     ctx.fillRect(baseX + 20, baseY - 56, 5, 7);
-    ctx.fillStyle = '#7a5530';
-    ctx.fillRect(x - 26, baseY - 30, 4, 30);
-    ctx.fillStyle = '#c9a56a';
-    ctx.fillRect(x - 40, baseY - 44, 32, 16);
-    ctx.fillStyle = '#5a3d17';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('민박', x - 24, baseY - 36);
-    ctx.textAlign = 'start';
   }
 
   // 상점 가판대: baseX = 가운데, baseY = 땅 윗면. 뒤에 주인이 서 있고 앞에 계산대가 있다
@@ -272,11 +262,7 @@
     ctx.fillRect(baseX - 34, topY - 26, 68, 22);
     ctx.fillStyle = '#e9d8a6';
     ctx.fillRect(baseX - 31, topY - 23, 62, 16);
-    ctx.fillStyle = '#5a3d17';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(potion ? '물약' : armor ? '갑옷' : '무기', baseX, topY - 15);
+    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
@@ -329,12 +315,53 @@
     ctx.fillRect(baseX + w / 2 + 18, baseY - 34, 4, 34);
     ctx.fillStyle = '#c9a56a';
     ctx.fillRect(baseX + w / 2 + 2, baseY - 52, 44, 20);
-    ctx.fillStyle = '#5a3d17';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('동굴', baseX + w / 2 + 24, baseY - 42);
+    G.TextLayer.add('동굴', baseX + w / 2 + 24, baseY - 42, 'bold 12px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
+  }
+
+  // 스테이지 문: 돌기둥 두 개와 상인방 사이에 소용돌이치는 빛이 있고, 위에 이름 간판이 걸려 있다. baseX = 가운데, baseY = 땅 윗면
+  const GATE_LOOK = {
+    forest: { name: '숲', a: '#6fd25a', b: '#d8ffb0' },
+    snow: { name: '설산', a: '#9fd6ff', b: '#ffffff' },
+    volcano: { name: '화산', a: '#ff7a2a', b: '#ffe08a' },
+  };
+  function drawGate(ctx, g, baseX, baseY, time) {
+    const L = GATE_LOOK[g.stage];
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.beginPath(); ctx.ellipse(baseX, baseY, 40, 5, 0, 0, Math.PI * 2); ctx.fill();
+    // 안쪽의 빛 (천천히 맥동)
+    const gl = ctx.createLinearGradient(0, baseY - 78, 0, baseY);
+    gl.addColorStop(0, L.b);
+    gl.addColorStop(1, L.a);
+    ctx.fillStyle = gl;
+    ctx.fillRect(baseX - 20, baseY - 74, 40, 74);
+    for (let i = 0; i < 4; i++) { // 소용돌이 줄무늬
+      const y = baseY - 14 - i * 17 + Math.sin(time * 2 + i) * 3;
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillRect(baseX - 16, y, 32, 3);
+    }
+    const a = 0.25 + 0.1 * Math.sin(time * 3);
+    ctx.fillStyle = L.a;
+    ctx.globalAlpha = a;
+    ctx.fillRect(baseX - 34, baseY - 86, 68, 86);
+    ctx.globalAlpha = 1;
+    // 돌기둥 + 상인방
+    ctx.fillStyle = '#7d8696';
+    ctx.fillRect(baseX - 26, baseY - 80, 8, 80);
+    ctx.fillRect(baseX + 18, baseY - 80, 8, 80);
+    ctx.fillRect(baseX - 30, baseY - 88, 60, 10);
+    ctx.fillStyle = '#a3acbb';
+    ctx.fillRect(baseX - 26, baseY - 80, 3, 80);
+    ctx.fillRect(baseX + 18, baseY - 80, 3, 80);
+    ctx.fillRect(baseX - 30, baseY - 88, 60, 3);
+    ctx.fillStyle = '#4b5260';
+    ctx.fillRect(baseX - 30, baseY - 80, 60, 2);
+    // 이름 간판
+    ctx.fillStyle = '#5a3d17';
+    ctx.fillRect(baseX - 22, baseY - 112, 44, 20);
+    ctx.fillStyle = '#e9d8a6';
+    ctx.fillRect(baseX - 20, baseY - 110, 40, 16);
+    G.TextLayer.add(L.name, baseX, baseY - 102, 'bold 12px sans-serif', '#5a3d17');
   }
 
   const Beach = {
@@ -501,6 +528,11 @@
         const bx = H.col * TILE + TILE / 2;
         if (bx < camera.x - 150 || bx > camera.x + view) continue;
         drawHouse(ctx, bx, (H.row + 1) * TILE, time);
+      }
+      for (const G2 of terrain.gates) {
+        const bx = G2.col * TILE + TILE / 2;
+        if (bx < camera.x - 100 || bx > camera.x + view) continue;
+        drawGate(ctx, G2, bx, (G2.row + 1) * TILE, time);
       }
       for (const D of terrain.caveEntrances) {
         const bx = D.col * TILE + TILE / 2;

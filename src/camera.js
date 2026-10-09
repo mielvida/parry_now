@@ -6,6 +6,7 @@
       this.viewH = viewH;
       this.x = 0;
       this.y = 0;
+      this.minX = 0; // 보스 경기장에서는 화면이 이 왼쪽으로 가지 않는다
     }
 
     // 대상(사각형) 중심을 향해 이동. snap=true면 즉시 이동(리스폰/시작 시)
@@ -16,7 +17,8 @@
       this.x += (tx - this.x) * k;
       this.y += (ty - this.y) * k;
 
-      this.x = Math.max(0, Math.min(this.x, Math.max(0, terrain.width - this.viewW)));
+      if (snap) this.px = undefined; // 즉시 이동(리스폰/시작)은 이전 위치와 이어 붙이지 않는다
+      this.x = Math.max(this.minX, Math.min(this.x, Math.max(0, terrain.width - this.viewW)));
       this.y = Math.max(0, Math.min(this.y, Math.max(0, terrain.height - this.viewH)));
     }
   }

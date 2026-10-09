@@ -17,6 +17,7 @@
     respawn(x, y) {
       this.x = x;
       this.y = y;
+      this.px = undefined; // 보간용 이전 위치 (순간이동하면 이어 붙이지 않는다)
       this.vx = 0;
       this.vy = 0;
       this.onGround = false;
@@ -53,6 +54,7 @@
       if (this.canThrow === undefined) this.canThrow = true;         // 대검은 false: 충전도 던지기도 하지 않는다
       this.parryWindow = this.parryWindow || C.PARRY_WINDOW;         // 패링 판정 지속 시간 (장갑)
       this.parryCooldownTime = this.parryCooldownTime || C.PARRY_COOLDOWN; // 패링 쿨다운 (무기)
+      this.slippery = this.slippery || false;                        // 얼음 바닥 스테이지(설산)에서 true
       this.speedMult = this.speedMult || 1;                          // 이동 속도 배율 (신발)
       this.lastGround = { x, y };       // 마지막으로 땅을 밟고 있던 위치 (구덩이에 빠졌을 때 복귀 지점)
     }
@@ -61,6 +63,7 @@
     placeAt(x, y) {
       this.x = x;
       this.y = y;
+      this.px = undefined;
       this.vx = 0;
       this.vy = 0;
     }
@@ -197,7 +200,7 @@
     _applyInput(dt, input) {
       const dir = input.moveX;
       if (dir !== 0) this.facing = dir;
-      const accel = this.onGround ? C.ACCEL_GROUND : C.ACCEL_AIR;
+      const accel = this.onGround ? (this.slippery ? C.ACCEL_ICE : C.ACCEL_GROUND) : C.ACCEL_AIR;
       this.vx = approach(this.vx, dir * C.MOVE_SPEED * this.speedMult, accel * dt);
 
       // 코요테 타임 / 점프 버퍼

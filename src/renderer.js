@@ -1,6 +1,14 @@
 // 렌더러: 상태를 읽어 캔버스에 그리기만 한다. 게임 상태를 바꾸지 않는다.
 (function (G) {
   const { TILE } = G.Config;
+  // 움직이는 것의 좌표: SMOOTH_SPRITES면 그대로(반 도트 단위로 부드럽게), 아니면 정수로 맞춘다
+  const sp = (v) => (G.Config.SMOOTH_SPRITES ? v : Math.round(v));
+  // 슬라임 색: [평소, 쫓을 때, 평소 테두리, 쫓을 때 테두리]
+  const SLIME_COLORS = {
+    green: ['#4fd37f', '#f0558c', '#2c9b55', '#b02a5c'],
+    ice: ['#7fd6ff', '#d6f1ff', '#3a8fc0', '#7fb4d6'],
+    lava: ['#ff8a3a', '#ff4a2a', '#b04a10', '#8a1a10'],
+  };
 
   class Renderer {
     // theme: 배경/타일/장식을 그리는 테마 (G.Cave 또는 G.Beach)
@@ -12,49 +20,141 @@
       this.viewH = viewH;
       this.scale = 1;
       this.setScale(1);
+      // 픽셀 화면: 월드는 낮은 해상도 버퍼(게임 화면의 1/px)에 그린 뒤 보간 없이 정수배로 키운다
+      this.px = Math.max(1, G.Config.PIXEL || 1);
+      this.buffer = document.createElement('canvas');
+      this.buffer.width = Math.round(viewW / this.px);
+      this.buffer.height = Math.round(viewH / this.px);
+      this.bctx = this.buffer.getContext('2d', { willReadFrequently: true });
+      this.snapOn = true; // false인 동안 그리는 것은 도트 격자에 맞추지 않는다 (움직이는 캐릭터/몬스터용)
+      this._snapRects(this.bctx);
+    }
+
+    // 버퍼에 그리는 사각형은 전부 버퍼 픽셀 경계에 딱 맞춘다 (반 픽셀로 번져 흐려지지 않게).
+    // 회전된 그림(칼 등)은 그대로 둔다. 좌표를 사용자 공간으로 되돌려 넘기므로 그라데이션도 그대로 동작한다
+    _snapRects(c) {
+      const orig = c.fillRect.bind(c);
+      c.fillRect = (x, y, w, h) => {
+        const m = c.getTransform();
+        if (!this.snapOn || m.b !== 0 || m.c !== 0 || m.a === 0 || m.d === 0) return orig(x, y, w, h);
+        const x0 = Math.round(m.a * x + m.e);
+        let x1 = Math.round(m.a * (x + w) + m.e);
+        const y0 = Math.round(m.d * y + m.f);
+        let y1 = Math.round(m.d * (y + h) + m.f);
+        if (x1 === x0 && w !== 0) x1 = x0 + Math.sign(m.a * w); // 아주 얇은 선도 최소 1픽셀
+        if (y1 === y0 && h !== 0) y1 = y0 + Math.sign(m.d * h);
+        return orig((x0 - m.e) / m.a, (y0 - m.f) / m.d, (x1 - x0) / m.a, (y1 - y0) / m.d);
+      };
+    }
+
+    // 색 단계를 거칠게 (옛날 게임 팔레트 느낌)
+    _posterize(c) {
+      const step = G.Config.POSTERIZE;
+      if (!step) return;
+      const img = c.getImageData(0, 0, this.buffer.width, this.buffer.height);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.round(d[i] / step) * step;
+        d[i + 1] = Math.round(d[i + 1] / step) * step;
+        d[i + 2] = Math.round(d[i + 2] / step) * step;
+      }
+      c.putImageData(img, 0, 0);
     }
 
     // 캔버스 내부 해상도를 게임 화면의 s배로 한다 (화면을 크게 늘려도 글자와 그림이 또렷하도록)
+    // s는 소수여도 된다 (화면에 실제로 차지하는 장치 픽셀에 정확히 맞추기 위해). 실제 배율은 캔버스 크기에서 다시 구한다
     setScale(s) {
-      this.scale = s;
-      this.canvas.width = this.viewW * s;
-      this.canvas.height = this.viewH * s;
+      this.canvas.width = Math.max(1, Math.round(this.viewW * s));
+      this.canvas.height = Math.max(1, Math.round(this.viewH * s));
+      this.scale = this.canvas.width / this.viewW;
     }
 
     draw(terrain, player, camera, monsters = [], effects = null, hud = null, sword = null, extras = {}) {
-      const ctx = this.ctx;
-      ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0); // 이후는 모두 게임 좌표(960x576)로 그린다
+      const main = this.ctx;
+      const px = this.px;
       const time = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+      const sh = effects ? effects.shakeOffset() : { x: 0, y: 0 };
+      const camX = Math.round((camera.x - sh.x) / px) * px; // 카메라도 버퍼 픽셀에 맞춘다
+      const camY = Math.round((camera.y - sh.y) / px) * px;
+      G.TextLayer.clear();
+
+      // ---- 1) 월드: 낮은 해상도 버퍼에 그린다 (좌표는 그대로 게임 단위) ----
+      const ctx = this.bctx;
+      ctx.setTransform(1 / px, 0, 0, 1 / px, 0, 0);
       this.theme.drawBackground(ctx, this.viewW, this.viewH, camera, time);
       ctx.save();
-      const sh = effects ? effects.shakeOffset() : { x: 0, y: 0 };
-      ctx.translate(-Math.round(camera.x - sh.x), -Math.round(camera.y - sh.y));
+      ctx.translate(-camX, -camY);
       this.theme.drawCeiling(ctx, camera, this.viewW);
       if (this.theme.drawDecor) this.theme.drawDecor(ctx, terrain, camera, time); // 집/짐더미 (테마에 있을 때만): 땅과 캐릭터 뒤에 깔리는 장식
+      if (extras.boss) extras.boss.drawBack(ctx); // 땅 뒤: 용암에서 올라오는 목
       this._drawTerrain(ctx, terrain, camera);
       if (extras.chest) this._drawChest(ctx, extras.chest);
+      if (extras.boss) extras.boss.drawFront(ctx); // 머리, 꼬리, 화염구
+      const crisp = !G.Config.SMOOTH_SPRITES;
+      this.snapOn = crisp; // 몬스터와 플레이어: 반 도트 단위로 부드럽게 움직인다
       for (const m of monsters) if (m.alive && this._inView(m, camera)) this._drawMonster(ctx, m); // 화면 밖은 그리지 않음 (대량 소환 대비)
       this._drawPlayer(ctx, player);
+      this.snapOn = true;
       if (extras.npcs) for (const n of extras.npcs) G.Npc.draw(ctx, n.kind, n.x, n.y, n.facing, time, n.alpha);
       if (extras.cutscene) extras.cutscene.drawWorld(ctx); // 땅 위/들어 올린 병
+      this.snapOn = crisp;
       G.Hero.drawCharge(ctx, player);
       if (sword) G.Hero.drawThrownSword(ctx, sword);
       if (effects) effects.draw(ctx);
       if (extras.magic) G.Magic.draw(ctx, extras.magic);
-      if (extras.popups) this._drawPopups(ctx, extras.popups);
+      this.snapOn = true;
       ctx.restore();
       this.theme.drawVignette(ctx, this.viewW, this.viewH);
-      if (effects) effects.drawOverlay(ctx, this.viewW, this.viewH);
+      this._posterize(ctx);
+
+      // ---- 2) 버퍼를 보간 없이 정수배로 키워 화면에 ----
+      main.setTransform(1, 0, 0, 1, 0, 0);
+      main.imageSmoothingEnabled = false;
+      main.drawImage(this.buffer, 0, 0, this.buffer.width, this.buffer.height, 0, 0, this.canvas.width, this.canvas.height);
+
+      // ---- 3) 글자와 인터페이스: 선명하게 (이후는 게임 좌표 960x576) ----
+      main.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+      main.save();
+      main.translate(-camX, -camY);
+      G.TextLayer.draw(main); // 월드 안의 간판 글자
+      if (extras.popups) this._drawPopups(main, extras.popups); // 데미지/코인 숫자
+      main.restore();
+      if (effects) effects.drawOverlay(main, this.viewW, this.viewH);
       if (extras.cutscene) { // 컷신: 자막·확대 화면·암전. 게임 HUD는 숨긴다
-        extras.cutscene.drawOverlay(ctx, this.viewW, this.viewH);
+        extras.cutscene.drawOverlay(main, this.viewW, this.viewH);
         return;
       }
       if (extras.ending) { // 엔딩: 코인 획득 -> 해변. 게임 HUD는 숨긴다
-        extras.ending.drawOverlay(ctx, this.viewW, this.viewH);
+        extras.ending.drawOverlay(main, this.viewW, this.viewH);
         return;
       }
-      this._drawHud(ctx, hud);
-      if (hud && hud.banner) this._drawStageBanner(ctx, hud.banner);
+      this._drawHud(main, hud);
+      if (hud && hud.boss) this._drawBossBars(main, hud.boss);
+      if (hud && hud.banner) this._drawStageBanner(main, hud.banner);
+    }
+
+    // 보스 체력: 머리마다 막대 (맞을 수 있는 머리는 노랗게)
+    _drawBossBars(ctx, boss) {
+      const bw = 250;
+      const gap = 24;
+      const x0 = (this.viewW - (bw * 3 + gap * 2)) / 2;
+      const y = 84;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 12px sans-serif';
+      boss.heads.forEach((h, i) => {
+        const x = x0 + i * (bw + gap);
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(x - 2, y - 2, bw + 4, 20);
+        ctx.fillStyle = '#3a0d08';
+        ctx.fillRect(x, y, bw, 16);
+        if (h.hp > 0) {
+          ctx.fillStyle = h.vulnerable ? '#ffd54a' : '#e2431f';
+          ctx.fillRect(x, y, (bw * h.hp) / h.maxHp, 16);
+        }
+        ctx.fillStyle = '#fff';
+        ctx.fillText(h.hp > 0 ? `용머리 ${i + 1}   ${h.hp} / ${h.maxHp}` : `용머리 ${i + 1}   쓰러짐`, x + bw / 2, y + 13);
+      });
+      ctx.textAlign = 'left';
     }
 
     // 스테이지 시작 소개: 검은 화면에서 서서히 밝아지며 "STAGE 2 / 지상 - 해변"
@@ -681,8 +781,8 @@
 
     _paintSlime(ctx, s) {
       // 바닥 중앙을 기준으로 가로/세로 배율을 적용한 젤리 몸체 (충돌 박스는 그대로)
-      const cx = Math.round(s.x + s.w / 2);
-      const bottom = Math.round(s.y + s.h);
+      const cx = sp(s.x + s.w / 2);
+      const bottom = sp(s.y + s.h);
       const bw = s.w * s.sx * 1.1;
       const bh = s.h * s.sy * 1.15;
       const left = cx - bw / 2;
@@ -696,11 +796,12 @@
       ctx.lineTo(right, bottom);
       ctx.closePath();
       ctx.globalAlpha = 0.92;
-      ctx.fillStyle = s.flying && Math.floor(s.flightTime / 0.05) % 2 === 0 ? '#ffffff' : s.chasing ? '#f0558c' : '#4fd37f'; // 사라지기 직전엔 하얗게 번쩍
+      const pal = SLIME_COLORS[s.variant] || SLIME_COLORS.green;
+      ctx.fillStyle = s.flying && Math.floor(s.flightTime / 0.05) % 2 === 0 ? '#ffffff' : s.chasing ? pal[1] : pal[0]; // 사라지기 직전엔 하얗게 번쩍
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.lineWidth = 2;
-      ctx.strokeStyle = s.chasing ? '#b02a5c' : '#2c9b55';
+      ctx.strokeStyle = s.chasing ? pal[3] : pal[2];
       ctx.stroke();
 
       // 젤리 하이라이트
@@ -723,17 +824,27 @@
 
     // 박쥐: 날개를 퍼덕이며 날고, 예비동작/급강하 때는 눈이 붉게 변한다
     _paintBat(ctx, b) {
-      const cx = Math.round(b.x + b.w / 2);
-      const cy = Math.round(b.y + b.h / 2);
+      const cx = sp(b.x + b.w / 2);
+      const cy = sp(b.y + b.h / 2);
       const angry = b.state === 'windup' || b.state === 'dive';
-      const flash = b.flying && Math.floor(b.flightTime / 0.05) % 2 === 0;
+      const flash = (b.flying && Math.floor(b.flightTime / 0.05) % 2 === 0) || b.hurtFlash > 0; // 맞으면 번쩍
       const dive = b.state === 'dive';
       const wing = dive ? 1.0 : Math.sin(b.flap) * 0.9; // 급강하 땐 날개를 접음
       ctx.save();
       ctx.translate(cx, cy);
       ctx.scale(b.dir >= 0 ? 1 : -1, 1);
-      const body = flash ? '#ffffff' : angry ? '#8a3f96' : '#6a52a0';
-      const membrane = flash ? '#ffffff' : angry ? '#a8416f' : '#7f64bd';
+      const gold = !!b.golden; // 황금박쥐: 금빛 몸과 날개, 은은한 후광
+      const body = flash ? '#ffffff' : gold ? (angry ? '#ffb020' : '#f5c030') : angry ? '#8a3f96' : '#6a52a0';
+      const membrane = flash ? '#ffffff' : gold ? (angry ? '#ffd24a' : '#ffe27a') : angry ? '#a8416f' : '#7f64bd';
+      const outline = gold ? 'rgba(110,70,0,0.85)' : 'rgba(20,12,40,0.8)';
+      if (gold) {
+        const t = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
+        const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
+        glow.addColorStop(0, `rgba(255,230,120,${0.5 + 0.15 * Math.sin(t * 6)})`);
+        glow.addColorStop(1, 'rgba(255,210,80,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(-30, -30, 60, 60);
+      }
       // 날개 (몸 뒤/앞 양쪽)
       for (const side of [-1, 1]) {
         ctx.save();
@@ -749,7 +860,7 @@
         ctx.closePath();
         ctx.fill();
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = 'rgba(20,12,40,0.8)';
+        ctx.strokeStyle = outline;
         ctx.stroke();
         ctx.restore();
       }
@@ -763,17 +874,24 @@
       ctx.moveTo(6, -5); ctx.lineTo(5, -12); ctx.lineTo(1, -6);
       ctx.fill();
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(20,12,40,0.8)';
+      ctx.strokeStyle = outline;
       ctx.beginPath();
       ctx.ellipse(0, 0, 9, 8, 0, 0, Math.PI * 2);
       ctx.stroke();
       // 눈 + 송곳니
-      ctx.fillStyle = angry ? '#ff4d4d' : '#ffe36b';
+      ctx.fillStyle = angry ? '#ff4d4d' : gold ? '#7a3b00' : '#ffe36b';
       ctx.fillRect(-5, -3, 3, 3);
       ctx.fillRect(2, -3, 3, 3);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(-3, 3, 2, 3);
       ctx.fillRect(1, 3, 2, 3);
+      if (gold) { // 남은 체력 점: 몇 대 더 때려야 하는지 보인다
+        const n = b.maxHp;
+        for (let i = 0; i < n; i++) {
+          ctx.fillStyle = i < b.hp ? '#ffd54a' : 'rgba(70,45,0,0.75)';
+          ctx.fillRect((i - (n - 1) / 2) * 6 - 2, -23, 4, 4);
+        }
+      }
       ctx.restore();
     }
 
@@ -786,7 +904,7 @@
       const dark = flash ? '#ffffff' : '#a8321c';
       const walking = Math.abs(c.vx) > 5;
       ctx.save();
-      ctx.translate(Math.round(c.x + c.w / 2), Math.round(c.y + c.h));
+      ctx.translate(sp(c.x + c.w / 2), sp(c.y + c.h));
       ctx.scale(c.dir >= 0 ? 1 : -1, 1);
       ctx.lineCap = 'round';
       ctx.strokeStyle = dark;

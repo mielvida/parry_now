@@ -15,6 +15,7 @@
       this.sx = 1;          // 그림용 가로/세로 배율 (충돌 박스와 무관)
       this.sy = 1;
       this.twoHit = true;   // 첫 타에 밀려나 기절, 다시 맞으면 죽는다
+      this.variant = 'green'; // 몸 색: green 기본 / ice 설산 / lava 화산 (그림만 다르다)
     }
 
     reset() {
@@ -83,7 +84,7 @@
 
       let speed = this.chasing ? C.SLIME_CHASE_SPEED : C.SLIME_WALK_SPEED;
       if (!this.onGround) speed *= C.SLIME_AIR_SPEED_MULT;
-      this.vx = this.dir * speed;
+      this.vx = this.dir * speed * this.stageSpeed;
 
       // 쫓아가다 구덩이에 빠지지 않게 멈춤 (작은 낙차는 내려감)
       if (this.chasing && this.onGround && this._ledgeAhead(terrain, C.SLIME_SAFE_DROP)) this.vx = 0;

@@ -21,6 +21,7 @@
       this.villagers = [];  // 마을 사람 {col,row}
       this.caveEntrances = []; // 마을의 동굴 입구 {col,row}
       this.exits = [];      // 동굴의 마을 출구 {col,row}
+      this.gates = [];      // 마을의 스테이지 문 {col,row,stage}: F 숲, N 설산, M 화산
 
       rows.forEach((line, r) => {
         const row = [];
@@ -40,6 +41,9 @@
           if (ch === 'V') this.villagers.push({ col: c, row: r });
           if (ch === 'D') this.caveEntrances.push({ col: c, row: r });
           if (ch === 'X') this.exits.push({ col: c, row: r });
+          if (ch === 'F') this.gates.push({ col: c, row: r, stage: 'forest' });
+          if (ch === 'N') this.gates.push({ col: c, row: r, stage: 'snow' });
+          if (ch === 'M') this.gates.push({ col: c, row: r, stage: 'volcano' });
         }
         this.grid.push(row);
       });

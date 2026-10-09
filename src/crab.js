@@ -47,7 +47,7 @@
           this.timer = C.CRAB_DASH_TIME;
         }
       } else if (this.state === 'dash') {
-        this.vx = this.dir * C.CRAB_DASH_SPEED; // 벽에 막히면 vx가 0이 되므로 매 프레임 다시 건다
+        this.vx = this.dir * C.CRAB_DASH_SPEED * this.stageSpeed; // 벽에 막히면 vx가 0이 되므로 매 프레임 다시 건다
         this.timer -= dt;
         if (this.timer <= 0 || this.hitWall || (this.onGround && this._ledgeAhead(terrain))) {
           this.state = 'walk';
@@ -74,7 +74,7 @@
           this.vx = 0;
           return;
         }
-        this.vx = this.dir * C.CRAB_CHASE_SPEED;
+        this.vx = this.dir * C.CRAB_CHASE_SPEED * this.stageSpeed;
         if (this.onGround && this._ledgeAhead(terrain)) this.vx = 0; // 쫓다가 바다로 떨어지지 않게 멈춤
         return;
       }
@@ -84,7 +84,7 @@
         return;
       }
       if (this.onGround && (this.hitWall || this._ledgeAhead(terrain))) this.dir = -this.dir;
-      this.vx = this.dir * C.CRAB_WALK_SPEED;
+      this.vx = this.dir * C.CRAB_WALK_SPEED * this.stageSpeed;
       if (Math.random() < 0.006) this.pause = 0.5 + Math.random() * 0.8;
     }
   }
