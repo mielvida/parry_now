@@ -12,12 +12,13 @@
       this.viewH = viewH;
     }
 
-    draw(terrain, player, camera) {
+    draw(terrain, player, camera, slimes = []) {
       const ctx = this.ctx;
       this._drawBackground(ctx);
       ctx.save();
       ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
       this._drawTerrain(ctx, terrain, camera);
+      for (const s of slimes) this._drawSlime(ctx, s);
       this._drawPlayer(ctx, player);
       ctx.restore();
       this._drawHud(ctx);
@@ -70,6 +71,48 @@
       ctx.fillRect(eyeX, y + 8, 6, 6);
       ctx.fillStyle = '#222';
       ctx.fillRect(eyeX + (p.facing > 0 ? 3 : 0), y + 10, 3, 3);
+    }
+
+    _drawSlime(ctx, s) {
+      // 바닥 중앙을 기준으로 가로/세로 배율을 적용한 젤리 몸체 (충돌 박스는 그대로)
+      const cx = Math.round(s.x + s.w / 2);
+      const bottom = Math.round(s.y + s.h);
+      const bw = s.w * s.sx * 1.1;
+      const bh = s.h * s.sy * 1.15;
+      const left = cx - bw / 2;
+      const right = cx + bw / 2;
+      const shoulder = bottom - bh * 0.45;
+
+      ctx.beginPath();
+      ctx.moveTo(left, bottom);
+      ctx.lineTo(left, shoulder);
+      ctx.quadraticCurveTo(cx, bottom - bh * 1.35, right, shoulder);
+      ctx.lineTo(right, bottom);
+      ctx.closePath();
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = s.chasing ? '#f0558c' : '#4fd37f';
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = s.chasing ? '#b02a5c' : '#2c9b55';
+      ctx.stroke();
+
+      // 젤리 하이라이트
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(cx - bw * 0.2, bottom - bh * 0.78, bw * 0.12, bh * 0.1, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 눈: 바라보는 쪽으로 쏠림
+      const ex = cx + s.dir * bw * 0.12;
+      const ey = bottom - bh * 0.5;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(ex - 7, ey - 4, 6, 7);
+      ctx.fillRect(ex + 1, ey - 4, 6, 7);
+      ctx.fillStyle = '#222';
+      const px = s.dir > 0 ? 2 : 0;
+      ctx.fillRect(ex - 7 + px, ey - 1, 3, 4);
+      ctx.fillRect(ex + 1 + px, ey - 1, 3, 4);
     }
 
     _drawHud(ctx) {

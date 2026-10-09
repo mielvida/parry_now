@@ -11,6 +11,7 @@
       this.height = this.rows * TILE;
       this.spawn = { x: TILE, y: TILE };
       this.grid = [];
+      this.slimeSpawns = [];
 
       rows.forEach((line, r) => {
         const row = [];
@@ -18,6 +19,7 @@
           const ch = line[c] || '.';
           row.push(ch === '#');
           if (ch === 'P') this.spawn = { col: c, row: r };
+          if (ch === 'S') this.slimeSpawns.push({ col: c, row: r });
         }
         this.grid.push(row);
       });
@@ -46,14 +48,18 @@
       return out;
     }
 
-    // 시작점: 해당 타일 바닥 중앙에 서도록 px 좌표로 변환 (엔티티 크기 필요)
+    // 타일 바닥 중앙에 서도록 px 좌표로 변환 (엔티티 크기 필요)
+    placeOnTile(col, row, entityW, entityH) {
+      return {
+        x: col * TILE + (TILE - entityW) / 2,
+        y: (row + 1) * TILE - entityH,
+      };
+    }
+
     spawnFor(entityW, entityH) {
       const s = this.spawn;
       if (s.col === undefined) return { x: s.x, y: s.y };
-      return {
-        x: s.col * TILE + (TILE - entityW) / 2,
-        y: (s.row + 1) * TILE - entityH,
-      };
+      return this.placeOnTile(s.col, s.row, entityW, entityH);
     }
   }
 

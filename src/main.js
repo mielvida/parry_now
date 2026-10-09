@@ -12,14 +12,24 @@
   const player = new G.Player(spawn.x, spawn.y);
   camera.follow(player, terrain, C.DT, true);
 
+  const slimes = terrain.slimeSpawns.map((s) => {
+    const p = terrain.placeOnTile(s.col, s.row, C.SLIME_W, C.SLIME_H);
+    return new G.Slime(p.x, p.y);
+  });
+
   function respawn() {
     player.respawn(spawn.x, spawn.y);
+    slimes.forEach((s) => s.reset());
     camera.follow(player, terrain, C.DT, true);
   }
 
   function step(dt) {
     if (input.down.has('KeyR')) respawn();
     player.update(dt, input, terrain);
+    for (const s of slimes) {
+      s.update(dt, player, terrain);
+      if (s.overlaps(player)) respawn(); // 슬라임에 닿으면 시작점으로
+    }
     if (player.y > terrain.height + C.TILE * 2) respawn(); // 구덩이 낙사
     camera.follow(player, terrain, dt);
     input.endFrame();
@@ -35,11 +45,11 @@
       step(C.DT);
       acc -= C.DT;
     }
-    renderer.draw(terrain, player, camera);
+    renderer.draw(terrain, player, camera, slimes);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
   // 테스트/디버그용 노출
-  G.state = { terrain, player, camera, input, step };
+  G.state = { terrain, player, slimes, camera, input, step };
 })(window.Game);
