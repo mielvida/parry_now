@@ -11,7 +11,8 @@
       this.vx = 0;
       this.vy = 0;
       this.onGround = false;
-      this.hitWall = false; // 직전 X 이동에서 벽에 막혔는가
+      this.hitWall = false;    // 직전 X 이동에서 벽에 막혔는가
+      this.hitCeiling = false; // 직전 Y 이동에서 천장에 부딪혔는가
     }
 
     applyGravity(dt, scale = 1) {
@@ -33,12 +34,14 @@
     moveY(dt, terrain) {
       this.y += this.vy * dt;
       this.onGround = false;
+      this.hitCeiling = false;
       for (const t of terrain.solidTilesIn(this.x, this.y, this.w, this.h)) {
         if (this.vy > 0) {          // 낙하 중 바닥에 닿음 -> 밟고 서기
           this.y = t.y - this.h;
           this.onGround = true;
         } else if (this.vy < 0) {   // 상승 중 천장에 부딪힘
           this.y = t.y + t.h;
+          this.hitCeiling = true;
         }
         this.vy = 0;
       }

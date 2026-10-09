@@ -12,24 +12,24 @@
       this.viewH = viewH;
     }
 
-    draw(terrain, player, camera, slimes = []) {
+    draw(terrain, player, camera, monsters = [], effects = null, hud = null, sword = null) {
       const ctx = this.ctx;
-      this._drawBackground(ctx);
+      const time = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+      G.Cave.drawBackground(ctx, this.viewW, this.viewH, camera, time);
       ctx.save();
-      ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+      const sh = effects ? effects.shakeOffset() : { x: 0, y: 0 };
+      ctx.translate(-Math.round(camera.x - sh.x), -Math.round(camera.y - sh.y));
+      G.Cave.drawCeiling(ctx, camera, this.viewW);
       this._drawTerrain(ctx, terrain, camera);
-      for (const s of slimes) this._drawSlime(ctx, s);
+      for (const m of monsters) if (m.alive && this._inView(m, camera)) this._drawMonster(ctx, m); // 화면 밖은 그리지 않음 (대량 소환 대비)
       this._drawPlayer(ctx, player);
+      G.Hero.drawCharge(ctx, player);
+      if (sword) G.Hero.drawThrownSword(ctx, sword);
+      if (effects) effects.draw(ctx);
       ctx.restore();
-      this._drawHud(ctx);
-    }
-
-    _drawBackground(ctx) {
-      const g = ctx.createLinearGradient(0, 0, 0, this.viewH);
-      g.addColorStop(0, '#6aa9e9');
-      g.addColorStop(1, '#cfe8ff');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, this.viewW, this.viewH);
+      G.Cave.drawVignette(ctx, this.viewW, this.viewH);
+      if (effects) effects.drawOverlay(ctx, this.viewW, this.viewH);
+      this._drawHud(ctx, hud);
     }
 
     _drawTerrain(ctx, terrain, camera) {
@@ -41,39 +41,61 @@
 
       for (let r = r0; r <= r1; r++) {
         for (let c = c0; c <= c1; c++) {
-          if (!terrain.grid[r][c]) continue;
-          const x = c * TILE;
-          const y = r * TILE;
-          const exposed = r === 0 || !terrain.grid[r - 1][c]; // 위가 비어 있으면 잔디
-          ctx.fillStyle = '#7a5634';
-          ctx.fillRect(x, y, TILE, TILE);
-          ctx.fillStyle = 'rgba(0,0,0,0.12)';
-          ctx.fillRect(x, y + TILE - 2, TILE, 2);
-          ctx.fillRect(x + TILE - 2, y, 2, TILE);
-          if (exposed) {
-            ctx.fillStyle = '#4caf50';
-            ctx.fillRect(x, y, TILE, 8);
-            ctx.fillStyle = '#7ed957';
-            ctx.fillRect(x, y, TILE, 3);
-          }
+          if (terrain.grid[r][c]) G.Cave.drawTile(ctx, terrain, c, r);
         }
       }
     }
 
     _drawPlayer(ctx, p) {
-      const x = Math.round(p.x);
-      const y = Math.round(p.y);
-      ctx.fillStyle = '#d6372f';
-      ctx.fillRect(x, y, p.w, p.h);
-      // 눈: 바라보는 방향 쪽에 배치
-      const eyeX = p.facing > 0 ? x + p.w - 10 : x + 4;
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(eyeX, y + 8, 6, 6);
-      ctx.fillStyle = '#222';
-      ctx.fillRect(eyeX + (p.facing > 0 ? 3 : 0), y + 10, 3, 3);
+      // 무적 중엔 깜빡인다
+      const blink = p.invuln > 0 && Math.floor(p.invuln / 0.08) % 2 === 0;
+      if (blink) ctx.globalAlpha = 0.3;
+      this._paintPlayer(ctx, p);
+      ctx.globalAlpha = 1;
     }
 
-    _drawSlime(ctx, s) {
+    _paintPlayer(ctx, p) {
+      G.Hero.draw(ctx, p);
+    }
+
+    _drawMonster(ctx, s) {
+      if (s.flying) {
+        // 튕겨난 몬스터: 몸 중심 기준으로 빙글 회전
+        ctx.save();
+        ctx.translate(s.x + s.w / 2, s.y + s.h / 2);
+        ctx.rotate(s.spin);
+        ctx.translate(-(s.x + s.w / 2), -(s.y + s.h / 2));
+        this._drawMonsterBody(ctx, s);
+        ctx.restore();
+        return;
+      }
+      this._drawMonsterBody(ctx, s);
+    }
+
+    _paintMonster(ctx, m) {
+      if (m.kind === 'bat') this._paintBat(ctx, m);
+      else this._paintSlime(ctx, m);
+    }
+
+    _drawMonsterBody(ctx, s) {
+      // 부활 직후: 바닥(박쥐는 중심)에서 통통 튀며 커지는 연출
+      if (s.appear > 0) {
+        const t = 1 - s.appear / G.Config.SLIME_APPEAR_TIME;
+        const k = 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2); // easeOutBack
+        const cx = s.x + s.w / 2;
+        const by = s.kind === 'bat' ? s.y + s.h / 2 : s.y + s.h;
+        ctx.save();
+        ctx.translate(cx, by);
+        ctx.scale(k, k);
+        ctx.translate(-cx, -by);
+        this._paintMonster(ctx, s);
+        ctx.restore();
+        return;
+      }
+      this._paintMonster(ctx, s);
+    }
+
+    _paintSlime(ctx, s) {
       // 바닥 중앙을 기준으로 가로/세로 배율을 적용한 젤리 몸체 (충돌 박스는 그대로)
       const cx = Math.round(s.x + s.w / 2);
       const bottom = Math.round(s.y + s.h);
@@ -90,7 +112,7 @@
       ctx.lineTo(right, bottom);
       ctx.closePath();
       ctx.globalAlpha = 0.92;
-      ctx.fillStyle = s.chasing ? '#f0558c' : '#4fd37f';
+      ctx.fillStyle = s.flying && Math.floor(s.flightTime / 0.05) % 2 === 0 ? '#ffffff' : s.chasing ? '#f0558c' : '#4fd37f'; // 사라지기 직전엔 하얗게 번쩍
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.lineWidth = 2;
@@ -115,11 +137,116 @@
       ctx.fillRect(ex + 1 + px, ey - 1, 3, 4);
     }
 
-    _drawHud(ctx) {
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    // 박쥐: 날개를 퍼덕이며 날고, 예비동작/급강하 때는 눈이 붉게 변한다
+    _paintBat(ctx, b) {
+      const cx = Math.round(b.x + b.w / 2);
+      const cy = Math.round(b.y + b.h / 2);
+      const angry = b.state === 'windup' || b.state === 'dive';
+      const flash = b.flying && Math.floor(b.flightTime / 0.05) % 2 === 0;
+      const dive = b.state === 'dive';
+      const wing = dive ? 1.0 : Math.sin(b.flap) * 0.9; // 급강하 땐 날개를 접음
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(b.dir >= 0 ? 1 : -1, 1);
+      const body = flash ? '#ffffff' : angry ? '#8a3f96' : '#6a52a0';
+      const membrane = flash ? '#ffffff' : angry ? '#a8416f' : '#7f64bd';
+      // 날개 (몸 뒤/앞 양쪽)
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.translate(side * 5, -2);
+        ctx.rotate(side * (-0.35 - wing * 0.6));
+        ctx.fillStyle = membrane;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(side * 20, -9 - wing * 4);
+        ctx.lineTo(side * 15, 0);
+        ctx.lineTo(side * 19, 6);
+        ctx.lineTo(side * 8, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(20,12,40,0.8)';
+        ctx.stroke();
+        ctx.restore();
+      }
+      // 몸통 + 귀
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 9, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-6, -5); ctx.lineTo(-5, -12); ctx.lineTo(-1, -6);
+      ctx.moveTo(6, -5); ctx.lineTo(5, -12); ctx.lineTo(1, -6);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(20,12,40,0.8)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 9, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // 눈 + 송곳니
+      ctx.fillStyle = angry ? '#ff4d4d' : '#ffe36b';
+      ctx.fillRect(-5, -3, 3, 3);
+      ctx.fillRect(2, -3, 3, 3);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-3, 3, 2, 3);
+      ctx.fillRect(1, 3, 2, 3);
+      ctx.restore();
+    }
+
+    _inView(o, camera) {
+      const m = 64;
+      return o.x + o.w > camera.x - m && o.x < camera.x + this.viewW + m && o.y + o.h > camera.y - m && o.y < camera.y + this.viewH + m;
+    }
+
+    _drawHeart(ctx, x, y, size, filled) {
+      const s = size;
+      ctx.beginPath();
+      ctx.moveTo(x, y + s * 0.35);
+      ctx.bezierCurveTo(x, y - s * 0.1, x - s * 0.55, y - s * 0.1, x - s * 0.55, y + s * 0.25);
+      ctx.bezierCurveTo(x - s * 0.55, y + s * 0.6, x, y + s * 0.8, x, y + s);
+      ctx.bezierCurveTo(x, y + s * 0.8, x + s * 0.55, y + s * 0.6, x + s * 0.55, y + s * 0.25);
+      ctx.bezierCurveTo(x + s * 0.55, y - s * 0.1, x, y - s * 0.1, x, y + s * 0.35);
+      ctx.closePath();
+      ctx.fillStyle = filled ? '#e8334a' : 'rgba(0,0,0,0.25)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = filled ? '#8f1427' : 'rgba(0,0,0,0.4)';
+      ctx.stroke();
+    }
+
+    // 어두운 동굴 배경에서도 읽히도록 그림자를 깐 밝은 글씨
+    _text(ctx, str, x, y) {
+      ctx.fillStyle = 'rgba(0,0,0,0.8)';
+      ctx.fillText(str, x + 1, y + 1);
+      ctx.fillStyle = 'rgba(225,232,255,0.92)';
+      ctx.fillText(str, x, y);
+    }
+
+    _drawHud(ctx, hud) {
       ctx.font = '16px sans-serif';
       ctx.textBaseline = 'top';
-      ctx.fillText('←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프 (길게 누르면 높이 점프)   R: 리스폰', 12, 10);
+      this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   R: 처음 위치로', 12, 10);
+      if (!hud) return;
+      if (hud.slimeCount !== undefined) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리   - 키: 슬라임 소환`, 12, 32);
+
+      // 목숨: 우측 상단 하트
+      for (let i = 0; i < hud.maxLives; i++) {
+        this._drawHeart(ctx, this.viewW - 28 - (hud.maxLives - 1 - i) * 34, 10, 26, i < hud.lives);
+      }
+
+      if (hud.gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, this.viewW, this.viewH);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ff4d63';
+        ctx.font = 'bold 64px sans-serif';
+        ctx.fillText('GAME OVER', this.viewW / 2, this.viewH / 2 - 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '22px sans-serif';
+        if (hud.canRestart) ctx.fillText('Enter 키로 다시 시작', this.viewW / 2, this.viewH / 2 + 38);
+        ctx.textAlign = 'start';
+      }
     }
   }
 

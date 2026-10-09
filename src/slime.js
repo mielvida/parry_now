@@ -1,36 +1,40 @@
 // 슬라임: 평소엔 땅 위를 왔다갔다 하다가, 플레이어가 가까이 오면 쫓아오며 점프한다.
 // 충돌 판정은 Player와 동일한 Body를 사용한다 (찌그러짐 애니메이션은 그림에만 적용).
 // 점프는 1타일 높이: 웅크렸다가(예비동작) 둥실 떠올라 느리게 이동하고, 착지하면 납작해진다.
+// 패링에 맞으면 날아가다 벽/땅/천장에 닿는 순간 터지고, 일정 시간 뒤 제자리에서 부활한다 (Monster 공통).
 (function (G) {
   const C = G.Config;
 
-  class Slime extends G.Body {
+  class Slime extends G.Monster {
     constructor(x, y) {
-      super(x, y, C.SLIME_W, C.SLIME_H);
-      this.home = { x, y };
-      this.dir = -1;
-      this.chasing = false;
+      super(x, y, C.SLIME_W, C.SLIME_H, 'slime');
       this.jumpCooldown = 0;
       this.crouch = 0;      // >0 이면 점프 직전 웅크리는 중
+      this.reachable = false; // 걸어서 갈 수 있는가 (사이에 구덩이가 없는가). 첫 착지 전에는 모름
       this.landTimer = 0;   // >0 이면 착지 직후 납작해지는 중
-      this.time = Math.random() * 10; // 개체마다 출렁이는 박자를 다르게
       this.sx = 1;          // 그림용 가로/세로 배율 (충돌 박스와 무관)
       this.sy = 1;
     }
 
     reset() {
-      this.x = this.home.x;
-      this.y = this.home.y;
-      this.vx = 0;
-      this.vy = 0;
+      super.reset();
       this.crouch = 0;
       this.landTimer = 0;
     }
 
+    knockback(dirX) {
+      super.knockback(dirX);
+      this.crouch = 0;
+    }
+
     update(dt, player, terrain) {
+      if (this.tickLifecycle(dt, terrain)) return;
+
       const dx = player.x + player.w / 2 - (this.x + this.w / 2);
       const dy = player.y + player.h / 2 - (this.y + this.h / 2);
-      this.chasing = Math.abs(dx) < C.SLIME_SIGHT_X && Math.abs(dy) < C.SLIME_SIGHT_Y;
+      if (this.onGround) this.reachable = this._pathClear(player, terrain);
+      this.chasing = this.reachable &&
+        Math.abs(dx) < C.SLIME_SIGHT_X && Math.abs(dy) < C.SLIME_SIGHT_Y;
       this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
       const wasAirborne = !this.onGround;
 
@@ -102,6 +106,20 @@
       const k = Math.min(1, dt * 18);
       this.sx += (tx - this.sx) * k;
       this.sy += (ty - this.sy) * k;
+    }
+
+    // 플레이어와의 사이에 구덩이(바닥 없는 열)가 없는가. 있으면 건너편의 플레이어를 알아채지 못한다.
+    _pathClear(player, terrain) {
+      const T = C.TILE;
+      const c0 = Math.floor((this.x + this.w / 2) / T);
+      const c1 = Math.floor((player.x + player.w / 2) / T);
+      const row = Math.floor((this.y + this.h + 1) / T);
+      for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++) {
+        let ground = false;
+        for (let i = 0; i < C.SLIME_SAFE_DROP && !ground; i++) ground = terrain.isSolid(c, row + i);
+        if (!ground) return false;
+      }
+      return true;
     }
 
     // 진행 방향 발밑 depth타일 안에 땅이 하나도 없는가 (순찰은 1: 어떤 낙차에서도 되돌아감)

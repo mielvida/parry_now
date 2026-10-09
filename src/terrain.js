@@ -12,6 +12,7 @@
       this.spawn = { x: TILE, y: TILE };
       this.grid = [];
       this.slimeSpawns = [];
+      this.batSpawns = [];
 
       rows.forEach((line, r) => {
         const row = [];
@@ -20,6 +21,7 @@
           row.push(ch === '#');
           if (ch === 'P') this.spawn = { col: c, row: r };
           if (ch === 'S') this.slimeSpawns.push({ col: c, row: r });
+          if (ch === 'B') this.batSpawns.push({ col: c, row: r });
         }
         this.grid.push(row);
       });
@@ -48,11 +50,30 @@
       return out;
     }
 
+    // 빈 타일이면서 바로 아래가 땅인 곳 = 서 있을 수 있는 자리 (몹 배치 후보)
+    standingSpots() {
+      const out = [];
+      for (let r = 0; r < this.rows - 1; r++) {
+        for (let c = 0; c < this.cols; c++) {
+          if (!this.grid[r][c] && this.grid[r + 1][c]) out.push({ col: c, row: r });
+        }
+      }
+      return out;
+    }
+
     // 타일 바닥 중앙에 서도록 px 좌표로 변환 (엔티티 크기 필요)
     placeOnTile(col, row, entityW, entityH) {
       return {
         x: col * TILE + (TILE - entityW) / 2,
         y: (row + 1) * TILE - entityH,
+      };
+    }
+
+    // 타일 한가운데에 놓이도록 px 좌표로 변환 (날아다니는 몹용)
+    centerOnTile(col, row, entityW, entityH) {
+      return {
+        x: col * TILE + (TILE - entityW) / 2,
+        y: row * TILE + (TILE - entityH) / 2,
       };
     }
 

@@ -3,17 +3,23 @@
   const LEFT = ['ArrowLeft', 'KeyA'];
   const RIGHT = ['ArrowRight', 'KeyD'];
   const JUMP = ['Space', 'ArrowUp', 'KeyW', 'KeyZ'];
+  const PARRY = ['Enter', 'NumpadEnter'];
+  const SPAWN = ['Minus', 'NumpadSubtract'];
   const PREVENT = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
   class Input {
     constructor(target) {
       this.down = new Set();
       this.jumpPressedThisFrame = false;
+      this.parryPressedThisFrame = false;
+      this.spawnPressedThisFrame = false;
 
       target.addEventListener('keydown', (e) => {
         if (PREVENT.has(e.code)) e.preventDefault();
         if (e.repeat) return;
         if (JUMP.includes(e.code) && !this._anyDown(JUMP)) this.jumpPressedThisFrame = true;
+        if (PARRY.includes(e.code)) this.parryPressedThisFrame = true;
+        if (SPAWN.includes(e.code)) this.spawnPressedThisFrame = true;
         this.down.add(e.code);
       });
       target.addEventListener('keyup', (e) => this.down.delete(e.code));
@@ -34,9 +40,22 @@
       return this.jumpPressedThisFrame;
     }
 
+    get parryHeld() {
+      return this._anyDown(PARRY);
+    }
+    get spawnPressed() {
+      return this.spawnPressedThisFrame;
+    }
+
+    get parryPressed() {
+      return this.parryPressedThisFrame;
+    }
+
     // 로직 스텝이 끝날 때마다 호출: "이번 프레임에 눌림" 플래그 초기화
     endFrame() {
       this.jumpPressedThisFrame = false;
+      this.parryPressedThisFrame = false;
+      this.spawnPressedThisFrame = false;
     }
   }
 
