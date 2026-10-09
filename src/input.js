@@ -5,6 +5,7 @@
   const JUMP = ['Space', 'ArrowUp', 'KeyW', 'KeyZ'];
   const PARRY = ['Enter', 'NumpadEnter'];
   const SPAWN = ['Minus', 'NumpadSubtract'];
+  const DASH = ['ShiftLeft', 'ShiftRight', 'KeyX']; // Shift(또는 X). Windows는 Shift를 연타하면 고정키 창이 떠서 입력이 끊길 수 있어 X도 쓸 수 있게
   const PREVENT = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
   class Input {
@@ -13,13 +14,17 @@
       this.jumpPressedThisFrame = false;
       this.parryPressedThisFrame = false;
       this.spawnPressedThisFrame = false;
+      this.dashPressedThisFrame = false;
+      this.pressedSet = new Set(); // 이번 프레임에 새로 눌린 키 (E, 숫자 키 등)
 
       target.addEventListener('keydown', (e) => {
         if (PREVENT.has(e.code)) e.preventDefault();
         if (e.repeat) return;
+        this.pressedSet.add(e.code);
         if (JUMP.includes(e.code) && !this._anyDown(JUMP)) this.jumpPressedThisFrame = true;
         if (PARRY.includes(e.code)) this.parryPressedThisFrame = true;
         if (SPAWN.includes(e.code)) this.spawnPressedThisFrame = true;
+        if (DASH.includes(e.code)) this.dashPressedThisFrame = true;
         this.down.add(e.code);
       });
       target.addEventListener('keyup', (e) => this.down.delete(e.code));
@@ -43,6 +48,9 @@
     get parryHeld() {
       return this._anyDown(PARRY);
     }
+    get dashPressed() {
+      return this.dashPressedThisFrame;
+    }
     get spawnPressed() {
       return this.spawnPressedThisFrame;
     }
@@ -51,11 +59,17 @@
       return this.parryPressedThisFrame;
     }
 
+    wasPressed(code) {
+      return this.pressedSet.has(code);
+    }
+
     // 로직 스텝이 끝날 때마다 호출: "이번 프레임에 눌림" 플래그 초기화
     endFrame() {
       this.jumpPressedThisFrame = false;
       this.parryPressedThisFrame = false;
       this.spawnPressedThisFrame = false;
+      this.dashPressedThisFrame = false;
+      this.pressedSet.clear();
     }
   }
 

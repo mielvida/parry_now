@@ -14,6 +14,7 @@
       this.landTimer = 0;   // >0 이면 착지 직후 납작해지는 중
       this.sx = 1;          // 그림용 가로/세로 배율 (충돌 박스와 무관)
       this.sy = 1;
+      this.twoHit = true;   // 첫 타에 밀려나 기절, 다시 맞으면 죽는다
     }
 
     reset() {
@@ -25,6 +26,12 @@
     knockback(dirX) {
       super.knockback(dirX);
       this.crouch = 0;
+    }
+
+    stagger(dirX) {
+      super.stagger(dirX);
+      this.crouch = 0;
+      this.landTimer = 0;
     }
 
     update(dt, player, terrain) {
@@ -119,16 +126,6 @@
         for (let i = 0; i < C.SLIME_SAFE_DROP && !ground; i++) ground = terrain.isSolid(c, row + i);
         if (!ground) return false;
       }
-      return true;
-    }
-
-    // 진행 방향 발밑 depth타일 안에 땅이 하나도 없는가 (순찰은 1: 어떤 낙차에서도 되돌아감)
-    _ledgeAhead(terrain, depth = 1) {
-      const T = C.TILE;
-      const frontX = this.dir > 0 ? this.x + this.w + 1 : this.x - 1;
-      const col = Math.floor(frontX / T);
-      const row = Math.floor((this.y + this.h + 1) / T);
-      for (let i = 0; i < depth; i++) if (terrain.isSolid(col, row + i)) return false;
       return true;
     }
   }

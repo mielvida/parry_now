@@ -228,6 +228,37 @@
       }
     },
 
+    // 장식: 마을로 나가는 출구 (바깥 햇빛이 비치는 나무 문틀 + 팻말). 땅 타일 뒤에 깐다
+    drawDecor(ctx, terrain, camera, time) {
+      for (const X of terrain.exits) {
+        const bx = X.col * TILE + TILE / 2;
+        if (bx < camera.x - 80 || bx > camera.x + camera.viewW + 80) continue;
+        const by = (X.row + 1) * TILE;
+        const g = ctx.createLinearGradient(0, by - 64, 0, by);
+        g.addColorStop(0, '#bfe8ff');
+        g.addColorStop(1, '#fff1b8');
+        ctx.fillStyle = g;
+        ctx.fillRect(bx - 18, by - 64, 36, 64);
+        const glow = ctx.createRadialGradient(bx, by - 30, 0, bx, by - 30, 70);
+        glow.addColorStop(0, `rgba(255,240,180,${0.3 + 0.08 * Math.sin(time * 3)})`);
+        glow.addColorStop(1, 'rgba(255,240,180,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(bx - 70, by - 100, 140, 140);
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(bx - 22, by - 68, 6, 68);
+        ctx.fillRect(bx + 16, by - 68, 6, 68);
+        ctx.fillRect(bx - 22, by - 70, 44, 6);
+        ctx.fillStyle = '#c9a56a';
+        ctx.fillRect(bx - 24, by - 92, 48, 18);
+        ctx.fillStyle = '#5a3d17';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('마을', bx, by - 83);
+        ctx.textAlign = 'start';
+      }
+    },
+
     // 화면 가장자리를 어둡게 + 아래쪽(구덩이)을 더 깊게 보이게 하는 오버레이
     drawVignette(ctx, w, h) {
       const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, w * 0.68);

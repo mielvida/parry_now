@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Platformer</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #14161c; }
+    html, body { margin: 0; height: 100%; background: #14161c; overflow: hidden; }
     body { display: flex; align-items: center; justify-content: center; }
-    canvas { max-width: 100%; max-height: 100%; background: #000; image-rendering: pixelated; }
+    /* 게임 화면(960x576, 비율 5:3)을 창에 꽉 차게: 가로/세로 중 먼저 닿는 쪽에 맞춰 늘린다 */
+    canvas { display: block; width: min(100vw, 166.6667vh); height: auto; background: #000; }
   </style>
 </head>
 <body>
@@ -16,20 +17,28 @@
   <!-- 로드 순서 = 의존 순서. file:// 에서도 동작하도록 ES 모듈 대신 네임스페이스(window.Game)를 사용 -->
   <script src="src/config.js"></script>
   <script src="src/input.js"></script>
+  <script src="src/audio.js"></script>
   <script src="src/terrain.js"></script>
   <script src="src/body.js"></script>
   <script src="src/player.js"></script>
   <script src="src/monster.js"></script>
   <script src="src/slime.js"></script>
   <script src="src/bat.js"></script>
+  <script src="src/crab.js"></script>
+  <script src="src/shop.js"></script>
+  <script src="src/npc.js"></script>
   <script src="src/sword.js"></script>
   <script src="src/camera.js"></script>
   <script src="src/effects.js"></script>
+  <script src="src/magic.js"></script>
   <script src="src/hero.js"></script>
   <script src="src/cave.js"></script>
+  <script src="src/beach.js"></script>
   <script src="src/cutscene.js"></script>
+  <script src="src/ending.js"></script>
   <script src="src/renderer.js"></script>
   <script src="src/levels.js"></script>
+  <script src="src/mine.js"></script>
   <script src="src/main.js"></script>
 </body>
 </html>

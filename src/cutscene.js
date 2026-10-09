@@ -11,7 +11,7 @@
 
   // 장면 순서. dur는 최대 시간(walk는 병에 도착하면 먼저 끝남)
   const PHASES = [
-    { id: 'find', dur: 2.2, caption: '깊은 동굴 속… 용사는 바닥에서 반짝이는 무언가를 발견했다.' },
+    { id: 'find', dur: 2.2, caption: '몬스터를 잡으러 깊은 동굴에 들어간 용사는 바닥에서 반짝이는 무언가를 발견했다.' },
     { id: 'walk', dur: 5, caption: '' },
     { id: 'pickup', dur: 1.8, caption: '유리병이다! 안에 무언가 들어 있어…' },
     { id: 'bottle', dur: 3.6, caption: '병 속에는 낡은 두루마리가 들어 있었다.' },
@@ -156,6 +156,7 @@
       } else if (id === 'bottle') {
         if (!this.corkPopped && this.pt >= 1.2) { // 코르크가 뽑히는 순간
           this.corkPopped = true;
+          G.Audio.play('pop');
           effects.shake(2, 0.08);
         }
       } else if (id === 'ready') {
@@ -176,6 +177,8 @@
       }
       this.phase += 1;
       this.pt = 0;
+      if (this.phaseId === 'pickup') G.Audio.play('pickup');
+      else if (this.phaseId === 'map') G.Audio.play('scroll');
     }
 
     // 병의 현재 월드 위치 (땅 위 -> 용사 머리 위로 들어 올림)

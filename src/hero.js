@@ -8,6 +8,7 @@
   const easeOut = (t) => 1 - (1 - t) * (1 - t);
   const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
+  const GUARD_UP = -80;    // 가드 자세에서 검을 세운 각도
   const GUARD = -35;       // 평소 검을 든 각도 (도, 앞이 0°, 위쪽이 음수)
   const WINDUP = -125;     // 머리 위로 치켜든 각도
   const FOLLOW = 55;       // 베고 난 뒤 아래로 내려간 각도
@@ -40,29 +41,45 @@
     ctx.fill();
   }
 
+  // 신발(없으면 기본 가죽색): [본체, 밑창]
+  let bootCol = ['#4a3b2a', '#3a2f22'];
+
   function drawLegs(ctx, p) {
     const moving = p.onGround && Math.abs(p.vx) > 10;
     const stride = moving ? Math.sin(p.runPhase) * 4 : 0;
     if (!p.onGround) { // 공중: 한 다리는 앞으로, 한 다리는 접음
-      rect(ctx, '#4a3b2a', -5, 25, 5, 6);
-      rect(ctx, '#4a3b2a', 1, 23, 6, 5);
+      rect(ctx, bootCol[0], -5, 25, 5, 6);
+      rect(ctx, bootCol[0], 1, 23, 6, 5);
       return;
     }
-    rect(ctx, '#3a2f22', -6 - stride, 24, 5, 8);
-    rect(ctx, '#4a3b2a', 1 + stride, 24, 5, 8);
+    rect(ctx, bootCol[1], -6 - stride, 24, 5, 8);
+    rect(ctx, bootCol[0], 1 + stride, 24, 5, 8);
+    if (bootCol[2]) { // 산 신발은 앞코를 조금 길게
+      rect(ctx, bootCol[0], -6 - stride, 29, 7, 3);
+      rect(ctx, bootCol[0], 1 + stride, 29, 7, 3);
+    }
   }
+
+  // 낀 갑옷의 몸통 색: [본체, 어깨 하이라이트]
+  let armorCol = ['#3b6fd4', '#5b8ff0'];
+  // 머리: 투구를 끼면 투구 색, 안 끼면 기본 투구 [본체, 하이라이트]
+  let headCol = ['#c9d2dc', '#e6edf5'];
 
   function drawBody(ctx, p) {
     const bob = p.onGround && Math.abs(p.vx) > 10 ? Math.abs(Math.sin(p.runPhase)) * -1 : 0;
     ctx.save();
     ctx.translate(0, bob);
-    rect(ctx, '#3b6fd4', -7, 12, 14, 13);       // 갑옷
-    rect(ctx, '#5b8ff0', -7, 12, 14, 3);        // 어깨 하이라이트
+    rect(ctx, armorCol[0], -7, 12, 14, 13);     // 갑옷
+    rect(ctx, armorCol[1], -7, 12, 14, 3);      // 어깨 하이라이트
     rect(ctx, '#e0b12f', -7, 21, 14, 2);        // 허리띠
     rect(ctx, '#e0b12f', 5, 12, 2, 9);          // 가슴 장식
     // 투구
-    rect(ctx, '#c9d2dc', -7, 1, 14, 11);
-    rect(ctx, '#e6edf5', -7, 1, 14, 3);
+    rect(ctx, headCol[0], -7, 1, 14, 11);
+    rect(ctx, headCol[1], -7, 1, 14, 3);
+    if (p.helmetId) { // 산 투구: 이마 테두리와 가운데 능선을 더해 기본 투구와 구분한다
+      rect(ctx, 'rgba(0,0,0,0.25)', -7, 11, 14, 1);
+      rect(ctx, headCol[1], -1, -1, 3, 3);
+    }
     rect(ctx, '#1b2433', 0, 5, 7, 3);           // 눈구멍
     rect(ctx, '#ffffff', 4, 6, 2, 1);           // 눈빛
     // 깃털
@@ -76,20 +93,79 @@
     ctx.restore();
   }
 
+  // 낀 무기의 모양: type = sword/great/staff, blade = [밝은 면, 그늘]
+  let weaponType = 'sword';
+  let blade = ['#e8f1ff', '#9db6d6'];
+  let gloveCol = '#e8b98a'; // 손 (장갑을 끼면 장갑 색)
+
+  // 가드 순간 앞쪽에 번지는 푸른 방어막 (손 기준 좌표). k = 1에서 0으로 사라진다
+  function drawGuardShield(ctx, k) {
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(150,215,255,${0.6 * k})`;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.arc(2, -2, 24, -1.1, 1.1);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${0.95 * k})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(2, -2, 27, -1.0, 1.0);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+
   function drawSword(ctx, angle) {
     ctx.save();
     ctx.rotate(angle * DEG);
-    rect(ctx, '#6b4423', -5, -1.5, 6, 3);       // 손잡이
-    rect(ctx, '#e0b12f', 1, -5, 3, 10);         // 날밑
-    rect(ctx, '#e8f1ff', 4, -2, 24, 4);         // 칼날
-    rect(ctx, '#9db6d6', 4, 0.5, 24, 1.5);      // 칼날 그늘
-    ctx.fillStyle = '#e8f1ff';
-    ctx.beginPath();                            // 칼끝
-    ctx.moveTo(28, -2);
-    ctx.lineTo(33, 0);
-    ctx.lineTo(28, 2);
-    ctx.closePath();
-    ctx.fill();
+    if (weaponType === 'staff') { // 지팡이: 나무 막대 + 끝의 빛나는 구슬
+      rect(ctx, '#6b4423', -8, -1.5, 36, 3);
+      rect(ctx, '#e0b12f', 22, -3, 3, 6);
+      const orb = ctx.createRadialGradient(33, 0, 1, 33, 0, 9);
+      orb.addColorStop(0, '#ffffff');
+      orb.addColorStop(0.4, blade[0]);
+      orb.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = orb;
+      ctx.fillRect(22, -11, 22, 22);
+      ctx.fillStyle = blade[0];
+      ctx.beginPath(); ctx.arc(33, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = blade[1]; ctx.lineWidth = 1.2; ctx.stroke();
+    } else if (weaponType === 'dagger') { // 단검: 짧고 가는 칼날
+      rect(ctx, '#6b4423', -4, -1.5, 5, 3);
+      rect(ctx, '#e0b12f', 1, -3.5, 2.5, 7);
+      rect(ctx, blade[0], 3.5, -1.8, 13, 3.6);
+      rect(ctx, blade[1], 3.5, 0.4, 13, 1.4);
+      ctx.fillStyle = blade[0];
+      ctx.beginPath();
+      ctx.moveTo(16.5, -1.8);
+      ctx.lineTo(21, 0);
+      ctx.lineTo(16.5, 1.8);
+      ctx.closePath();
+      ctx.fill();
+    } else if (weaponType === 'great') { // 대검: 길고 넓은 칼날
+      rect(ctx, '#6b4423', -7, -1.5, 8, 3);
+      rect(ctx, '#e0b12f', 1, -7, 3, 14);
+      rect(ctx, blade[0], 4, -3.5, 34, 7);
+      rect(ctx, blade[1], 4, 1, 34, 2.5);
+      ctx.fillStyle = blade[0];
+      ctx.beginPath();
+      ctx.moveTo(38, -3.5);
+      ctx.lineTo(45, 0);
+      ctx.lineTo(38, 3.5);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      rect(ctx, '#6b4423', -5, -1.5, 6, 3);       // 손잡이
+      rect(ctx, '#e0b12f', 1, -5, 3, 10);         // 날밑
+      rect(ctx, blade[0], 4, -2, 24, 4);          // 칼날
+      rect(ctx, blade[1], 4, 0.5, 24, 1.5);       // 칼날 그늘
+      ctx.fillStyle = blade[0];
+      ctx.beginPath();                            // 칼끝
+      ctx.moveTo(28, -2);
+      ctx.lineTo(33, 0);
+      ctx.lineTo(28, 2);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -181,6 +257,14 @@
 
     // (x, y) = 충돌 박스 좌상단. 앞쪽(facing)을 +x로 놓고 그린 뒤 필요하면 좌우 반전
     draw(ctx, p) {
+      const items = G.Shop.ITEMS;
+      const wp = items[p.weaponId || 'sword0'];
+      weaponType = wp.type;
+      blade = wp.look;
+      armorCol = items[p.armorId || 'armor0'].look;
+      headCol = p.helmetId ? items[p.helmetId].look : ['#c9d2dc', '#e6edf5'];
+      gloveCol = p.glovesId ? items[p.glovesId].look[0] : '#e8b98a';
+      bootCol = p.bootsId ? [items[p.bootsId].look[0], items[p.bootsId].look[1], true] : ['#4a3b2a', '#3a2f22'];
       const cx = Math.round(p.x + p.w / 2);
       const top = Math.round(p.y);
       ctx.save();
@@ -195,12 +279,14 @@
       ctx.save();
       ctx.translate(6, 16);
       const f = p.swing;
-      const angle = swordAngle(f);
+      const guard = p.guardTimer > 0; // 패링 성공 직후: 검을 앞으로 세우고 막는 자세
+      const angle = guard ? GUARD_UP : swordAngle(f);
       if (!p.swordOut) { // 검을 던진 동안은 손이 빈다
-        drawSlashTrail(ctx, f, angle);
+        if (!guard) drawSlashTrail(ctx, f, angle);
         drawSword(ctx, angle);
       }
-      rect(ctx, '#e8b98a', -2.5, -2.5, 5, 5);   // 손
+      if (guard) drawGuardShield(ctx, p.guardTimer / C.GUARD_TIME);
+      rect(ctx, gloveCol, -2.5, -2.5, 5, 5);    // 손 (장갑)
       ctx.restore();
 
       ctx.restore();

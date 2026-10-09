@@ -8,6 +8,8 @@
   class Bat extends G.Monster {
     constructor(x, y) {
       super(x, y, C.BAT_W, C.BAT_H, 'bat');
+      this.maxHp = 2; // 박쥐는 체력 2 (독이면 2초에 죽는다)
+      this.hp = 2;
       this.state = 'patrol';
       this.timer = 0;        // 현재 상태에서 남은 시간
       this.cooldown = 0;     // 다음 급강하까지 대기

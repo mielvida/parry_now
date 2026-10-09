@@ -159,6 +159,95 @@
       this.shake(4, 0.12);
     }
 
+    // 대시를 시작한 순간: 발밑에서 먼지가 뒤쪽으로 흩날리고, 몸 높이로 바람줄이 길게 뻗는다 (dir = 먼지가 날아가는 방향)
+    dashDust(x, y, dir) {
+      for (let i = 0; i < 8; i++) {
+        this.particles.push({
+          kind: 'spark', x: x - dir * rand(-6, 10), y: y - rand(6, 30), vx: dir * rand(500, 900), vy: rand(-20, 20),
+          life: rand(0.12, 0.22), max: 0.22, size: rand(2, 3.5), gravity: 0, color: i % 2 ? '255,255,255' : '170,225,255',
+        });
+      }
+      for (let i = 0; i < 9; i++) {
+        this.particles.push({
+          kind: 'blob', x: x + rand(-6, 6), y: y - rand(0, 4), vx: dir * rand(40, 200), vy: -rand(10, 90),
+          life: rand(0.2, 0.45), max: 0.45, size: rand(2, 5), gravity: 300, color: i % 2 ? '215,195,150' : '240,230,210',
+        });
+      }
+    }
+
+    // 얼면서 죽는 순간: 얼음 조각이 사방으로 흩어지고 푸른 링이 퍼진다
+    iceShatter(x, y) {
+      this.flash = 0.1;
+      this.flashColor = '190,235,255';
+      this.rings.push({ x, y, r0: 4, r1: 60, life: 0.3, max: 0.3, color: '190,235,255', width: 5 });
+      this.rings.push({ x, y, r0: 2, r1: 34, life: 0.22, max: 0.22, color: '255,255,255', width: 3 });
+      const palette = ['190,235,255', '255,255,255', '120,200,255', '160,215,255'];
+      for (let i = 0; i < 30; i++) {
+        const a = rand(0, Math.PI * 2);
+        const sp = rand(120, 460);
+        this.particles.push({
+          kind: i % 2 ? 'spark' : 'blob', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 100,
+          life: rand(0.35, 0.7), max: 0.7, size: rand(2, 6), gravity: 700, color: palette[i % palette.length],
+        });
+      }
+      this.shake(5, 0.14);
+    }
+
+    // 불타며 죽는 순간: 불꽃이 위로 치솟는다
+    fireBurst(x, y) {
+      this.flash = 0.1;
+      this.flashColor = '255,170,80';
+      this.rings.push({ x, y, r0: 4, r1: 62, life: 0.32, max: 0.32, color: '255,150,60', width: 6 });
+      const palette = ['255,230,120', '255,170,60', '255,100,40', '90,40,30'];
+      for (let i = 0; i < 28; i++) {
+        this.particles.push({
+          kind: 'blob', x: x + rand(-14, 14), y: y + rand(-6, 8), vx: rand(-110, 110), vy: -rand(80, 360),
+          life: rand(0.4, 0.85), max: 0.85, size: rand(3, 7), gravity: -160, color: palette[i % palette.length],
+        });
+      }
+      this.shake(5, 0.14);
+    }
+
+    // 빛 무기: 금빛 고리가 r 반경까지 퍼진다
+    lightBurst(x, y, r) {
+      this.flash = 0.12;
+      this.flashColor = '255,240,170';
+      this.rings.push({ x, y, r0: 6, r1: r, life: 0.4, max: 0.4, color: '255,235,150', width: 7 });
+      this.rings.push({ x, y, r0: 4, r1: r * 0.6, life: 0.3, max: 0.3, color: '255,255,255', width: 3 });
+      for (let i = 0; i < 18; i++) {
+        const a = (i / 18) * Math.PI * 2;
+        this.particles.push({
+          kind: 'spark', x, y, vx: Math.cos(a) * rand(200, 420), vy: Math.sin(a) * rand(200, 420),
+          life: rand(0.2, 0.4), max: 0.4, size: rand(2, 4), gravity: 0, color: '255,240,170',
+        });
+      }
+    }
+
+    // 대지 무기: 먼지가 일고 갈색 충격파가 땅을 따라 퍼진다
+    quakeDust(x, y, r) {
+      this.rings.push({ x, y, r0: 6, r1: r, life: 0.4, max: 0.4, color: '190,150,100', width: 8 });
+      for (let i = 0; i < 22; i++) {
+        const dir = i % 2 ? 1 : -1;
+        this.particles.push({
+          kind: 'blob', x: x + dir * rand(0, 20), y: y + rand(-4, 2), vx: dir * rand(60, r * 1.6), vy: -rand(40, 200),
+          life: rand(0.35, 0.7), max: 0.7, size: rand(3, 7), gravity: 500, color: i % 3 ? '170,135,95' : '210,185,140',
+        });
+      }
+      this.shake(7, 0.25);
+    }
+
+    // 수정 무기: 분홍/하늘색 파편이 튄다
+    crystalShards(x, y) {
+      const palette = ['255,160,230', '160,230,255', '255,255,255'];
+      for (let i = 0; i < 12; i++) {
+        const a = rand(0, Math.PI * 2);
+        this.particles.push({
+          kind: 'spark', x, y, vx: Math.cos(a) * rand(160, 380), vy: Math.sin(a) * rand(160, 380),
+          life: rand(0.2, 0.4), max: 0.4, size: rand(2, 4), gravity: 200, color: palette[i % palette.length],
+        });
+      }
+    }
+
     // 부활: 바닥으로 빨려 들어오는 링 + 위로 솟는 초록 빛 입자
     spawn(x, y) {
       this.rings.push({ x, y, r0: 44, r1: 6, life: 0.4, max: 0.4, color: '79,211,127', width: 4, fadeIn: true });

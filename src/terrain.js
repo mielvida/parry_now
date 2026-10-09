@@ -3,7 +3,7 @@
   const { TILE } = G.Config;
 
   class Terrain {
-    // rows: 문자열 배열. '#' = 솔리드, 'P' = 플레이어 시작점, 그 외 = 빈 공간
+    // rows: 문자열 배열. '#' = 솔리드, 'P' = 플레이어 시작점, 'H'/'L'/'K'/'W'/'A'/'V'/'D'/'X' = 장식·상점·마을 사람·동굴 입구/출구, 그 외 = 빈 공간
     constructor(rows) {
       this.rows = rows.length;
       this.cols = Math.max(...rows.map((r) => r.length));
@@ -13,7 +13,14 @@
       this.grid = [];
       this.slimeSpawns = [];
       this.batSpawns = [];
+      this.crabSpawns = [];
       this.treasure = null; // 보물 상자 위치 {col,row}
+      this.houses = [];     // 해변 집 위치 {col,row} (장식)
+      this.luggage = [];    // 짐더미 위치 {col,row} (장식)
+      this.shops = [];      // 상점 {col,row,kind:'potion'|'sword'}
+      this.villagers = [];  // 마을 사람 {col,row}
+      this.caveEntrances = []; // 마을의 동굴 입구 {col,row}
+      this.exits = [];      // 동굴의 마을 출구 {col,row}
 
       rows.forEach((line, r) => {
         const row = [];
@@ -23,7 +30,16 @@
           if (ch === 'P') this.spawn = { col: c, row: r };
           if (ch === 'S') this.slimeSpawns.push({ col: c, row: r });
           if (ch === 'B') this.batSpawns.push({ col: c, row: r });
+          if (ch === 'C') this.crabSpawns.push({ col: c, row: r });
           if (ch === 'T') this.treasure = { col: c, row: r };
+          if (ch === 'H') this.houses.push({ col: c, row: r });
+          if (ch === 'L') this.luggage.push({ col: c, row: r });
+          if (ch === 'K') this.shops.push({ col: c, row: r, kind: 'potion' });
+          if (ch === 'W') this.shops.push({ col: c, row: r, kind: 'sword' });
+          if (ch === 'A') this.shops.push({ col: c, row: r, kind: 'armor' });
+          if (ch === 'V') this.villagers.push({ col: c, row: r });
+          if (ch === 'D') this.caveEntrances.push({ col: c, row: r });
+          if (ch === 'X') this.exits.push({ col: c, row: r });
         }
         this.grid.push(row);
       });

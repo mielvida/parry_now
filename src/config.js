@@ -23,6 +23,11 @@ Game.Config = {
   GRAVITY: 1800,
   MAX_FALL_SPEED: 900,  // 타일 높이(32px)보다 한 프레임 이동량이 작도록 제한 -> 터널링 방지
   JUMP_SPEED: 640,      // 최대 점프 높이 ≈ v²/2g ≈ 114px (약 3.5타일)
+  DASH_TILES: 3,        // Shift 대시 거리 (타일)
+  DASH_SPEED: 600,      // 대시 속도 (px/s). 거리를 다 가면 끝난다 (96px / 600 = 약 0.16초: 날아가는 모습이 보이게)
+  DASH_COOLDOWN: 0.7,   // 대시 후 다음 대시까지 대기 (초)
+  DASH_TRAIL: 0.3,      // 대시 잔상이 남는 시간 (초)
+  DASH_GRACE: 0.2,      // 대시가 끝난 뒤에도 잠시 맞지 않는 시간 (몬스터 몸 안에서 끝나도 바로 맞지 않게)
   JUMP_CUT_GRAVITY: 2,  // 점프 키를 일찍 떼면 상승 중 중력을 N배로 -> 가변 점프 높이
   // 슬라임
   SLIME_W: 28,
@@ -50,6 +55,23 @@ Game.Config = {
   BAT_WINDUP: 0.4,         // 급강하 직전 예비동작 시간
   BAT_DIVE_TIME: 0.9,      // 급강하 최대 지속 시간
   BAT_COOLDOWN: 1.6,       // 급강하 후 다음 급강하까지 대기
+  // 꽃게 (해변의 몬스터. 옆걸음 + 집게를 치켜든 뒤 옆으로 돌진)
+  CRAB_W: 30,
+  CRAB_H: 20,
+  CRAB_WALK_SPEED: 40,
+  CRAB_CHASE_SPEED: 80,
+  CRAB_SIGHT_X: 224,       // 이 범위 안에 플레이어가 들어오면 추적 (7타일)
+  CRAB_SIGHT_Y: 64,
+  CRAB_ATTACK_RANGE: 128,  // 가로 거리가 이 안(4타일)이면 돌진 예비동작
+  CRAB_WINDUP: 0.45,       // 집게를 치켜드는 예비동작 시간 (패링 타이밍을 읽을 수 있게)
+  CRAB_DASH_SPEED: 300,
+  CRAB_DASH_TIME: 0.45,
+  CRAB_COOLDOWN: 1.6,      // 돌진 후 다음 돌진까지 대기
+  CRAB_COIN: 8,            // 꽃게를 쓰러뜨리면 떨어뜨리는 코인
+  SLIME_COIN: 5,           // 슬라임을 쓰러뜨리면 떨어뜨리는 코인
+  MINE_COINS: 100,         // 마을 동굴 보물 상자의 코인 (첫 탐험)
+  MINE_COINS_PER_RUN: 25,  // 탐험을 거듭할수록 상자 코인이 이만큼씩 늘어난다
+  TREASURE_COINS: 50,      // 동굴 보물 상자에서 얻는 코인
   SLIME_SPAWN_BATCH: 30,   // - 키를 한 번 누를 때 소환되는 슬라임 수
   SLIME_MAX: 300,          // 슬라임 총 수 상한 (성능 보호)
   SLIME_SAFE_DROP: 3,      // 추적 중 이 타일 수 안에 바닥이 있으면 낭떠러지로 보지 않음
@@ -69,12 +91,25 @@ Game.Config = {
   SWORD_BACK_SPEED: 700,   // 돌아오는 속도 (px/s)
   SWORD_CATCH_RADIUS: 12,  // 손에서 이 거리 안이면 다시 잡음
   PARRY_COOLDOWN: 0.6,     // 다음 패링까지 대기 (연타 방지)
-  PARRY_REACH: 12,         // 플레이어 몸에서 이 거리(px) 안의 몹까지 튕겨냄
   PARRY_KNOCK_VX: 520,     // 튕겨나가는 가로 속도
   PARRY_KNOCK_VY: 380,     // 튕겨나가는 위쪽 속도
   PARRY_MAX_FLIGHT: 2,     // 패링에 맞은 슬라임이 아무것에도 안 닿아도 이 시간(초) 뒤엔 터짐
   SLIME_RESPAWN_TIME: 3,   // 터진 슬라임이 부활하기까지의 시간 (초)
   SLIME_APPEAR_TIME: 0.4,  // 부활 직후 나타나는 연출 시간 (이 동안은 해롭지 않음)
+  // 몬스터 체력/마법 피해 (슬라임·꽃게 3, 박쥐 2). 독: 3초 동안 1초마다 1씩, 총 3
+  POISON_TICKS: 3,
+  POISON_TICK_DAMAGE: 1,
+  FIRE_DAMAGE: 2,
+  BURN_TICKS: 3,           // 화염 무기: 불타는 동안 1초마다 1씩, 총 3
+  BURN_TICK_DAMAGE: 1,
+  FREEZE_TIME: 2.5,        // 서리 무기: 얼어붙어 있는 시간 (이 안에 다시 때려도 되고, 맞으면 얼음 조각으로 부서진다)
+  LIGHTNING_DAMAGE: 1,
+  // 슬라임·꽃게(2번 맞아야 죽는 몬스터): 첫 타에 밀려나 기절하고, 기절 중에 다시 맞으면 날아가 터진다
+  PUSH_DIST: 64,           // 첫 타에 밀려나는 거리 (2타일)
+  PUSH_TIME: 0.15,         // 밀려나는 데 걸리는 시간
+  STAGGER_TIME: 1.5,       // 기절해 있는 시간 (이 안에 다시 때려야 죽는다. 지나면 다시 움직인다)
+  HIT_GRACE: 0.35,         // 첫 타 직후 이 시간 동안은 같은 휘두르기로 두 번 맞지 않는다
+  GUARD_TIME: 0.35,        // 패링 성공 후 가드 자세를 유지하는 시간
   HIT_STOP: 0.07,          // 패링 성공 순간 화면이 멈추는 시간 (타격감)
 
   COYOTE_TIME: 0.1,    // 발판을 떠난 직후에도 점프 허용 (초)
