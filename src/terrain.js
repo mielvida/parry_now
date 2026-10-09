@@ -1,0 +1,61 @@
+// 지형 관리: 타일맵 데이터 + 충돌 질의. 렌더링/입력은 모른다.
+(function (G) {
+  const { TILE } = G.Config;
+
+  class Terrain {
+    // rows: 문자열 배열. '#' = 솔리드, 'P' = 플레이어 시작점, 그 외 = 빈 공간
+    constructor(rows) {
+      this.rows = rows.length;
+      this.cols = Math.max(...rows.map((r) => r.length));
+      this.width = this.cols * TILE;
+      this.height = this.rows * TILE;
+      this.spawn = { x: TILE, y: TILE };
+      this.grid = [];
+
+      rows.forEach((line, r) => {
+        const row = [];
+        for (let c = 0; c < this.cols; c++) {
+          const ch = line[c] || '.';
+          row.push(ch === '#');
+          if (ch === 'P') this.spawn = { col: c, row: r };
+        }
+        this.grid.push(row);
+      });
+    }
+
+    // 맵 위/좌/우 바깥은 벽, 아래쪽 바깥은 허공(낙사 -> 리스폰)
+    isSolid(col, row) {
+      if (col < 0 || col >= this.cols || row < 0) return true;
+      if (row >= this.rows) return false;
+      return this.grid[row][col];
+    }
+
+    // 주어진 AABB와 겹치는 솔리드 타일들의 사각형 목록
+    solidTilesIn(x, y, w, h) {
+      const EPS = 0.001; // 경계에 딱 붙은 상태는 "겹침"이 아니다
+      const c0 = Math.floor(x / TILE);
+      const c1 = Math.floor((x + w - EPS) / TILE);
+      const r0 = Math.floor(y / TILE);
+      const r1 = Math.floor((y + h - EPS) / TILE);
+      const out = [];
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          if (this.isSolid(c, r)) out.push({ x: c * TILE, y: r * TILE, w: TILE, h: TILE });
+        }
+      }
+      return out;
+    }
+
+    // 시작점: 해당 타일 바닥 중앙에 서도록 px 좌표로 변환 (엔티티 크기 필요)
+    spawnFor(entityW, entityH) {
+      const s = this.spawn;
+      if (s.col === undefined) return { x: s.x, y: s.y };
+      return {
+        x: s.col * TILE + (TILE - entityW) / 2,
+        y: (s.row + 1) * TILE - entityH,
+      };
+    }
+  }
+
+  G.Terrain = Terrain;
+})(window.Game);

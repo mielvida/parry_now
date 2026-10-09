@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Platformer</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #14161c; }
+    body { display: flex; align-items: center; justify-content: center; }
+    canvas { max-width: 100%; max-height: 100%; background: #000; image-rendering: pixelated; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- 로드 순서 = 의존 순서. file:// 에서도 동작하도록 ES 모듈 대신 네임스페이스(window.Game)를 사용 -->
+  <script src="src/config.js"></script>
+  <script src="src/input.js"></script>
+  <script src="src/terrain.js"></script>
+  <script src="src/player.js"></script>
+  <script src="src/camera.js"></script>
+  <script src="src/renderer.js"></script>
+  <script src="src/levels.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
