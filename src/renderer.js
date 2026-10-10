@@ -402,10 +402,11 @@
       const pg = Math.max(0, Math.min(pages - 1, page));
       const items = all.slice(pg * PER, pg * PER + PER);
       const hasTabs = def.tabs.length > 1;
-      const w = Math.max(640, Math.min(920, 56 + def.tabs.length * 104)); // 탭이 많으면 넓힌다
+      const cust = !!def.tabs[tab].custom; // 합치기 작업대처럼 직접 그리는 탭
+      const w = Math.max(cust ? 760 : 640, Math.min(920, 56 + def.tabs.length * 104)); // 탭이 많으면 넓힌다
       const rowH = 82;
       const top = 70 + (hasTabs ? 50 : 0);
-      const h = top + Math.max(1, items.length) * rowH + 84;
+      const h = cust ? 470 : top + Math.max(1, items.length) * rowH + 84;
       const x = (vw - w) / 2;
       const y = (vh - h) / 2;
       return {
@@ -667,12 +668,267 @@
     }
 
     // 상점 창: 탭 + 물품 줄(아이콘, 이름, 설명, 가격). 줄을 클릭하거나 숫자 키로 구매, ←→ 탭 전환, E/Esc 닫기
+    // 합치기 작업대 배치 (그리기와 마우스 판정이 같이 쓴다). panel = 상점 패널, sel = 고른 무기, len = 무기 개수
+    static mergeGeometry(panel, sel, len) {
+      const { x, y } = panel;
+      const top = Math.max(0, Math.min(sel - 3, len - 4));
+      const rows = [];
+      for (let i = 0; i < 4 && top + i < len; i++) rows.push({ idx: top + i, x: x + 20, y: y + 116 + i * 58, w: 276, h: 52 });
+      return {
+        top, rows,
+        slots: [0, 1, 2].map((i) => ({ x: x + 334 + i * 86, y: y + 128, w: 72, h: 72 })),
+        result: { x: x + 640, y: y + 120, w: 88, h: 88 },
+        self: { x: x + 322, y: y + 246, w: 200, h: 78 }, smith: { x: x + 534, y: y + 246, w: 200, h: 78 },
+        bar: { x: x + 322, y: y + 256, w: 412, h: 22 }, collect: { x: x + 322, y: y + 292, w: 412, h: 46 },
+        npc: { x: x + panel.w - 62, y: y + panel.h - 104 },
+      };
+    }
+
+    _drawMerge(ctx, s, geo) {
+      const m = s.merge;
+      const mg = Renderer.mergeGeometry(geo.panel, m.sel, m.cands.length);
+      const F = G.Forge;
+      const box = (r, fill, stroke, lw = 2) => { ctx.fillStyle = fill; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.strokeRect(r.x, r.y, r.w, r.h); };
+      const sel = m.cands[m.sel];
+      ctx.save();
+      // 왼쪽: 합칠 수 있는 무기 목록
+      ctx.textBaseline = 'middle';
+      if (!m.cands.length) {
+        ctx.textAlign = 'left'; ctx.font = '15px sans-serif'; ctx.fillStyle = '#b8c2dc';
+        ctx.fillText('합칠 무기가 없어요.', geo.panel.x + 30, geo.panel.y + 140);
+        ctx.fillText('같은 무기를 3개 모으세요.', geo.panel.x + 30, geo.panel.y + 164);
+      }
+      for (const r of mg.rows) {
+        const c = m.cands[r.idx];
+        const on = r.idx === m.sel;
+        const ready = c.n >= 3;
+        box(r, on ? 'rgba(255,213,74,0.18)' : 'rgba(255,255,255,0.06)', on ? '#ffd54a' : 'rgba(255,255,255,0.14)', on ? 3 : 1);
+        this._drawItemIcon(ctx, c.item, r.x + 30, r.y + r.h / 2 + 2, 0.5);
+        ctx.textAlign = 'left'; ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = ready ? '#fff' : '#8a93a8';
+        ctx.fillText(c.item.name, r.x + 58, r.y + 19);
+        ctx.font = '13px sans-serif'; ctx.fillStyle = ready ? '#9fe8a8' : '#8a93a8';
+        ctx.fillText(ready ? '3개 이상 — 합칠 수 있어요' : '3개를 모으면 합칠 수 있어요', r.x + 58, r.y + 38);
+        ctx.textAlign = 'right'; ctx.font = 'bold 19px sans-serif'; ctx.fillStyle = ready ? '#ffd54a' : '#ff9a9a';
+        ctx.fillText(`${Math.min(c.n, 99)}/3`, r.x + r.w - 12, r.y + r.h / 2);
+      }
+      // 가운데: 3칸 + 결과 칸
+      const job = m.job;
+      const showItem = job ? job.fromItem : sel && sel.item;
+      const filled = job ? 3 : sel ? Math.min(3, sel.n) : 0;
+      mg.slots.forEach((r, i) => {
+        const has = i < filled;
+        box(r, has ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)', has ? '#9fe0ff' : 'rgba(255,255,255,0.25)', has ? 2.5 : 1.5);
+        if (has && showItem) this._drawItemIcon(ctx, showItem, r.x + r.w / 2, r.y + r.h / 2 + 2, 0.78);
+        else { ctx.textAlign = 'center'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillText('+', r.x + r.w / 2, r.y + r.h / 2); }
+      });
+      ctx.textAlign = 'center'; ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = '#ffd54a';
+      ctx.fillText('▶', geo.panel.x + 610, geo.panel.y + 164);
+      const out = job ? job.toItem : sel && sel.nxt;
+      box(mg.result, 'rgba(255,213,74,0.1)', '#e0b12f', 3);
+      if (out) { this._drawItemIcon(ctx, out, mg.result.x + 44, mg.result.y + 46, 0.95); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#ffe9a0'; ctx.fillText(out.name, mg.result.x + 44, mg.result.y + 106); }
+      // 아래: 버튼 또는 진행 막대
+      if (!job) {
+        const can = sel && sel.n >= 3;
+        const canSmith = can && s.coins >= m.fee;
+        for (const [r, title, sub, on, hot] of [[mg.self, '직접 합치기', '무료 · 용광로 곁에서 1분', can, '1'], [mg.smith, '대장장이에게 맡기기', `${m.fee} G · 1분 뒤 완성 (그동안 자유)`, canSmith, '2']]) {
+          box(r, on ? 'rgba(111,208,255,0.18)' : 'rgba(255,255,255,0.05)', on ? '#6fd0ff' : 'rgba(255,255,255,0.15)', 2);
+          ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = on ? '#e6f6ff' : '#667088';
+          ctx.fillText(`${hot}. ${title}`, r.x + r.w / 2, r.y + 26);
+          ctx.font = '13px sans-serif'; ctx.fillStyle = on ? (r === mg.smith ? '#ffd54a' : '#9fe8a8') : '#667088';
+          ctx.fillText(sub, r.x + r.w / 2, r.y + 54);
+        }
+      } else {
+        const k = job.t / job.total;
+        box(mg.bar, 'rgba(0,0,0,0.5)', 'rgba(255,255,255,0.3)', 1.5);
+        ctx.fillStyle = job.done ? '#7dffa0' : '#ffb347'; ctx.fillRect(mg.bar.x + 2, mg.bar.y + 2, (mg.bar.w - 4) * k, mg.bar.h - 4);
+        ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#fff';
+        const left = Math.ceil(job.total - job.t);
+        ctx.fillText(job.done ? '완성!' : `${left}초 남음`, mg.bar.x + mg.bar.w / 2, mg.bar.y + mg.bar.h / 2 + 1);
+        ctx.font = '14px sans-serif'; ctx.fillStyle = '#b8c2dc';
+        if (!job.done) ctx.fillText(job.by === 'smith' ? '대장장이가 작업 중 — 어디에 있어도 시간이 가요' : (m.near ? '직접 작업 중 — 곁에서 기다리는 중' : '직접 작업 중 — 용광로 곁에 있어야 시간이 가요 (멈춤)'), mg.collect.x + mg.collect.w / 2, mg.collect.y + 22);
+        else { box(mg.collect, 'rgba(125,255,160,0.2)', '#7dffa0', 2); ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#d6ffe2'; ctx.fillText(`3. ${job.toItem.name} 찾기`, mg.collect.x + mg.collect.w / 2, mg.collect.y + mg.collect.h / 2); }
+      }
+      // 대장장이 아저씨와 한마디
+      G.Npc.draw(ctx, 'smith', mg.npc.x, mg.npc.y, -1, Date.now() / 1000);
+      ctx.textAlign = 'left'; ctx.font = 'italic 14px sans-serif'; ctx.fillStyle = '#d9c9a8';
+      ctx.fillText(job ? (job.done ? '"다 됐네! 가져가게."' : '"조금만 기다리게, 불이 한창이야."') : '"같은 걸 셋 모아 오게. 내가 한 단계 위로 벼려 주지."', geo.panel.x + 322, geo.panel.y + 372);
+      ctx.restore();
+    }
+
+    // 제련 미니게임: 풀무질로 온도를 초록 띠에 맞춘다
+    _drawSmeltGame(ctx, a) {
+      const W = this.viewW, H = this.viewH;
+      const defs = G.Shop.ITEMS;
+      const oreItem = defs['ore_' + a.ore];
+      const ingot = defs['ingot_' + a.ore];
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.74)'; ctx.fillRect(0, 0, W, H);
+      const P = { x: 130, y: 36, w: W - 260, h: H - 72 };
+      ctx.fillStyle = '#1d2233'; ctx.fillRect(P.x, P.y, P.w, P.h);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#e0b12f'; ctx.strokeRect(P.x, P.y, P.w, P.h);
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffd54a';
+      ctx.fillText('제련 — 불 온도 맞추기', P.x + 24, P.y + 32);
+      ctx.textAlign = 'right'; ctx.font = 'bold 24px sans-serif';
+      const sec = Math.ceil(a.t);
+      ctx.fillStyle = sec <= 15 ? '#ff8a8a' : '#fff';
+      ctx.fillText(`${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, P.x + P.w - 24, P.y + 32);
+      // 진행 막대
+      const pb = { x: P.x + 24, y: P.y + 62, w: P.w - 48, h: 20 };
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(pb.x, pb.y, pb.w, pb.h);
+      ctx.fillStyle = a.progress >= 100 ? '#7dffa0' : '#ffb347'; ctx.fillRect(pb.x + 2, pb.y + 2, (pb.w - 4) * (a.progress / 100), pb.h - 4);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
+      ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#fff';
+      ctx.fillText(`녹는 중 ${Math.round(a.progress)}%`, pb.x + pb.w / 2, pb.y + pb.h / 2 + 1);
+      // 화로: 불길은 온도에 따라 커지고 색이 변한다
+      const cx = P.x + 250, by = P.y + P.h - 120;
+      const T = a.temp / 100;
+      ctx.fillStyle = '#6a646f'; ctx.fillRect(cx - 120, by - 150, 240, 170);
+      ctx.fillStyle = '#58535e'; for (let r = 0; r < 5; r++) ctx.fillRect(cx - 114 + (r % 2) * 14, by - 140 + r * 32, 200, 3);
+      ctx.fillStyle = '#1b1218'; ctx.fillRect(cx - 86, by - 118, 172, 130);
+      const tt = a.time;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const gl = ctx.createRadialGradient(cx, by - 40, 6, cx, by - 40, 190);
+      gl.addColorStop(0, `rgba(255,${Math.round(120 + 100 * T)},40,${0.18 + 0.5 * T})`); gl.addColorStop(1, 'rgba(255,90,20,0)');
+      ctx.fillStyle = gl; ctx.fillRect(cx - 200, by - 240, 400, 300);
+      ctx.restore();
+      for (let i = 0; i < 7; i++) {
+        const fx = cx - 72 + i * 24;
+        const h = 14 + (20 + 70 * T) * Math.abs(Math.sin(tt * 6 + i * 1.7)) + 8 * Math.sin(tt * 13 + i);
+        ctx.fillStyle = a.temp > 92 ? '#ff3a1a' : T > 0.55 ? '#ffb02a' : '#ff6a1a';
+        ctx.beginPath(); ctx.moveTo(fx - 11, by + 8); ctx.quadraticCurveTo(fx - 4, by - h * 0.7, fx, by - h - 8); ctx.quadraticCurveTo(fx + 4, by - h * 0.7, fx + 11, by + 8); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = a.temp > 92 ? '#ffd0a0' : '#ffe27a';
+        ctx.beginPath(); ctx.moveTo(fx - 5, by + 8); ctx.quadraticCurveTo(fx, by - h * 0.5, fx, by - h * 0.7); ctx.quadraticCurveTo(fx + 1, by - h * 0.4, fx + 5, by + 8); ctx.closePath(); ctx.fill();
+      }
+      // 도가니: 광석 3개가 녹아 주괴가 된다
+      ctx.fillStyle = '#2f2c36'; ctx.fillRect(cx - 52, by - 92, 104, 20);
+      if (oreItem && ingot) {
+        const k = a.progress / 100;
+        ctx.globalAlpha = 1 - k; for (let i = 0; i < 3; i++) this._drawItemIcon(ctx, oreItem, cx - 36 + i * 36, by - 112 + (a.held ? 0 : 0), 0.5);
+        ctx.globalAlpha = k; this._drawItemIcon(ctx, ingot, cx, by - 114, 0.8);
+        ctx.globalAlpha = 1;
+      }
+      // 풀무 (누르는 동안 움직인다)
+      const pump = a.held ? 0.5 + 0.5 * Math.sin(tt * 18) : 0;
+      ctx.fillStyle = '#7a5530'; ctx.beginPath(); ctx.moveTo(cx + 130, by - 10); ctx.lineTo(cx + 215, by - 40 - pump * 10); ctx.lineTo(cx + 215, by + 4 - pump * 4); ctx.lineTo(cx + 130, by + 10); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#a66a33'; ctx.fillRect(cx + 200, by - 52 - pump * 12, 40, 14 + pump * 3);
+      // 온도계: 초록 띠가 알맞은 온도
+      const th = { x: P.x + P.w - 190, y: P.y + 100, w: 56, h: P.h - 250 };
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(th.x, th.y, th.w, th.h);
+      const yOf = (v) => th.y + th.h - (v / 100) * th.h;
+      const grad = ctx.createLinearGradient(0, th.y + th.h, 0, th.y);
+      grad.addColorStop(0, 'rgba(90,150,255,0.35)'); grad.addColorStop(0.5, 'rgba(255,200,80,0.25)'); grad.addColorStop(1, 'rgba(255,60,40,0.5)');
+      ctx.fillStyle = grad; ctx.fillRect(th.x, th.y, th.w, th.h);
+      ctx.fillStyle = 'rgba(80,220,120,0.55)'; ctx.fillRect(th.x, yOf(a.band + a.hw), th.w, (a.hw * 2 / 100) * th.h);
+      ctx.fillStyle = 'rgba(160,255,190,0.9)'; ctx.fillRect(th.x - 6, yOf(a.band), th.w + 12, 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2; ctx.strokeRect(th.x, th.y, th.w, th.h);
+      const ny = yOf(a.temp);
+      ctx.fillStyle = '#fff'; ctx.fillRect(th.x - 10, ny - 3, th.w + 20, 6);
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.moveTo(th.x - 22, ny - 9); ctx.lineTo(th.x - 22, ny + 9); ctx.lineTo(th.x - 10, ny); ctx.closePath(); ctx.fill();
+      ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#ff9a8a'; ctx.fillText('뜨거움', th.x + th.w / 2, th.y - 12);
+      ctx.fillStyle = '#9fc0ff'; ctx.fillText('차가움', th.x + th.w / 2, th.y + th.h + 14);
+      ctx.fillStyle = '#9fe8a8'; ctx.fillText('알맞음', th.x + th.w + 38, yOf(a.band));
+      ctx.font = 'bold 18px sans-serif';
+      const bad = Math.abs(a.temp - a.band) > a.hw;
+      ctx.fillStyle = a.msgT > 0 ? (bad ? '#ff8a8a' : '#7dffa0') : 'rgba(0,0,0,0)';
+      ctx.fillText(a.msg, P.x + P.w / 2, P.y + P.h - 76);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(`${a.oreName} 광석 3개를 녹여 주괴 1개   ·   Space / Enter / 마우스 누르기: 풀무질 (온도 ↑), 떼면 식어요`, P.x + P.w / 2, P.y + P.h - 46);
+      ctx.fillText(`제한 시간 ${G.Forge.SMELT_TIME}초   ·   난이도 ${['쉬움', '보통', '어려움', '최대'][a.tier - 1]} (희귀한 광석일수록 어려워요)   ·   Esc: 포기 (잃는 것 없음)`, P.x + P.w / 2, P.y + P.h - 24);
+      if (a.result) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(P.x + 40, P.y + 150, P.w - 80, 150);
+        ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = a.result === 'win' ? '#7dffa0' : '#ff8a8a';
+        ctx.fillText(a.result === 'win' ? (a.ok ? '제련 성공!' : '제련하지 못했어요') : '실패', W / 2, P.y + 198);
+        ctx.font = '17px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(a.msg, W / 2, P.y + 244);
+        if (a.resultT < 0) { ctx.font = '14px sans-serif'; ctx.fillStyle = '#9aa4c0'; ctx.fillText('Space로 닫기', W / 2, P.y + 278); }
+      }
+      ctx.restore();
+    }
+
+    // 부착 미니게임: 모루 위의 무기에 주괴를 망치로 두드려 붙인다
+    _drawAttachGame(ctx, a) {
+      const W = this.viewW, H = this.viewH;
+      const defs = G.Shop.ITEMS;
+      const weapon = defs[a.weaponId];
+      const ingot = defs['ingot_' + a.ore];
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(0, 0, W, H);
+      const P = { x: 130, y: 36, w: W - 260, h: H - 72 };
+      ctx.fillStyle = '#1d2233'; ctx.fillRect(P.x, P.y, P.w, P.h);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#e0b12f'; ctx.strokeRect(P.x, P.y, P.w, P.h);
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffd54a';
+      ctx.fillText('부착 — 두드려 붙이기', P.x + 24, P.y + 32);
+      ctx.textAlign = 'right'; ctx.font = 'bold 24px sans-serif';
+      const sec = Math.ceil(a.t);
+      ctx.fillStyle = sec <= 20 ? '#ff8a8a' : '#fff';
+      ctx.fillText(`${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, P.x + P.w - 24, P.y + 32);
+      // 진행 막대
+      const pb = { x: P.x + 24, y: P.y + 62, w: P.w - 48, h: 20 };
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(pb.x, pb.y, pb.w, pb.h);
+      ctx.fillStyle = a.progress >= 100 ? '#7dffa0' : '#ffb347'; ctx.fillRect(pb.x + 2, pb.y + 2, (pb.w - 4) * (a.progress / 100), pb.h - 4);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
+      ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#fff';
+      ctx.fillText(`붙는 중 ${Math.round(a.progress)}%`, pb.x + pb.w / 2, pb.y + pb.h / 2 + 1);
+      // 모루, 무기, 주괴
+      const cx = W / 2, ay = P.y + 250;
+      const heat = a.progress / 100;
+      ctx.fillStyle = `rgba(255,${150 + heat * 80},60,${0.12 + 0.28 * heat + 0.3 * a.flash})`;
+      ctx.beginPath(); ctx.ellipse(cx, ay - 20, 190, 60, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a3a44'; ctx.fillRect(cx - 120, ay, 240, 22); ctx.fillRect(cx - 70, ay + 22, 140, 36); ctx.fillRect(cx - 150, ay - 8, 56, 14);
+      ctx.fillStyle = '#55555f'; ctx.fillRect(cx - 120, ay, 240, 5);
+      ctx.save(); ctx.translate(cx, ay - 34); ctx.rotate(-0.5); this._drawItemIcon(ctx, weapon, 0, 0, 1.5); ctx.restore();
+      const drop = (1 - heat) * 70;
+      if (ingot) this._drawItemIcon(ctx, ingot, cx + 12, ay - 108 - drop + (a.swing > 0 ? 6 : 0), 0.9);
+      // 망치
+      const hs = a.swing;
+      ctx.save(); ctx.translate(cx + 130, ay - 70); ctx.rotate(-0.9 + hs * 1.0);
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(-4, 0, 8, 80);
+      ctx.fillStyle = '#8f98a8'; ctx.fillRect(-22, -14, 44, 24); ctx.fillStyle = '#c9d2dc'; ctx.fillRect(-22, -14, 44, 6);
+      ctx.restore();
+      // 불똥
+      for (const p of a.sparks) { ctx.fillStyle = `rgba(255,${180 + Math.random() * 60},80,${Math.min(1, p.life * 2.5)})`; ctx.fillRect(P.x + p.x * P.w, P.y + 250 + (p.y - 0.62) * 300 - 20, 3, 3); }
+      // 눈금: 움직이는 바늘이 초록 칸에 있을 때 두드린다
+      const g = { x: P.x + 60, y: P.y + P.h - 150, w: P.w - 120, h: 34 };
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(g.x, g.y, g.w, g.h);
+      const zc = g.x + a.zone * g.w;
+      ctx.fillStyle = 'rgba(80,220,120,0.45)'; ctx.fillRect(zc - a.goodW * g.w, g.y, a.goodW * 2 * g.w, g.h);
+      ctx.fillStyle = 'rgba(160,255,190,0.85)'; ctx.fillRect(zc - a.perfW * g.w, g.y, a.perfW * 2 * g.w, g.h);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.strokeRect(g.x, g.y, g.w, g.h);
+      const nx = g.x + a.agPos * g.w;
+      ctx.fillStyle = '#fff'; ctx.fillRect(nx - 3, g.y - 8, 6, g.h + 16);
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.moveTo(nx - 9, g.y - 10); ctx.lineTo(nx + 9, g.y - 10); ctx.lineTo(nx, g.y); ctx.closePath(); ctx.fill();
+      ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = a.msgT > 0 ? (/빗나/.test(a.msg) ? '#ff8a8a' : '#7dffa0') : 'rgba(0,0,0,0)';
+      ctx.fillText(a.msg, W / 2, g.y - 26);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(`${a.oreName} 주괴를 ${weapon.name}에 붙인다  ·  난이도 ${['쉬움', '보통', '어려움', '최대'][a.tier - 1]}  ·  완벽 ${a.perfect}  좋음 ${a.good}  빗나감 ${a.miss}`, W / 2, g.y + g.h + 26);
+      ctx.fillText('Space / Enter / 클릭: 망치질     Esc: 포기 (아무것도 잃지 않아요)     제한 시간 2분 · 희귀한 광석일수록 어려워요', W / 2, g.y + g.h + 52);
+      if (a.result) { // 결과
+        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(P.x + 40, P.y + 120, P.w - 80, 150);
+        ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = a.result === 'win' ? '#7dffa0' : '#ff8a8a';
+        ctx.fillText(a.result === 'win' ? (a.ok ? '부착 성공!' : '붙이지 못했어요') : '실패', W / 2, P.y + 168);
+        ctx.font = '17px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(a.msg, W / 2, P.y + 214);
+        if (a.resultT < 0) { ctx.font = '14px sans-serif'; ctx.fillStyle = '#9aa4c0'; ctx.fillText('Space로 닫기', W / 2, P.y + 248); }
+      }
+      ctx.restore();
+    }
+
+    // 합치기 진행 알림 (화면 오른쪽 위, 코인 아래)
+    _drawJobHud(ctx, j) {
+      ctx.save();
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.font = 'bold 14px sans-serif';
+      const text = j.done ? '⚒ 합치기 완성! 용광로에서 찾으세요' : `⚒ ${j.name} 만드는 중 ${j.left}초${j.by === 'self' && !j.near ? ' (멈춤)' : ''}`;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(text, this.viewW - 13, 99);
+      ctx.fillStyle = j.done ? '#7dffa0' : '#ffcf8a'; ctx.fillText(text, this.viewW - 14, 98);
+      ctx.restore();
+    }
+
     _drawShop(ctx, s) {
       ctx.save();
       const geo = Renderer.shopGeometry(this.viewW, this.viewH, s.def, s.tab, s.page || 0);
       const { x, y, w, h } = geo.panel;
       const pg = geo.pager ? geo.pager.page : 0;
-      const items = s.def.tabs[s.tab].items.slice(pg * 4, pg * 4 + 4); // 지금 페이지의 물품
+      const custom = s.def.tabs[s.tab].custom;
+      const items = custom ? [] : s.def.tabs[s.tab].items.slice(pg * 4, pg * 4 + 4); // 지금 페이지의 물품
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(0, 0, this.viewW, this.viewH);
       ctx.fillStyle = '#1d2233';
@@ -698,6 +954,7 @@
         ctx.fillStyle = on ? '#1d2233' : '#b8c2dc';
         ctx.fillText(s.def.tabs[i].name, t.x + t.w / 2, t.y + t.h / 2 + 1);
       });
+      if (custom === 'merge' && s.merge) this._drawMerge(ctx, s, geo);
       items.forEach((it, i) => {
         const row = geo.rows[i];
         const d = G.Shop.describe(it, s.inv);
@@ -763,7 +1020,7 @@
       ctx.fillText(s.msg, x + w / 2, y + h - 54);
       ctx.font = '16px sans-serif';
       ctx.fillStyle = '#9aa4c0';
-      ctx.fillText(`클릭 또는 숫자 키: 구매     ${geo.tabs.length ? '←→: 탭 전환     ' : ''}${geo.pager ? '↑↓: 페이지     ' : ''}E / Esc: 닫기`, x + w / 2, y + h - 26);
+      ctx.fillText(custom === 'merge' ? '↑↓: 무기 고르기     1: 직접     2: 대장장이에게 맡기기     3: 찾기     ←→: 탭     E / Esc: 닫기' : `클릭 또는 숫자 키: 구매     ${geo.tabs.length ? '←→: 탭 전환     ' : ''}${geo.pager ? '↑↓: 페이지     ' : ''}E / Esc: 닫기`, x + w / 2, y + h - 26);
       ctx.restore();
     }
 
@@ -2592,16 +2849,19 @@
       }
 
       if (hud.coins !== undefined) this._drawCoinHud(ctx, hud.coins, hud.potions, hud.exp);
+      if (hud.job) this._drawJobHud(ctx, hud.job);
       if (hud.home) this._drawHomeHud(ctx, hud.home);
       if (hud.dialog) this._drawBottomText(ctx, hud.dialog.text + (hud.dialog.queue ? '   ▶ E' : ''), Math.min(1, hud.dialog.t / 0.3));
       else if (hud.prompt) this._drawBottomText(ctx, hud.prompt);
       if (hud.shop) this._drawShop(ctx, hud.shop);
+      if (hud.attach) this._drawAttachGame(ctx, hud.attach);
+      if (hud.smelt) this._drawSmeltGame(ctx, hud.smelt);
       if (hud.equip) this._drawEquip(ctx, hud.equip);
       if (hud.dev) this._drawDev(ctx, hud.dev);
       if (hud.mini) this._drawMini(ctx, hud.mini);
       if (hud.settings) this._drawSettings(ctx, hud.settings);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.attach && !hud.smelt) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

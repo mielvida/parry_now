@@ -528,6 +528,7 @@
       invSort: 'default', // 인벤토리 정렬
       invSub: 'all', // 무기/방어구 탭의 종류 필터
       hotbar: ['wood0', null, null, null, null], // 왼쪽 위 무기 칸 1~5 (숫자 키로 바꿔 든다)
+      forgeJob: null, // 합치기 작업대에 올려 둔 작업 (forge.js)
       copies: {}, // 같은 무기를 여러 자루 가졌을 때의 개수 (3개를 대장간에서 합친다). 없으면 1자루
       ores: {}, // 캔 광석 개수 (광물 동굴)
       ingots: {}, // 제련한 주괴 개수

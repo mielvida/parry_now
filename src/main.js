@@ -1241,6 +1241,191 @@
     return { coins, exp, lives, maxLives: maxLives(), inv };
   }
 
+  // ---- 합치기 작업대 (용광로 '합치기' 탭): 3칸에 같은 무기 3개를 올려 1분 뒤에 한 단계 위로. 직접(무료, 곁에서 대기) / 대장장이에게 맡기기(70G) ----
+  const isMergeTab = () => !!shop && !!shop.def.tabs[shop.tab] && shop.def.tabs[shop.tab].custom === 'merge';
+  const nearFurnace = () => {
+    if (stageName !== 'village') return false;
+    const f = terrain.shops.find((q) => q.kind === 'furnace');
+    return !!f && Math.abs(player.x + player.w / 2 - (f.col * C.TILE + C.TILE / 2)) < C.TILE * 7;
+  };
+  function mergeView() {
+    const F = G.Forge;
+    const cands = F.mergeCandidates(inv);
+    const sel = Math.max(0, Math.min(cands.length - 1, shop.msel || 0));
+    const j = F.jobOf(inv);
+    return {
+      cands: cands.map((it) => ({ item: it, n: F.copiesOf(inv, it.id), nxt: F.nextOf(it) })), sel, fee: F.SMITH_FEE,
+      job: j ? { fromItem: G.Shop.ITEMS[j.from], toItem: G.Shop.ITEMS[j.to], by: j.by, t: j.t, total: j.total, done: j.done } : null, near: nearFurnace(),
+    };
+  }
+  function mergeDo(kind) {
+    const F = G.Forge;
+    let res;
+    if (kind === 'collect') res = F.collectJob(inv);
+    else {
+      const cands = F.mergeCandidates(inv);
+      const it = cands[Math.max(0, Math.min(cands.length - 1, shop.msel || 0))];
+      if (!it) res = { ok: false, msg: '합칠 무기가 없어요.' };
+      else { const w = wallet(); res = F.startMerge(inv, it.id, kind, w); coins = w.coins; }
+    }
+    if (res.ok) applyEquipment();
+    shop.msg = res.msg;
+    shop.ok = res.ok;
+    shop.msgT = 2.6;
+    G.Audio.play(res.ok ? (kind === 'collect' ? 'treasure' : 'coin') : 'deny');
+  }
+
+  // ---- 부착 미니게임 (용광로 '부착' 탭에서 주괴를 고르면): 2분 안에 망치로 두드려 무기와 주괴를 붙인다 ----
+  //  움직이는 눈금이 초록 칸(가운데는 완벽)에 있을 때 Space/Enter/클릭. 진행 100%가 되면 붙는다.
+  //  시간이 다 되거나 Esc로 나가면 실패: 주괴와 수수료는 그대로다. 성공할 때만 수수료를 낸다
+  let ag = null;
+  // 광석이 희귀할수록 어렵다: 4단계가 가장 어렵고(초록 칸이 가장 좁고 눈금이 가장 빠르며 빗나가면 -6), 1단계는 아주 쉽다.
+  // 처음의 '보통' 난이도(초록 칸 ±0.14, 눈금 2 rad/s, +14/+8/-6)가 최대 단계다. 진행이 식거나 칸이 흔들리지 않는다
+  function attachDifficulty(tier) {
+    const d = (tier - 1) / 3; // 0(쉬움) ~ 1(최대)
+    return {
+      goodW: 0.24 - 0.1 * d, perfW: 0.09 - 0.04 * d,
+      spd0: 1.4 + 0.6 * d, spdP: 0.01 + 0.01 * d, // 눈금 속도(rad/s) = spd0 + 진행 × spdP
+      decay: 0, driftAmp: 0, harm: 0,
+      gainP: Math.round(16 - 2 * d), gainG: Math.round(10 - 2 * d), lossM: Math.round(2 + 4 * d),
+    };
+  }
+  function startAttachGame(oreId) {
+    const ore = G.Forge.ORES.find((o) => o.id === oreId);
+    shop = null;
+    ag = { ore: oreId, oreName: ore.name, weaponId: inv.equipped.weapon, t: G.Forge.ATTACH_TIME, progress: 0, tier: ore.tier, ...attachDifficulty(ore.tier), drift: 0, phase: 0, zone: 0.3 + Math.random() * 0.4, perfect: 0, good: 0, miss: 0, msg: '두드려서 붙이자! 눈금이 초록 칸에 올 때 Space', msgT: 3, swing: 0, flash: 0, result: null, resultT: 0, sparks: [] };
+    G.Audio.play('pickup');
+  }
+  // 눈금 위치: 3단계 이상 광석은 속도가 들쭉날쭉해서 타이밍을 읽기 어렵다
+const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase * 1.7));
+  function agHit() {
+    const d = Math.abs(agPos() - ag.zone);
+    ag.swing = 1;
+    let gain;
+    if (d < ag.perfW) { gain = ag.gainP; ag.perfect += 1; ag.msg = `완벽! +${gain}`; G.Audio.play('crit'); ag.flash = 1; effects.shake(5, 0.16); }
+    else if (d < ag.goodW) { gain = ag.gainG; ag.good += 1; ag.msg = `좋아! +${gain}`; G.Audio.play('clack'); effects.shake(3, 0.1); }
+    else { gain = -ag.lossM; ag.miss += 1; ag.msg = `빗나갔다! ${gain}`; G.Audio.play('deny'); }
+    ag.progress = Math.max(0, Math.min(100, ag.progress + gain));
+    ag.msgT = 1.2;
+    for (let i = 0; i < (gain > 0 ? 14 : 4); i++) ag.sparks.push({ x: 0.5 + (Math.random() - 0.5) * 0.12, y: 0.62, vx: (Math.random() - 0.5) * 0.9, vy: -Math.random() * 0.9, life: 0.4 + Math.random() * 0.3 });
+    ag.zone = 0.15 + Math.random() * 0.7; // 다음 칸은 다른 곳에
+    if (ag.progress >= 100) agFinish(true);
+  }
+  function agFinish(win) {
+    ag.result = win ? 'win' : 'fail';
+    ag.resultT = 2;
+    if (win) {
+      const w = wallet();
+      const res = G.Forge.attach(inv, ag.ore, w);
+      coins = w.coins;
+      applyEquipment();
+      ag.msg = res.ok ? res.msg : res.msg;
+      ag.ok = res.ok;
+      G.Audio.play(res.ok ? 'treasure' : 'deny');
+    } else {
+      ag.msg = '시간이 다 됐어요… 주괴와 수수료는 그대로예요';
+      ag.ok = false;
+      G.Audio.play('deny');
+    }
+    ag.msgT = 3;
+  }
+  function updateAttachGame(dt) {
+    if (ag.result) { // 결과 화면: 잠깐 보여 준 뒤 Space/Enter/클릭으로 닫는다
+      ag.resultT -= dt;
+      if (ag.resultT < 0 && (input.wasPressed('Space') || input.wasPressed('Enter') || input.wasPressed('Escape') || input.wasPressed('KeyE') || ag.click)) ag = null;
+      else ag.click = false;
+      return;
+    }
+    if (input.wasPressed('Escape')) { ag = null; return; } // 중도 포기: 아무것도 잃지 않는다
+    ag.t = Math.max(0, ag.t - dt);
+    ag.phase += (ag.spd0 + ag.progress * ag.spdP) * dt; // 눈금: 광석 단계가 높고 진행될수록 빨라진다 (대략 4~8 rad/s)
+    ag.progress = Math.max(0, ag.progress - ag.decay * dt); // 식어서 조금씩 되돌아간다: 멈추면 안 붙는다
+    if (ag.progress > 25 && ag.driftAmp > 0) { ag.drift += dt; ag.zone = Math.max(0.14, Math.min(0.86, ag.zone + Math.sin(ag.drift * (1.1 + 0.2 * ag.tier)) * ag.driftAmp * dt)); } // 초록 칸이 천천히 흔들린다
+    ag.swing = Math.max(0, ag.swing - dt * 5);
+    ag.flash = Math.max(0, ag.flash - dt * 4);
+    ag.msgT = Math.max(0, ag.msgT - dt);
+    for (const p of ag.sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 2.2 * dt; p.life -= dt; }
+    ag.sparks = ag.sparks.filter((p) => p.life > 0);
+    if (input.wasPressed('Space') || input.wasPressed('Enter') || input.wasPressed('ArrowDown') || ag.click) agHit();
+    ag.click = false;
+    if (!ag.result && ag.t <= 0) agFinish(false);
+  }
+
+  // ---- 제련 미니게임 (용광로 '제련' 탭에서 광석을 고르면): 풀무질로 불의 온도를 알맞게 유지해 광석을 녹인다 ----
+  //  Space/Enter/마우스를 누르고 있으면 온도가 오르고, 떼면 식는다. 온도 눈금이 초록 띠(알맞은 온도)에 머무는 동안 녹는다.
+  //  너무 차가우면 조금씩 굳고, 너무 뜨거우면(빨강) 빠르게 굳는다. 띠는 천천히 오르내리고 광석 단계가 높을수록 좁고 뜨겁다.
+  //  시간 초과나 Esc는 실패: 광석과 수수료는 그대로. 성공할 때만 광석 3개와 수수료를 쓴다
+  let sg = null;
+  // 광석이 희귀할수록 어렵다: 4단계가 최대(좁은 띠, 빨리 식고 불길이 거세며, 띠가 크게 움직이고, 굳는 벌이 크다), 1단계는 아주 쉽다
+  function smeltDifficulty(tier) {
+    const d = (tier - 1) / 3; // 0(쉬움) ~ 1(최대)
+    return {
+      hw: 18 - 13 * d,                       // 알맞은 온도 띠의 반폭
+      heat: 30 + 10 * d, cool: 12 + 16 * d,  // 풀무질로 오르는 속도 / 식는 속도 (/초)
+      wob: 1.5 + 6 * d,                      // 불길이 제멋대로 흔들리는 세기
+      bandAmp: 2 + 8 * d, bandSpd: 0.3 + 0.3 * d, // 띠가 오르내리는 폭과 속도
+      need: 8 + 12 * d,                      // 띠 안에서 버텨야 하는 시간(초)
+      coldP: 0.8 + 1.4 * d, hotP: 2 + 5 * d, burnP: 4 + 10 * d, // 차가울 때 / 뜨거울 때 / 과열(92 이상) 때 굳는 속도
+    };
+  }
+  function startSmeltGame(oreId) {
+    const ore = G.Forge.ORES.find((o) => o.id === oreId);
+    shop = null;
+    const tier = ore.tier;
+    sg = { ore: oreId, oreName: ore.name, tier, ...smeltDifficulty(tier), t: G.Forge.SMELT_TIME, temp: 15, progress: 0, base: 30 + tier * 10, time: 0, ph: Math.random() * 6, mouse: false, held: false, over: 0, msg: '풀무질! Space를 누르면 온도가 오르고, 떼면 식어요', msgT: 4, flash: 0, result: null, resultT: 0, click: false, inBand: 0 };
+    G.Audio.play('pickup');
+  }
+  const sgBand = () => sg.base + sg.bandAmp * Math.sin(sg.time * sg.bandSpd + sg.ph); // 알맞은 온도의 가운데
+  function updateSmeltGame(dt) {
+    if (sg.result) { // 결과 화면: 잠깐 보여 준 뒤 닫는다
+      sg.resultT -= dt;
+      if (sg.resultT < 0 && (input.wasPressed('Space') || input.wasPressed('Enter') || input.wasPressed('Escape') || input.wasPressed('KeyE') || sg.click)) sg = null;
+      else sg.click = false;
+      return;
+    }
+    if (input.wasPressed('Escape')) { sg = null; return; } // 중도 포기: 아무것도 잃지 않는다
+    sg.time += dt;
+    sg.t = Math.max(0, sg.t - dt);
+    sg.held = input.down.has('Space') || input.down.has('Enter') || sg.mouse;
+    // 온도: 풀무질하면 오르고, 아니면 식는다. 불길이 제멋대로 흔들린다
+    sg.temp += (sg.held ? sg.heat : -sg.cool) * dt + Math.sin(sg.time * 2.3 + sg.ph) * sg.wob * dt;
+    sg.temp = Math.max(0, Math.min(100, sg.temp));
+    const c = sgBand();
+    const diff = sg.temp - c;
+    sg.flash = Math.max(0, sg.flash - dt * 3);
+    sg.msgT = Math.max(0, sg.msgT - dt);
+    if (Math.abs(diff) <= sg.hw) { // 알맞음: 녹는다
+      sg.progress += dt * (100 / sg.need);
+      sg.inBand += dt;
+      if (sg.msgT <= 0) { sg.msg = '좋아요! 그대로 유지!'; sg.msgT = 0.4; }
+    } else if (diff < 0) { sg.progress -= sg.coldP * dt; if (sg.msgT <= 0) { sg.msg = '너무 차가워요! 풀무질!'; sg.msgT = 0.4; } }
+    else { // 너무 뜨거움
+      sg.progress -= (sg.temp > 92 ? sg.burnP : sg.hotP) * dt;
+      sg.over += dt;
+      if (sg.msgT <= 0) { sg.msg = sg.temp > 92 ? '과열! 광석이 타요!' : '너무 뜨거워요! 풀무질을 멈춰요'; sg.msgT = 0.4; }
+    }
+    sg.progress = Math.max(0, Math.min(100, sg.progress));
+    if (sg.progress >= 100) smeltFinish(true);
+    else if (sg.t <= 0) smeltFinish(false);
+  }
+  function smeltFinish(win) {
+    sg.result = win ? 'win' : 'fail';
+    sg.resultT = 2;
+    if (win) {
+      const w = wallet();
+      const res = G.Forge.smelt(inv, sg.ore, w);
+      coins = w.coins;
+      sg.msg = res.msg;
+      sg.ok = res.ok;
+      G.Audio.play(res.ok ? 'treasure' : 'deny');
+      effects.shake(6, 0.2);
+    } else {
+      sg.msg = '시간이 다 됐어요… 광석과 수수료는 그대로예요';
+      sg.ok = false;
+      G.Audio.play('deny');
+    }
+  }
+
   const SHOP_PER_PAGE = 4;
   const shopPages = () => Math.max(1, Math.ceil(shop.def.tabs[shop.tab].items.length / SHOP_PER_PAGE));
   const shopItems = () => { const pg = Math.min(shop.page || 0, shopPages() - 1); return shop.def.tabs[shop.tab].items.slice(pg * SHOP_PER_PAGE, pg * SHOP_PER_PAGE + SHOP_PER_PAGE); }; // 지금 페이지의 물품
@@ -1266,9 +1451,12 @@
   }
 
   function buyItem(item) {
+    if (!shop) return;
     if (shop.mode === 'place') { placeItem(item); return; }
     const w = wallet();
     const res = G.Shop.buy(item, w);
+    if (res.ok && res.minigame === 'attach') { startAttachGame(res.ore); return; } // 부착: 미니게임으로
+    if (res.ok && res.minigame === 'smelt') { startSmeltGame(res.ore); return; } // 제련: 온도 맞추기 미니게임으로
     if (res.ok && item.upgrade === 'stmax') stamina += C.STAMINA_MAX_STEP; // 늘어난 만큼 바로 채워 준다
     coins = w.coins;
     exp = w.exp;
@@ -1287,18 +1475,30 @@
       return;
     }
     const tabs = shop.def.tabs.length;
+    if (isMergeTab()) { // 합치기 작업대: ↑↓ 무기 고르기, 1 직접 / 2 맡기기 / 3(또는 Enter) 찾기
+      const n = G.Forge.mergeCandidates(inv).length;
+      shop.msel = Math.max(0, Math.min(Math.max(0, n - 1), shop.msel || 0));
+      if (input.wasPressed('ArrowUp') || input.wasPressed('KeyW')) shop.msel = Math.max(0, shop.msel - 1);
+      if (input.wasPressed('ArrowDown') || input.wasPressed('KeyS')) shop.msel = Math.min(Math.max(0, n - 1), shop.msel + 1);
+      const j = G.Forge.jobOf(inv);
+      if (input.wasPressed('Digit1') || input.wasPressed('Numpad1')) mergeDo('self');
+      else if (input.wasPressed('Digit2') || input.wasPressed('Numpad2')) mergeDo('smith');
+      else if (input.wasPressed('Digit3') || input.wasPressed('Numpad3') || (j && j.done && input.wasPressed('Enter'))) mergeDo('collect');
+    }
     if (tabs > 1) {
       const was = shop.tab;
       if (input.wasPressed('ArrowRight') || input.wasPressed('KeyD')) shop.tab = (shop.tab + 1) % tabs;
       if (input.wasPressed('ArrowLeft') || input.wasPressed('KeyA')) shop.tab = (shop.tab + tabs - 1) % tabs;
       if (shop.tab !== was) shop.page = 0;
     }
-    if (input.wasPressed('ArrowDown') || input.wasPressed('KeyS') || input.wasPressed('PageDown')) shopPage(1); // 물품이 4개를 넘으면 페이지 넘김
-    if (input.wasPressed('ArrowUp') || input.wasPressed('KeyW') || input.wasPressed('PageUp')) shopPage(-1);
+    if (!isMergeTab()) {
+      if (input.wasPressed('ArrowDown') || input.wasPressed('KeyS') || input.wasPressed('PageDown')) shopPage(1); // 물품이 4개를 넘으면 페이지 넘김
+      if (input.wasPressed('ArrowUp') || input.wasPressed('KeyW') || input.wasPressed('PageUp')) shopPage(-1);
+    }
     shopItems().forEach((item, i) => {
       if (input.wasPressed('Digit' + (i + 1)) || input.wasPressed('Numpad' + (i + 1))) buyItem(item);
     });
-    shop.msgT = Math.max(0, shop.msgT - dt);
+    if (shop) shop.msgT = Math.max(0, shop.msgT - dt); // (부착 미니게임이 열리면 상점은 닫혀 있다)
   }
 
   const INV_COLS = 8; // 인벤토리 격자: 8칸 x 보이는 5줄, 모두 120칸 (더 가지면 늘어난다), 스크롤
@@ -1769,6 +1969,8 @@
       equipUI.msgT = 0;
     }
   });
+  canvas.addEventListener('mousedown', () => { if (sg && !sg.result) sg.mouse = true; }); // 제련 미니게임: 누르는 동안 풀무질
+  window.addEventListener('mouseup', () => { if (sg) sg.mouse = false; });
   canvas.addEventListener('mousemove', (ev) => {
     const p = canvasPoint(ev);
     if (mini) { mini.mouse = p; mini.useMouse = true; } // 놀이마당: 마우스로 조준/선택
@@ -1809,6 +2011,8 @@
   canvas.addEventListener('click', (ev) => {
     if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
+    if (ag) { ag.click = true; return; } // 부착 미니게임: 클릭 = 망치질
+    if (sg) { if (sg.result) sg.click = true; return; } // 제련 미니게임: 결과 닫기 (풀무질은 마우스를 누르고 있는 동안)
     if (mini) { mini.click = p; mini.mouse = p; mini.useMouse = true; return; }
     if (settingsUI) { // 설정 창: 줄 클릭 = 토글, 음량 막대 클릭 = 그 위치로
       const L = G.Renderer.settingsRows(C.VIEW_W, C.VIEW_H);
@@ -1855,6 +2059,16 @@
         shop.tab = t;
         shop.page = 0;
         shop.hover = -1;
+        return;
+      }
+      if (isMergeTab()) { // 합치기 작업대: 무기 줄 선택, 버튼 누르기
+        const mv = mergeView();
+        const mg = G.Renderer.mergeGeometry(geo.panel, mv.sel, mv.cands.length);
+        const r = mg.rows.find((q) => inRect(p, q));
+        if (r) { shop.msel = r.idx; G.Audio.play('catch'); return; }
+        if (!mv.job && inRect(p, mg.self)) mergeDo('self');
+        else if (!mv.job && inRect(p, mg.smith)) mergeDo('smith');
+        else if (mv.job && mv.job.done && inRect(p, mg.collect)) mergeDo('collect');
         return;
       }
       if (geo.pager && inRect(p, geo.pager.prev)) { shopPage(-1); return; }
@@ -2181,12 +2395,26 @@
   }
 
   function step(dt) {
+    if (G.Forge.tickJob(inv, dt, nearFurnace())) { // 합치기 작업 완성
+      say('합치기 완료! 용광로에서 무기를 찾으세요', 'rgba(255,225,120,A)');
+      G.Audio.play('treasure');
+    }
     if (!devUI && input.wasPressed('F1')) { // F1: 개발 메뉴 (모든 테스트 기능)
       devUI = { tab: 0, cur: 0, scroll: 0, msg: '', msgT: 0, fresh: true };
       G.Audio.play('pickup');
     }
     if (devUI) { // 메뉴가 열려 있는 동안 게임이 멈춘다
       updateDev(dt);
+      input.endFrame();
+      return;
+    }
+    if (ag) { // 부착 미니게임 중에는 게임이 멈춘다
+      updateAttachGame(dt);
+      input.endFrame();
+      return;
+    }
+    if (sg) { // 제련 미니게임 중에도 멈춘다
+      updateSmeltGame(dt);
       input.endFrame();
       return;
     }
@@ -2630,11 +2858,13 @@
   function drawFrame() {
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
-    const near = !shop && !equipUI && !devUI && !mini && !dialog && !won && !cutscene ? nearbyInteract() : null;
+    const near = !shop && !equipUI && !devUI && !mini && !ag && !sg && !dialog && !won && !cutscene ? nearbyInteract() : null;
     const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
     const prompt = near ? (near.type === 'shop' ? (near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
-    const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }) : null;
+    const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }, isMergeTab() ? { merge: mergeView() } : {}) : null;
+    const jobNow = G.Forge.jobOf(inv);
+    const jobHud = jobNow ? { done: jobNow.done, by: jobNow.by, left: Math.ceil(jobNow.total - jobNow.t), name: G.Shop.ITEMS[jobNow.to].name, near: nearFurnace() } : null;
     const equipView = equipUI ? Object.assign({}, equipUI, { inv, lives, maxLives: maxLives(), coins, bonus: Object.assign({ critDamage: G.Shop.critDamage(inv) }, G.Shop.homeBonuses(inv)) }) : null;
     const house = terrain.houses[0];
     const npcs = ending && ending.mode === 'house' && house ? [{ kind: 'elder', x: house.col * C.TILE + C.TILE / 2 + 44, y: (house.row + 1) * C.TILE, facing: -1, alpha: ending.npcAlpha }] : [];
@@ -2653,7 +2883,7 @@
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, equip: equipView, boss: bossOn() ? boss : null,
+      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: agPos(), cutoff: null }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand() }) : null, equip: equipView, boss: bossOn() ? boss : null,
     }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   requestAnimationFrame(frame);
@@ -2688,6 +2918,8 @@
     get equip() { return equipUI; },
     get dev() { return devUI; },
     get settings() { return settingsUI; },
+    get attachGame() { return ag; },
+    get smeltGame() { return sg; },
     get mini() { return mini; },
     get duelRun() { return duelRun; },
     get analysis() { return analysis; },

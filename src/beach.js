@@ -222,6 +222,7 @@
       ctx.fillStyle = 'rgba(160,155,170,' + (0.35 * (1 - t)) + ')';
       ctx.beginPath(); ctx.arc(baseX + 26 + Math.sin(time + i * 2) * 8 + t * 16, baseY - 160 - t * 70, 7 + t * 12, 0, Math.PI * 2); ctx.fill();
     }
+    G.Npc.draw(ctx, 'smith', baseX - 70, baseY - 16, 1, time); // 대장장이 아저씨
     // 앞의 모루와 주괴 틀
     ctx.fillStyle = '#3a3a44'; ctx.fillRect(baseX + 50, baseY - 14, 26, 8); ctx.fillRect(baseX + 56, baseY - 6, 14, 6);
     ctx.fillStyle = '#d98a3a'; ctx.fillRect(baseX + 56, baseY - 18, 12, 4);
