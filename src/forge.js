@@ -1,6 +1,6 @@
 // 대장간: 같은 무기 3개 합치기(최대 2단계), 광석 제련, 주괴 붙이기, 곡괭이.
 // 데이터와 규칙만 다룬다 (화면은 Renderer가, 입력은 main이). shop.js 뒤에 불러와 G.Shop.ITEMS 에 새 아이템을 더하고
-// 대장간 상점(SHOPS.sword)에 합치기/부착/곡괭이 탭을, 용광로 상점(SHOPS.furnace)에 제련 탭을 이어 붙인다.
+// 대장간(SHOPS.sword)에 곡괭이 탭을, 용광로(SHOPS.furnace)에 합치기/제련/부착(+신성 강화) 탭을 이어 붙인다.
 //
 //  - 합치기: 같은 무기 3개 -> 한 단계 위 무기(1단계 "강화된 …", 2단계 "최강의 …" = 최대). 단계가 오를수록 모습과 공격이 강해진다
 //  - 곡괭이로 광물 동굴(orecave.js)에서 광석을 캔다. 광석 3개를 제련하면 주괴 1개
@@ -62,7 +62,7 @@
   }
   const CLS_NAME = { sword: '검', gun: '총' };
   for (const o of ORES) {
-    ITEMS['ore_' + o.id] = { id: 'ore_' + o.id, name: `${o.name} 광석`, ore: o.id, quest: true, look: o.look, desc: `${o.tier}단계 광석 · ${CLS_NAME[o.cls]}용. 3개를 대장간에서 제련하면 주괴 1개` };
+    ITEMS['ore_' + o.id] = { id: 'ore_' + o.id, name: `${o.name} 광석`, ore: o.id, quest: true, look: o.look, desc: `${o.tier}단계 광석 · ${CLS_NAME[o.cls]}용. 3개를 용광로에서 제련하면 주괴 1개` };
     ITEMS['ingot_' + o.id] = { id: 'ingot_' + o.id, name: `${o.name} 주괴`, ingot: o.id, quest: true, look: o.look, desc: `${CLS_NAME[o.cls]}에 붙인다: ${bonusText(o.bonus)}` };
   }
   const SMELT_NEED = 3; // 광석 3개 -> 주괴 1개
@@ -298,11 +298,13 @@
     return cache;
   }
 
-  const baseTabs = Shop.SHOPS.sword.tabs; // 검/대검/단검/지팡이/신성 강화
-  // 대장간: 합치기·부착·곡괭이. 제련은 따로 있는 용광로(마을)에서 한다
-  Object.defineProperty(Shop.SHOPS.sword, 'tabs', { get: () => (bound ? baseTabs.concat(forgeTabs(bound).filter((t) => t.name !== '제련')) : baseTabs), configurable: true, enumerable: true });
+  const allBase = Shop.SHOPS.sword.tabs; // 검/대검/단검/지팡이/신성 강화
+  const baseTabs = allBase.filter((t) => t.name !== '신성 강화'); // 대장간(무기 상점)에는 무기와 곡괭이만 남긴다
+  const holyTab = allBase.filter((t) => t.name === '신성 강화');
+  // 대장간(무기 상점): 무기 + 곡괭이. 합치기·제련·부착·신성 강화는 용광로에서 한다
+  Object.defineProperty(Shop.SHOPS.sword, 'tabs', { get: () => (bound ? baseTabs.concat(forgeTabs(bound).filter((t) => t.name === '곡괭이')) : baseTabs), configurable: true, enumerable: true });
   Shop.SHOPS.furnace = { title: '용광로' };
-  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name === '제련') : []), configurable: true, enumerable: true });
+  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name !== '곡괭이').concat(holyTab) : holyTab), configurable: true, enumerable: true });
 
   function act(item, wallet) {
     const r = item.run(wallet);

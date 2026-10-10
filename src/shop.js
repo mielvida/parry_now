@@ -259,7 +259,7 @@
 
   // 크리스탈 만들기: 어둠의 크리스탈(보스) -> 숲의 샘물로 씻기 -> 정화된 크리스탈 -> 화산의 제단 -> 신성 크리스탈 -> 대장간에서 칼에 붙이기
   add({ id: 'cleancrystal', name: '정화된 크리스탈', desc: '숲의 샘물로 씻어 어둠이 빠진 크리스탈. 화산의 제단에서 신성한 힘을 얻는다', quest: true, look: ['#a8ecff', '#3a8fc0'] });
-  add({ id: 'holycrystal', name: '신성 크리스탈', desc: '화산의 제단에서 신성해진 크리스탈. 대장간에서 칼에 붙이면 탑의 보스에게 더 강해진다', quest: true, look: ['#fff2a8', '#e0a82a'] });
+  add({ id: 'holycrystal', name: '신성 크리스탈', desc: '화산의 제단에서 신성해진 크리스탈. 용광로에서 칼에 붙이면 탑의 보스에게 더 강해진다', quest: true, look: ['#fff2a8', '#e0a82a'] });
 
   // 보상 상점의 업그레이드 두 가지 (레벨은 인벤토리에 저장되어 스테이지가 바뀌어도 유지된다)
   //  mine  동굴 보상: 마을 동굴 보물 상자의 코인 (1레벨 100 G -> 15레벨 450 G). 처음부터 1레벨
@@ -679,7 +679,7 @@
     }
     if (dupWeapon && wallet.inv.items.includes(item.id)) { // 이미 있는 무기: 한 자루 더
       const n = G.Forge.addCopy(wallet.inv, item.id);
-      return { ok: true, msg: `${item.name} 한 자루 더! (보유 ${n}개) 같은 무기 3개는 대장간에서 합칠 수 있어요.` };
+      return { ok: true, msg: `${item.name} 한 자루 더! (보유 ${n}개) 같은 무기 3개는 용광로에서 합칠 수 있어요.` };
     }
     if (item.lens) { // 돋보기는 사도 장착하지 않는다 (인벤토리에서 직접 끼운다)
       wallet.inv.items.push(item.id);

@@ -114,7 +114,7 @@
   const VILLAGER_LINES = [
     '마을 사람: "이 마을엔 몬스터가 없어서 평화롭지."',
     '마을 사람: "물약 가게에서 체력을 회복할 수 있다네."',
-    '마을 사람: "대장간에선 같은 검 3개를 합쳐 더 강하게 만들 수 있다네. 광물 동굴에서 캔 광석은 옆의 용광로에서 녹이게."',
+    '마을 사람: "같은 검 3개를 합쳐 더 강하게 만드는 건 옆의 용광로라네. 광물 동굴에서 캔 광석도 거기서 녹여 칼에 붙이게."',
     '마을 사람: "해변의 꽃게를 잡으면 코인을 떨어뜨린다더군."',
     '마을 사람: "마을 오른쪽 끝 동굴엔 보물이 있지만, 슬라임과 박쥐가 득시글하다네."',
     '마을 사람: "마을 곳곳의 문으로 숲, 설산, 화산에 갈 수 있다네. 갈수록 위험하지만 상자 보상도 크지."',
@@ -159,7 +159,7 @@
   let coins = 0;        // 보유 코인 (스테이지가 바뀌어도 유지)
   let exp = 0;          // 경험치 (보스 상자에서 얻는다. 아직 표시만 한다)
   const inv = G.Shop.newInventory(); // 가진 아이템과 낀 장비 (스테이지가 바뀌어도 유지)
-  G.Forge.bind(inv); // 대장간(합치기·부착)과 용광로(제련)가 이 인벤토리를 본다
+  G.Forge.bind(inv); // 대장간(곡괭이)과 용광로(합치기·제련·부착)가 이 인벤토리를 본다
   let equipStats = G.Shop.stats(inv); // 낀 장비의 능력치 합계 (applyEquipment가 갱신)
   const chestTaken = {};            // 이미 연 보물 상자 (같은 상자로 코인을 또 벌 수 없다)
   let nextStage = null;             // 클리어 연출이 끝나면 갈 곳 {name, near}
@@ -841,7 +841,7 @@
     if (!n) { say('정화된 크리스탈이 없어요 (어둠의 크리스탈을 숲의 샘물로 씻어 오세요)', 'rgba(255,170,170,A)'); G.Audio.play('deny'); return; }
     inv.materials.cleancrystal = 0;
     inv.materials.holycrystal = (inv.materials.holycrystal || 0) + n;
-    say(`신성 크리스탈 ${n}개를 얻었다! (대장간에서 칼에 붙일 수 있어요)`, 'rgba(255,225,120,A)');
+    say(`신성 크리스탈 ${n}개를 얻었다! (용광로에서 칼에 붙일 수 있어요)`, 'rgba(255,225,120,A)');
     G.Audio.play('treasure');
     effects.treasure(player.x + player.w / 2, player.y);
   }
@@ -1604,8 +1604,8 @@
       { label: '던전 위층 (+1)', hint: `지금 ${darkFloor}층`, img: 'd1', run: goto(() => goFloor(darkFloor + 1)) },
       { label: '던전 아래층 (-1)', hint: `지금 ${darkFloor}층`, img: 'd1', run: goto(() => goFloor(darkFloor - 1)) },
       { head: '마을 가게' },
-      { label: '대장간', hint: '합치기 · 신성 · 부착 · 곡괭이', img: 'shop_sword', run: shopGo('village', 'sword') },
-      { label: '용광로', hint: '광석 제련', img: 'shop_furnace', run: shopGo('village', 'furnace') },
+      { label: '대장간', hint: '무기 · 곡괭이', img: 'shop_sword', run: shopGo('village', 'sword') },
+      { label: '용광로', hint: '합치기 · 제련 · 부착 · 신성', img: 'shop_furnace', run: shopGo('village', 'furnace') },
       { label: '특수 무기 상점', hint: '창 · 도끼 · 망치 …', img: 'shop_weapon2', run: shopGo('village', 'weapon2') },
       { label: '갑옷 가게', img: 'shop_armor', run: shopGo('village', 'armor') },
       { label: '바지 가게', img: 'shop_pants', run: shopGo('village', 'pants') },
