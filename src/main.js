@@ -41,9 +41,9 @@
       music: 'cave', theme: G.DarkTheme, dark: true, summon: true, returnNear: 'dungeon', exitTo: 'darkhub',
       get level() { return dungeon.rows; },
       get boss() { return dungeon.boss; },
-      get label() { return `던전 ${darkFloor}층`; },
-      get goal() { return `어둠의 던전 ${darkFloor}층 / ${C.DUNGEON_FLOORS}층: ${dungeon.boss ? '보스를 쓰러뜨려라!' : '끝의 계단으로 올라가라 (경험치!)'}  [B 얼음폭탄 · V 먹기]`; },
-      get banner() { return { title: `${darkFloor}층`, sub: dungeon.bossKind ? '보스가 기다린다…' : '어둠의 던전', dur: 2.5, caption: dungeon.bossKind ? '…강한 기운이 느껴진다. 이 층의 끝에 보스가 있다.' : '…위로, 위로. 시크너가 기다린다.' }; },
+      get label() { return `어둠의 탑 ${darkFloor}층`; },
+      get goal() { return `어둠의 탑 ${darkFloor}층 / ${C.DUNGEON_FLOORS}층: ${dungeon.boss ? '보스를 쓰러뜨려라!' : '발판을 타고 꼭대기 계단으로! (암흑은 맞으면 -3)'}  [B 얼음폭탄 · V 먹기]`; },
+      get banner() { return { title: `${darkFloor}층`, sub: dungeon.bossKind ? '보스가 기다린다…' : '어둠의 탑', dur: 2.5, caption: dungeon.bossKind ? '…강한 기운이 느껴진다. 이 층의 끝에 보스가 있다.' : '…위로, 위로. 시크너가 기다린다.' }; },
     },
     home: { // 우리 집 안 (마을의 내 집 터에서 E). 장식품을 놓고 치우는 곳
       music: 'village', label: '우리 집', monsterless: true, returnNear: 'Y', theme: G.HomeTheme,
@@ -189,7 +189,7 @@
         mo.noExp = true;
         mo.fromBoss = true;
         mo.stageSpeed = 1;
-        mo.contactDmg = STAGES[stageName].dark && darkFloor >= 60 ? 2 : 1;
+        mo.contactDmg = STAGES[stageName].dark ? 3 : 1;
         if (STAGES[stageName].dark) mo.dark = true;
         if (k !== 'shade') { mo.dir = s.dir; mo.vy = s.vy; }
         monsters.push(mo);
@@ -245,7 +245,7 @@
   const bossDamage = () => (killsInOne() ? 2 : 1) + (boss && G.Shop.ITEMS[inv.equipped.weapon].elem === boss.weak ? (boss.weak === 'ice' ? C.BOSS_ICE_BONUS : C.BOSS_FIRE_BONUS) : 0);
 
   // 던전: 층마다 0~3개의 아이템이 바닥에 떨어져 있다 (스태미나, 얼음 폭탄, 음식)
-  const PICKUP_TABLE = ['st70', 'st30', 'st30', 'icebomb', 'burger', 'melon', 'burger'];
+  const PICKUP_TABLE = ['st70', 'st30', 'st30', 'icebomb', 'st30'];
   function scatterPickups() {
     const n = Math.random() < 0.35 ? 0 : 1 + Math.floor(Math.random() * 3);
     const pool = terrain.standingSpots().filter((s) => s.col > 12 && s.col < terrain.cols - 12);
@@ -305,14 +305,14 @@
       monsters.push(new G.DarkStone(p.x, p.y));
     }
     for (const sh of terrain.shadeSpawns) {
-      const p = terrain.centerOnTile(sh.col, sh.row - 4, G.Shade.W, G.Shade.H);
+      const p = terrain.centerOnTile(sh.col, sh.row, G.Shade.W, G.Shade.H);
       monsters.push(new G.Shade(p.x, p.y));
     }
     pickups.length = 0;
     enemyShots.length = 0;
     for (const mo of monsters) {
       mo.stageSpeed = (st.monsterSpeed || 1) * (st.dark ? 1 + Math.min(0.6, darkFloor * 0.006) : 1); // 다크월드는 올라갈수록 빨라진다
-      mo.contactDmg = st.monsterDamage || (st.dark && darkFloor >= 60 ? 2 : 1); // 설산 몬스터는 한 번에 목숨 2개
+      mo.contactDmg = st.monsterDamage || (st.dark ? 3 : 1); // 설산 몬스터는 목숨 2개, 다크월드(암흑)는 3개
       if (st.dark) { // 다크월드 몬스터: 층이 오를수록 단단하다 (체력, 더 때려야 하는 횟수)
         mo.dark = true;
         mo.maxHp = Math.round(mo.maxHp * (1 + darkFloor * 0.06));
@@ -400,6 +400,11 @@
     } else if (e.code === 'Digit7' || e.code === 'Numpad7') {
       cutscene = null;
       enterMine();
+    } else if (e.code === 'Digit4' || e.code === 'Numpad4') { // 테스트: 4 = 이야기를 건너뛰고 바로 다크월드로
+      cutscene = null;
+      story.revealed = true;
+      story.pending = false;
+      loadStage('darkhub', true);
     } else if (e.code === 'KeyK') { // 내 스프라이트(editor.html에서 그린 모션) 켜기/끄기
       const S = G.Sprites;
       let text;
@@ -821,9 +826,8 @@
   // V 키: 지금 가장 필요한 것을 먹는다 (스태미나가 모자라면 스태미나 물약, 피가 모자라면 음식)
   function eatBest() {
     const has = (id) => inv.consumables[id] > 0;
-    const lowLife = lives < maxLives();
     const lowSt = stamina < C.STAMINA_MAX - 25;
-    const order = lowSt ? (lowLife ? ['st30', 'melon', 'st70', 'burger'] : ['st30', 'st70', 'melon']) : ['burger', 'melon', 'st30', 'st70'];
+    const order = lowSt ? ['st30', 'st70'] : ['st30', 'st70']; // 스태미나 물약 (작은 것부터)
     for (const id of order) {
       if (!has(id)) continue;
       const r = useConsumable(id);
@@ -862,7 +866,7 @@
       if (player.invuln === 0 && !player.dashing && Math.abs(f.x - (player.x + player.w / 2)) < player.w / 2 + 9 && Math.abs(f.y - (player.y + player.h / 2)) < player.h / 2 + 9) {
         effects.parryHit(f.x, f.y);
         dead();
-        loseLife(player.x + player.w / 2, player.y + player.h / 2, STAGES[stageName].dark && darkFloor >= 60 ? 2 : 1);
+        loseLife(player.x + player.w / 2, player.y + player.h / 2, STAGES[stageName].dark ? 3 : 1);
       }
     }
   }

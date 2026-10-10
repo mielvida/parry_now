@@ -71,13 +71,11 @@
   weapon('shield2', 'shield', '철 방패', 2800, 0.8, 0, 0.1, ['#b8c0cc', '#6c7686'], { windowAdd: 0.2, note: '방패: 범위 넓고 패링이 오래 간다' });
   weapon('shield3', 'shield', '어둠 방패', 6000, 0.9, 0, 0.1, ['#6a2fb0', '#2a1250'], { windowAdd: 0.3, note: '방패: 가장 넓고 오래 막는다' });
 
-  // ---- 다크월드 아이템 상점 (소모품): 스태미나/음식은 인벤토리에서 쓰거나 V 키, 얼음 폭탄은 B 키로 던진다 ----
+  // ---- 다크월드 아이템 상점 (소모품): 스태미나는 인벤토리에서 쓰거나 V 키, 얼음 폭탄은 B 키로 던진다 ----
   add({ id: 'st70', name: '스태미나 +70', desc: '스태미나를 70 회복', price: 120, consumable: true, stamina: 70, look: ['#7dffd0', '#2fa88a'] });
   add({ id: 'st30', name: '스태미나 +30', desc: '스태미나를 30 회복', price: 60, consumable: true, stamina: 30, look: ['#bfffe8', '#4fc8a0'] });
   add({ id: 'icebomb', name: '얼음 폭탄', desc: '던지면 주변 3칸 몬스터가 얼어붙는다', price: 150, consumable: true, bomb: 'ice', look: ['#bfe8ff', '#5fa8d9'], note: 'B 키로 던진다' });
-  add({ id: 'burger', name: '햄버거', desc: '피 2칸 회복', price: 100, consumable: true, food: 2, look: ['#d9a05a', '#8a5a2b'] });
-  add({ id: 'melon', name: '수박', desc: '피 1칸 + 스태미나 30 회복', price: 80, consumable: true, food: 1, stamina: 30, look: ['#e8334a', '#3f9a45'] });
-  const CONSUMABLE_IDS = ['st70', 'st30', 'icebomb', 'burger', 'melon'];
+  const CONSUMABLE_IDS = ['st70', 'st30', 'icebomb'];
 
   // 물약: 사서 인벤토리에 쌓아 두었다가 나중에 마신다 (heal = 회복하는 피 칸 수)
   add({ id: 'potion1', name: '치유 물약', desc: '피 1칸 회복', price: 100, heal: 1, look: ['#e8334a'] });
@@ -247,7 +245,7 @@
     },
     ditem: {
       title: '다크월드 아이템 상점',
-      tabs: [{ name: '아이템', items: ids('st70', 'st30', 'icebomb', 'burger', 'melon') }],
+      tabs: [{ name: '아이템', items: ids('st70', 'st30', 'icebomb') }],
     },
     estate: {
       title: '부동산',
@@ -283,7 +281,7 @@
       items: ['sword0', 'armor0'],
       potions: { potion1: 0, potion2: 0 }, // 물약 개수
       materials: { darkcrystal: 0 }, // 보스가 떨어뜨리는 소중한 물건의 개수 (쌓인다)
-      consumables: { st70: 0, st30: 0, icebomb: 0, burger: 0, melon: 0 }, // 다크월드 소모품 개수
+      consumables: { st70: 0, st30: 0, icebomb: 0 }, // 다크월드 소모품 개수
       home: { type: null, owned: {}, placed: { floor: [], wall: [] } }, // 우리 집: 산 집 종류, 가진 장식품 개수, 방에 놓은 장식품
       mineLevel: 1, // 동굴 보상 업그레이드 레벨 (동굴 보물 상자 코인)
       speedLevel: 0, // 마을 달리기 업그레이드 레벨 (마을에서의 이동 속도)

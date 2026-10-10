@@ -18,35 +18,66 @@
   const mix = (c1, c2, t) => `rgb(${Math.round(c1[0] + (c2[0] - c1[0]) * t)},${Math.round(c1[1] + (c2[1] - c1[1]) * t)},${Math.round(c1[2] + (c2[2] - c1[2]) * t)})`;
   const DarkTheme = {
     rnd,
+    // 탑 안쪽 벽: 어두운 벽돌, 아치 창 너머의 붉은 달밤, 타오르는 횃불. 모두 세계 좌표에 고정되어 올라갈수록 위로 흘러간다
     drawBackground(ctx, w, h, camera, time) {
       const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, '#07020f');
-      g.addColorStop(0.6, '#1a0830');
-      g.addColorStop(1, '#2d0f45');
+      g.addColorStop(0, '#0a0414');
+      g.addColorStop(1, '#1d0a30');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
-      const mg = ctx.createRadialGradient(w * 0.78, h * 0.2, 0, w * 0.78, h * 0.2, 150);
-      mg.addColorStop(0, 'rgba(255,70,90,0.55)');
-      mg.addColorStop(0.35, 'rgba(180,30,80,0.25)');
-      mg.addColorStop(1, 'rgba(120,20,80,0)');
-      ctx.fillStyle = mg;
-      ctx.fillRect(w * 0.78 - 150, h * 0.2 - 150, 300, 300);
-      ctx.fillStyle = '#c0304a'; // 붉은 달
-      ctx.beginPath(); ctx.arc(w * 0.78, h * 0.2, 34, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#7a1a3a';
-      ctx.beginPath(); ctx.arc(w * 0.78 + 8, h * 0.2 - 6, 9, 0, Math.PI * 2); ctx.fill();
-      // 먼 산 실루엣 (시차)
-      ctx.fillStyle = '#12061f';
-      const off = -(camera.x * 0.2) % 220;
-      for (let x = off - 220; x < w + 220; x += 220) {
-        const k = Math.floor((x - off) / 220);
-        ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x + 70, h - 120 - rnd(k, 3, 1) * 120); ctx.lineTo(x + 150, h - 60 - rnd(k, 4, 1) * 60); ctx.lineTo(x + 220, h); ctx.fill();
+      const cx = camera.x;
+      const cy = camera.y || 0;
+      // 벽돌 (세계에 고정)
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      const bw = 64;
+      const bh = 32;
+      const r0 = Math.floor(cy / bh);
+      const c0 = Math.floor(cx / bw);
+      for (let r = r0; r <= r0 + Math.ceil(h / bh) + 1; r++) {
+        const y = r * bh - cy;
+        ctx.fillRect(0, y, w, 2);
+        const off = (r % 2) * (bw / 2);
+        for (let c = c0 - 1; c <= c0 + Math.ceil(w / bw) + 1; c++) {
+          const x = c * bw + off - cx;
+          ctx.fillRect(x, y, 2, bh);
+        }
       }
-      ctx.fillStyle = 'rgba(190,120,255,0.55)'; // 떠다니는 어둠의 불씨
-      for (let i = 0; i < 40; i++) {
-        const px = ((rnd(i, 1, 7) * (w + 200) - camera.x * (0.3 + (i % 3) * 0.1) + time * 8 * (1 + i % 3)) % (w + 200) + (w + 200)) % (w + 200) - 100;
-        const py = ((rnd(i, 2, 7) * h - time * (10 + (i % 4) * 5)) % h + h) % h;
-        ctx.fillRect(px, py, 2, 2);
+      // 아치 창: 일정한 간격으로 (밖은 붉은 달과 별)
+      const WX = 360;
+      const WY = 420;
+      const k0 = Math.floor((cx - 100) / WX);
+      const j0 = Math.floor((cy - 300) / WY);
+      for (let j = j0; j <= j0 + 2; j++) {
+        for (let k = k0; k <= k0 + Math.ceil(w / WX) + 1; k++) {
+          const x = k * WX + 150 + (j % 2) * 90 - cx;
+          const y = j * WY + 130 - cy;
+          if (x < -120 || x > w + 40 || y < -200 || y > h + 40) continue;
+          ctx.fillStyle = '#05020a';
+          ctx.beginPath(); ctx.moveTo(x - 4, y + 150); ctx.lineTo(x - 4, y + 40); ctx.arc(x + 36, y + 40, 40, Math.PI, 0); ctx.lineTo(x + 76, y + 150); ctx.closePath(); ctx.fill();
+          const wg = ctx.createLinearGradient(0, y, 0, y + 150);
+          wg.addColorStop(0, '#1a0a3a'); wg.addColorStop(1, '#4a1a5a');
+          ctx.fillStyle = wg;
+          ctx.beginPath(); ctx.moveTo(x, y + 150); ctx.lineTo(x, y + 40); ctx.arc(x + 36, y + 40, 36, Math.PI, 0); ctx.lineTo(x + 72, y + 150); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = (k + j) % 3 === 0 ? '#c0304a' : 'rgba(230,200,255,0.8)'; // 달 또는 별
+          ctx.beginPath(); ctx.arc(x + 44, y + 36, (k + j) % 3 === 0 ? 14 : 2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#05020a'; ctx.fillRect(x + 34, y, 4, 150); ctx.fillRect(x, y + 78, 72, 4);
+        }
+      }
+      // 횃불 (보랏빛 불꽃)
+      const TX = 240;
+      for (let k = Math.floor(cx / TX) - 1; k <= Math.floor((cx + w) / TX) + 1; k++) {
+        for (let j = Math.floor(cy / 300) - 1; j <= Math.floor((cy + h) / 300) + 1; j++) {
+          if (rnd(k, j, 11) < 0.45) continue;
+          const x = k * TX + 40 + rnd(k, j, 12) * 160 - cx;
+          const y = j * 300 + 90 + rnd(k, j, 13) * 140 - cy;
+          const f = 0.7 + 0.3 * Math.sin(time * 9 + k * 3 + j);
+          const tg = ctx.createRadialGradient(x, y, 0, x, y, 70);
+          tg.addColorStop(0, `rgba(190,110,255,${0.45 * f})`); tg.addColorStop(1, 'rgba(120,40,200,0)');
+          ctx.fillStyle = tg; ctx.fillRect(x - 70, y - 70, 140, 140);
+          ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x - 3, y, 6, 22);
+          ctx.fillStyle = `rgba(210,150,255,${f})`;
+          ctx.beginPath(); ctx.ellipse(x, y - 4, 5, 9 * f, 0, 0, Math.PI * 2); ctx.fill();
+        }
       }
     },
     drawCeiling() {},
@@ -58,21 +89,23 @@
       const left = c > 0 && terrain.grid[r][c - 1];
       const right = c + 1 < terrain.cols && terrain.grid[r][c + 1];
       const v = rnd(c, r, 1);
-      ctx.fillStyle = above ? mix([34, 20, 52], [26, 14, 42], v) : mix([62, 36, 92], [48, 26, 76], v);
+      ctx.fillStyle = above ? mix([36, 22, 54], [28, 16, 44], v) : mix([66, 40, 96], [52, 30, 80], v);
       ctx.fillRect(x, y, T, T);
-      ctx.fillStyle = 'rgba(0,0,0,0.25)';
-      for (let k = 0; k < 3; k++) ctx.fillRect(x + Math.floor(rnd(c, r, 20 + k) * (T - 8)), y + 6 + Math.floor(rnd(c, r, 30 + k) * (T - 12)), 6 + Math.floor(rnd(c, r, 40 + k) * 8), 3);
-      if (rnd(c, r, 5) > 0.82) { // 보랏빛으로 빛나는 균열
-        ctx.strokeStyle = 'rgba(200,110,255,0.75)';
+      ctx.fillStyle = 'rgba(0,0,0,0.38)'; // 벽돌 줄눈
+      ctx.fillRect(x, y + 15, T, 2);
+      ctx.fillRect(x + (r % 2 ? 8 : 20), y, 2, 15);
+      ctx.fillRect(x + (r % 2 ? 22 : 6), y + 17, 2, 15);
+      if (rnd(c, r, 5) > 0.84) { // 보랏빛으로 빛나는 균열
+        ctx.strokeStyle = 'rgba(200,110,255,0.7)';
         ctx.lineWidth = 1.5;
-        const cx = x + 6 + Math.floor(rnd(c, r, 6) * (T - 12));
-        ctx.beginPath(); ctx.moveTo(cx, y + 3); ctx.lineTo(cx + 5, y + 12); ctx.lineTo(cx - 2, y + 21); ctx.lineTo(cx + 4, y + 30); ctx.stroke();
+        const cx0 = x + 6 + Math.floor(rnd(c, r, 6) * (T - 12));
+        ctx.beginPath(); ctx.moveTo(cx0, y + 3); ctx.lineTo(cx0 + 5, y + 12); ctx.lineTo(cx0 - 2, y + 21); ctx.lineTo(cx0 + 4, y + 30); ctx.stroke();
       }
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       if (!right) ctx.fillRect(x + T - 3, y, 3, T);
       if (!left) ctx.fillRect(x, y, 2, T);
       if (!below) ctx.fillRect(x, y + T - 4, T, 4);
-      if (!above) { // 윗면: 어둠의 이끼
+      if (!above) { // 윗면: 발판 위의 어둠의 이끼
         ctx.fillStyle = '#6a3aa0';
         ctx.fillRect(x, y, T, 4);
         ctx.fillStyle = '#9a62e0';
@@ -177,46 +210,92 @@
   Shade.W = 26;
   Shade.H = 34;
 
-  // ======================= 층 만들기 =======================
-  // 층마다 새로 만든다. 층이 오를수록 길고 구덩이가 많고 몬스터가 많으며, 어둠의 돌/그림자가 섞여 나온다
+  // ======================= 층 만들기 (탑) =======================
+  // 어둠의 탑: 한 층씩 올라간다. 일반 층은 세로로 긴 탑 안쪽(36줄)이고, 바닥에서 시작해 지그재그로 놓인 발판을 타고 꼭대기의 계단으로 올라간다.
+  // 33/66/100층은 한 화면짜리 보스방. 층이 오를수록 발판이 좁고 간격이 벌어지며 몬스터가 늘고 강해진다.
+  const TOWER_H = 36;
+  const TOWER_W = 44;
+
+  function makeTower(floor, rand) {
+    const t = floor / 100;
+    const pick = (a, b) => a + Math.floor(rand() * (b - a + 1));
+    const g = Array.from({ length: TOWER_H }, () => Array(TOWER_W).fill('.'));
+    for (let r = 0; r < TOWER_H; r++) { g[r][0] = g[r][1] = '#'; g[r][TOWER_W - 1] = g[r][TOWER_W - 2] = '#'; } // 바깥 벽 (두께 2)
+    for (let c = 0; c < TOWER_W; c++) { g[0][c] = g[1][c] = '#'; g[TOWER_H - 2][c] = g[TOWER_H - 1][c] = '#'; } // 천장, 바닥
+    const platforms = []; // {row, x0, x1}: 윗면이 row인 발판
+    let prev = { row: TOWER_H - 2, x0: 2, x1: TOWER_W - 3 }; // 바닥
+    let guard = 0;
+    while (prev.row > 9 && guard++ < 80) {
+      const rise = rand() < 0.08 + 0.3 * t ? 3 : 2;
+      const maxGap = rise === 3 ? 2 : 3;
+      const w = pick(4, Math.max(5, 7 - Math.floor(t * 3)));
+      const last = prev.row - rise <= 9;
+      const row = last ? Math.max(6, prev.row - rise) : prev.row - rise;
+      const ww = last ? 10 : w;
+      let placed = null;
+      const dirs = rand() < 0.5 ? [1, -1] : [-1, 1];
+      for (const dir of dirs) {
+        for (let tries = 0; tries < 6 && !placed; tries++) {
+          const gap = pick(1, maxGap);
+          let x0;
+          let x1;
+          if (prev.row === TOWER_H - 2) { // 첫 발판은 바닥 위 어디서나
+            x0 = pick(3, TOWER_W - 3 - ww);
+            x1 = x0 + ww - 1;
+          } else if (dir > 0) { x0 = prev.x1 + 1 + gap; x1 = x0 + ww - 1; }
+          else { x1 = prev.x0 - 1 - gap; x0 = x1 - ww + 1; }
+          if (x0 >= 3 && x1 <= TOWER_W - 4) placed = { row, x0, x1 };
+        }
+        if (placed) break;
+      }
+      if (!placed) { // 벽 쪽이라 막히면 반대 끝으로
+        const x0 = Math.max(3, prev.x0 > TOWER_W / 2 ? 3 : TOWER_W - 3 - ww);
+        placed = { row, x0, x1: Math.min(TOWER_W - 4, x0 + ww - 1) };
+      }
+      platforms.push(placed);
+      prev = placed;
+      for (let c = placed.x0; c <= placed.x1; c++) g[placed.row][c] = '#';
+    }
+    const top = platforms[platforms.length - 1];
+    // 몬스터: 발판마다. 지상 몬스터는 발판 위, 박쥐/그림자는 발판 위 공중
+    const ground = (p, name) => { const c = pick(p.x0 + 1, Math.max(p.x0 + 1, p.x1 - 1)); if (g[p.row - 1][c] === '.') g[p.row - 1][c] = name; };
+    const air = (p, name, up) => { const c = pick(p.x0, p.x1); const r = p.row - up; if (r > 2 && g[r][c] === '.' && g[r - 1][c] === '.') g[r][c] = name; };
+    platforms.slice(0, -1).forEach((p, i) => {
+      if (i === 0 && floor < 3) return;
+      const w = p.x1 - p.x0 + 1;
+      if (w >= 5 && rand() < 0.55 + 0.3 * t) {
+        const x = rand();
+        ground(p, floor >= 10 && x < 0.1 + t * 0.2 ? 'j' : floor >= 5 && x < 0.3 + t * 0.15 ? 'k' : x < 0.5 ? 'G' : 'S');
+      }
+      if (rand() < 0.28 + 0.4 * t) air(p, floor >= 10 && rand() < 0.4 ? 'j' : 'B', 4);
+      if (floor >= 20 && w >= 6 && rand() < 0.3 * t + 0.1) ground(p, rand() < 0.5 ? 'S' : 'k');
+    });
+    // 바닥에도 몇 마리 (시작 지점에서 떨어진 곳)
+    for (let n = 0; n < Math.min(4, 1 + Math.floor(floor / 15)); n++) {
+      const c = pick(14, TOWER_W - 6);
+      if (g[TOWER_H - 3][c] === '.') g[TOWER_H - 3][c] = rand() < 0.5 ? 'S' : 'G';
+    }
+    g[TOWER_H - 3][3] = 'X';
+    g[TOWER_H - 3][6] = 'P';
+    g[top.row - 1][Math.floor((top.x0 + top.x1) / 2)] = 'T'; // 꼭대기의 위층으로 오르는 계단
+    return { floor, rows: g.map((r) => r.join('')), boss: null, bossKind: null, tower: true };
+  }
+
+  // 보스방: 짧은 복도 + 한 화면짜리 평평한 경기장 (보스가 시작되면 복도 쪽이 막힌다)
+  function makeBossRoom(floor, bossKind) {
+    const W = 34;
+    const g = Array.from({ length: 18 }, () => Array(W).fill('.'));
+    for (let r = 0; r < 18; r++) for (let c = 0; c < W; c++) if (r <= 1 || r >= 16) g[r][c] = '#';
+    g[15][1] = 'X';
+    g[15][3] = 'P';
+    g[15][W - 3] = 'T';
+    return { floor, rows: g.map((r) => r.join('')), boss: { col: 5, kind: 'dark_' + bossKind, drop: 'darkcrystal' }, bossKind, tower: false };
+  }
+
   function makeFloor(floor) {
     const rand = mulberry(floor * 7919 + 17);
     const bossKind = BOSS_FLOORS[floor] || null;
-    const t = floor / 100;
-    const opts = {
-      length: Math.min(240, Math.round(110 + floor * 1.2)),
-      weights: { flat: 0.3 - 0.12 * t, bump: 0.16, up: 0.14, down: 0.12, pit: 0.14 + 0.14 * t, wide: 0.08 + 0.08 * t },
-      slimes: Math.min(30, Math.round(6 + floor * 0.25)),
-      bats: Math.min(12, Math.round(2 + floor * 0.1)),
-      crabs: 0,
-      floatChance: 0.3,
-    };
-    const rows = G.MineGen.generate(floor, rand, opts);
-    const grid = rows.map((r) => r.split(''));
-    const W = grid[0].length;
-    // 슬라임 자리 일부를 흙골렘/어둠의 돌/시크너의 그림자로 바꾼다 (층이 오를수록 강한 것이 많아진다)
-    for (let r = 0; r < grid.length; r++) {
-      for (let c = 0; c < W; c++) {
-        if (grid[r][c] !== 'S') continue;
-        const x = rand();
-        if (floor >= 10 && x < 0.1 + t * 0.2) grid[r][c] = 'j';
-        else if (floor >= 5 && x < 0.28 + t * 0.2) grid[r][c] = 'k';
-        else if (x < 0.5) grid[r][c] = 'G';
-      }
-    }
-    let boss = null;
-    if (bossKind) { // 끝 30칸을 평평한 보스방으로 만든다
-      const START = W - 35;
-      const top = (c) => { for (let r = 0; r < 18; r++) if (grid[r][c] === '#') return r; return null; };
-      const g0 = top(START - 1);
-      for (let c = START; c < W; c++) {
-        const tp = Math.min(16, (g0 === null ? 16 : g0) + (c - START + 1));
-        for (let r = 0; r < 18; r++) grid[r][c] = r >= tp ? '#' : '.';
-      }
-      grid[15][W - 3] = 'T';
-      boss = { col: W - 29, kind: 'dark_' + bossKind, drop: 'darkcrystal' };
-    }
-    return { floor, rows: grid.map((r) => r.join('')), boss, bossKind };
+    return bossKind ? makeBossRoom(floor, bossKind) : makeTower(floor, rand);
   }
 
   // ======================= 보스 =======================
@@ -240,6 +319,7 @@
       this.scale = m.scale;
       this.body.maxHp = m.hp();
       this.body.hp = this.body.maxHp;
+      this.hurtDmg = 3; // 암흑의 존재는 한 번에 목숨 3개
       this.shards = [];
       this.rains = [];
     }

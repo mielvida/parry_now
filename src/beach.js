@@ -215,11 +215,12 @@
       ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 76, baseY - 79); ctx.lineTo(x + 76, baseY - 49); ctx.stroke();
       ctx.fillStyle = '#6a2fb0'; ctx.beginPath(); ctx.arc(x + 112, baseY - 62, 14, 0, Math.PI * 2); ctx.fill(); // 방패
       ctx.fillStyle = '#e0b12f'; ctx.fillRect(x + 110, baseY - 74, 4, 24); ctx.fillRect(x + 100, baseY - 64, 24, 4);
-    } else if (ditem) { // 선반 위 병, 햄버거, 수박
+    } else if (ditem) { // 선반 위 스태미나 병과 얼음 폭탄
       ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
       ctx.fillStyle = '#7dffd0'; ctx.fillRect(x + 18, baseY - 80, 12, 18); ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + 21, baseY - 86, 6, 7);
-      ctx.fillStyle = '#d9a05a'; ctx.beginPath(); ctx.arc(x + 58, baseY - 68, 12, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#6b3a1a'; ctx.fillRect(x + 46, baseY - 68, 24, 5); ctx.fillStyle = '#d9a05a'; ctx.fillRect(x + 46, baseY - 63, 24, 4);
-      ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(x + 100, baseY - 62, 14, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#3f9a45'; ctx.fillRect(x + 86, baseY - 62, 28, 3);
+      ctx.fillStyle = '#bfffe8'; ctx.fillRect(x + 54, baseY - 76, 10, 14); ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + 56, baseY - 81, 6, 6); // 작은 스태미나 병
+      ctx.fillStyle = '#5fa8d9'; ctx.beginPath(); ctx.arc(x + 98, baseY - 70, 9, 0, Math.PI * 2); ctx.fill(); // 얼음 폭탄
+      ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.arc(x + 95, baseY - 73, 3, 0, Math.PI * 2); ctx.fill();
     } else if (estate) { // 선반 위 작은 집 모형들
       ctx.fillStyle = '#7a5530';
       ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
@@ -290,9 +291,9 @@
     } else if (dweapon) { // 계산대 위 폭탄
       ctx.fillStyle = '#2a2a32'; ctx.beginPath(); ctx.arc(x + w - 32, baseY - 38, 8, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#ff9a3a'; ctx.fillRect(x + w - 30, baseY - 49, 3, 5);
-    } else if (ditem) { // 계산대 위 수박 조각
-      ctx.fillStyle = '#3f9a45'; ctx.beginPath(); ctx.arc(x + w - 32, baseY - 36, 11, Math.PI, 0); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(x + w - 32, baseY - 36, 8, Math.PI, 0); ctx.closePath(); ctx.fill();
+    } else if (ditem) { // 계산대 위 스태미나 병
+      ctx.fillStyle = '#7dffd0'; ctx.fillRect(x + w - 38, baseY - 46, 12, 14);
+      ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + w - 35, baseY - 52, 6, 7);
     } else if (estate) { // 계산대 위 열쇠
       ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(x + w - 36, baseY - 40, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillRect(x + w - 31, baseY - 41, 16, 3); ctx.fillRect(x + w - 20, baseY - 41, 3, 8);

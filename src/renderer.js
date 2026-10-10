@@ -381,16 +381,6 @@
           ctx.fillStyle = L[0]; ctx.beginPath(); ctx.arc(-4, 0, 6, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = '#a66a33'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(4, -12); ctx.quadraticCurveTo(10, -20, 7, -24); ctx.stroke();
           ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.arc(7, -26, 5, 0, Math.PI * 2); ctx.fill();
-        } else if (item.id === 'burger') {
-          ctx.fillStyle = '#d9a05a'; ctx.beginPath(); ctx.arc(0, -4, 17, Math.PI, 0); ctx.fill();
-          ctx.fillStyle = '#3f9a45'; ctx.fillRect(-18, -4, 36, 5);
-          ctx.fillStyle = '#6b3a1a'; ctx.fillRect(-17, 1, 34, 8);
-          ctx.fillStyle = '#ffd54a'; ctx.fillRect(-18, 9, 36, 4);
-          ctx.fillStyle = '#d9a05a'; ctx.fillRect(-17, 13, 34, 7);
-        } else if (item.id === 'melon') {
-          ctx.fillStyle = '#3f9a45'; ctx.beginPath(); ctx.arc(0, 0, 20, Math.PI, 0); ctx.closePath(); ctx.fill();
-          ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(0, 0, 16, Math.PI, 0); ctx.closePath(); ctx.fill();
-          ctx.fillStyle = '#2a2a30'; for (const [sx, sy] of [[-8, -4], [0, -9], [8, -4], [0, -2]]) ctx.fillRect(sx - 1, sy - 1, 3, 4);
         } else { // 스태미나: 병 안의 번개
           ctx.fillStyle = L[1]; ctx.fillRect(-11, -8, 22, 28);
           ctx.fillStyle = L[0]; ctx.fillRect(-8, -5, 16, 22);
@@ -1108,7 +1098,7 @@
       const c = hud.consumables || {};
       const bits = [];
       if (c.icebomb > 0) bits.push(`얼음폭탄 ${c.icebomb} (B)`);
-      const food = (c.burger || 0) + (c.melon || 0) + (c.st30 || 0) + (c.st70 || 0);
+      const food = (c.st30 || 0) + (c.st70 || 0);
       if (food > 0) bits.push(`먹기 ${food} (V)`);
       if (bits.length) {
         ctx.font = 'bold 12px sans-serif';
@@ -1366,7 +1356,7 @@
       this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Shift(또는 X): 3칸 대시   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   R: 처음 위치로', 12, 10);
       ctx.font = '16px sans-serif';
       if (!hud) return;
-      const test = '   [테스트] 0: 해변  9: 마을  7: 마을 동굴  8: 코인+1000   1: 장비';
+      const test = '   [테스트] 0: 해변  9: 마을  7: 마을 동굴  4: 다크월드  8: 코인+1000   1: 장비';
       if (hud.summon) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리${test}`, 12, 32);
       else if (hud.monsterless) this._text(ctx, `몬스터가 없는 평화로운 마을${test}`, 12, 32);
       else if (hud.crabCount !== undefined) this._text(ctx, `꽃게 ${hud.crabCount}마리${test}`, 12, 32);
