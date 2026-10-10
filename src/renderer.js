@@ -2710,6 +2710,7 @@
       else if (m.kind === 'golem') this._paintGolem(ctx, m);
       else if (m.kind === 'darkstone') this._paintDarkStone(ctx, m);
       else if (m.kind === 'shade') this._paintShade(ctx, m);
+      else if (m.kind === 'raider') this._paintRaider(ctx, m);
       else this._paintSlime(ctx, m);
       if (m.dark) this._drawDarkAura(ctx, m);
       if (m.staggered > 0) this._drawDazed(ctx, m);
@@ -2934,6 +2935,15 @@
     // 몬스터가 쏜 어둠 구슬 (쳐내면 하얗게 변해 되돌아간다)
     _drawEnemyShot(ctx, f) {
       const white = f.reflected;
+      if (f.arrow) { // 궁수의 화살
+        const a = Math.atan2(f.vy, f.vx);
+        ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
+        ctx.fillStyle = white ? '#ffffff' : '#7a5a2a'; ctx.fillRect(-12, -1, 22, 2);
+        ctx.fillStyle = white ? '#e8f0ff' : '#dfe6ee'; ctx.beginPath(); ctx.moveTo(10, -3); ctx.lineTo(16, 0); ctx.lineTo(10, 3); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = white ? '#ffffff' : '#c0273a'; ctx.fillRect(-14, -3, 5, 2); ctx.fillRect(-14, 1, 5, 2);
+        ctx.restore();
+        return;
+      }
       const g = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, 18);
       g.addColorStop(0, white ? 'rgba(255,255,255,0.95)' : 'rgba(230,170,255,0.9)');
       g.addColorStop(1, white ? 'rgba(200,220,255,0)' : 'rgba(120,40,200,0)');
@@ -3078,6 +3088,67 @@
     }
 
     // 흙괴물: 진흙과 바위로 된 몸. 몸을 던지기 전에 팔을 번쩍 든다. 머리와 어깨에 눈이 쌓여 있다
+    // 왕국을 덮치는 군단병: 종류마다 갑옷색과 무기가 다르다 (창병 창, 방패병 방패, 궁수 활, 돌격병 단검, 오우거 몽둥이)
+    _paintRaider(ctx, m) {
+      const flash = m.flying && Math.floor(m.flightTime / 0.05) % 2 === 0;
+      const v = m.variant;
+      const pal = { spear: ['#4a5a82', '#c0273a', '#e8b98a'], shield: ['#6a707e', '#2a56b8', '#e8b98a'], archer: ['#3a6a3a', '#7a5a2a', '#e8b98a'], rusher: ['#8a3a3a', '#f2f2f2', '#e8b98a'], ogre: ['#5e7a3e', '#7a4a2a', '#7e9a56'] }[v];
+      const body = flash ? '#ffffff' : pal[0], acc = flash ? '#ffffff' : pal[1], skin = flash ? '#ffffff' : pal[2];
+      const k = m.h / 40;
+      const walking = Math.abs(m.vx) > 5;
+      const bob = walking ? Math.abs(Math.sin(m.time * (v === 'rusher' ? 14 : 7))) * 1.6 : 0;
+      const wind = m.state === 'windup', strike = m.state === 'strike';
+      ctx.save();
+      ctx.translate(sp(m.x + m.w / 2), sp(m.y + m.h));
+      ctx.scale(m.dir >= 0 ? 1 : -1, 1);
+      ctx.translate(strike && v !== 'spear' ? 4 : 0, -bob);
+      ctx.scale(k, k);
+      ctx.rotate(strike && v !== 'spear' ? 0.16 : 0);
+      const dark = '#2a2230';
+      ctx.fillStyle = dark; ctx.fillRect(-8, -10, 6, 10); ctx.fillRect(2, -10, 6, 10); // 다리
+      ctx.fillStyle = body; ctx.fillRect(-10, -26, 20, 17); // 몸통
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(-10, -26, 20, 3);
+      ctx.fillStyle = acc; ctx.fillRect(-10, -12, 20, 3); // 허리띠
+      ctx.fillStyle = skin; ctx.fillRect(-7, -37, 14, 12); // 얼굴
+      ctx.fillStyle = body; ctx.fillRect(-8, -40, 16, 6); // 투구
+      if (v === 'spear') { ctx.fillStyle = acc; ctx.fillRect(-1, -48, 3, 9); }
+      if (v === 'shield') { ctx.fillStyle = '#c9d2dc'; ctx.fillRect(-9, -40, 18, 3); }
+      if (v === 'archer') { ctx.fillStyle = body; ctx.fillRect(-9, -41, 18, 7); ctx.fillStyle = skin; ctx.fillRect(-5, -36, 10, 8); }
+      if (v === 'rusher') { ctx.fillStyle = acc; ctx.fillRect(-8, -35, 16, 3); ctx.fillRect(6, -36, 6, 2); }
+      if (v === 'ogre') { ctx.fillStyle = '#e8e0c8'; ctx.fillRect(2, -33, 3, 5); ctx.fillRect(-6, -33, 3, 5); }
+      ctx.fillStyle = '#d02a2a'; ctx.fillRect(2, -32, 3, 3); // 눈
+      ctx.strokeStyle = dark; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      if (v === 'spear') { // 창: 평소엔 어깨에 세우고, 예비동작에서 뒤로 빼고, 찌를 때 길게 뻗는다
+        const ax = wind ? -10 : strike ? 30 : 12;
+        ctx.strokeStyle = '#7a5a2a'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(wind ? -22 : strike ? -6 : 10, wind ? -22 : strike ? -22 : -44); ctx.lineTo(ax + (strike ? 34 : 0), strike ? -22 : wind ? -22 : -4); ctx.stroke();
+        ctx.fillStyle = flash ? '#fff' : '#dfe6ee';
+        const tipX = strike ? 64 : wind ? -12 : 10, tipY = strike ? -22 : wind ? -22 : -48;
+        ctx.beginPath(); ctx.moveTo(tipX, tipY - 4); ctx.lineTo(tipX + 12, tipY); ctx.lineTo(tipX, tipY + 4); ctx.closePath(); ctx.fill();
+      } else if (v === 'shield') {
+        ctx.fillStyle = flash ? '#fff' : '#2a56b8'; ctx.fillRect(strike ? 8 : 10, -30, 11, 24);
+        ctx.fillStyle = flash ? '#fff' : '#ffd54a'; ctx.fillRect(strike ? 11 : 13, -22, 5, 8);
+        ctx.strokeStyle = '#c9d2dc'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, -22); ctx.lineTo(-14, -42); ctx.stroke();
+      } else if (v === 'archer') {
+        ctx.strokeStyle = '#a07a3a'; ctx.lineWidth = 2.5;
+        const pull = wind ? 6 : 0;
+        ctx.beginPath(); ctx.arc(16, -24, 14, -Math.PI * 0.45, Math.PI * 0.45); ctx.stroke();
+        ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(16 + Math.cos(-Math.PI * 0.45) * 14, -24 + Math.sin(-Math.PI * 0.45) * 14); ctx.lineTo(16 - pull, -24); ctx.lineTo(16 + Math.cos(Math.PI * 0.45) * 14, -24 + Math.sin(Math.PI * 0.45) * 14); ctx.stroke();
+        if (wind) { ctx.strokeStyle = '#7a5a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16 - pull, -24); ctx.lineTo(30, -24); ctx.stroke(); }
+      } else if (v === 'rusher') {
+        ctx.strokeStyle = dark; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(8, -22); ctx.lineTo(18, -26); ctx.stroke();
+        ctx.fillStyle = '#dfe6ee'; ctx.beginPath(); ctx.moveTo(18, -28); ctx.lineTo(30, -26); ctx.lineTo(18, -24); ctx.closePath(); ctx.fill();
+      } else { // 오우거: 몽둥이
+        ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 6;
+        const raise = wind ? -48 : strike ? -10 : -26;
+        ctx.beginPath(); ctx.moveTo(10, -22); ctx.lineTo(wind ? 10 : 22, raise); ctx.stroke();
+        ctx.fillStyle = '#7a5a3a'; ctx.beginPath(); ctx.arc(wind ? 10 : 22, raise - 2, 8, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
     _paintGolem(ctx, g) {
       const windup = g.state === 'windup';
       const lunge = g.state === 'lunge';

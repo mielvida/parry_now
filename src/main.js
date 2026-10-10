@@ -42,7 +42,11 @@
     },
     kingdom: { // 챕터 2: 왕이 다스리는 거대한 왕국의 도시. 가게가 길게 늘어서 있고 가운데 성에 왕이 있다
       music: 'village', label: '왕국', level: G.Levels.kingdom, theme: G.KingdomTheme, monsterless: true, returnNear: 'kingdom', exitTo: 'village',
-      goal: '챕터 2 왕국: 거리를 따라 여러 가게가 늘어서 있다. 가운데 성에서 왕을 만나자 (가게 앞에서 E). 왼쪽 끝 문에서 E: 마을로',
+      get goal() {
+        if (invasion) return `성을 지켜라! ${invasion.wave + 1}/${invasion.waves} 웨이브 · 성 HP ${Math.max(0, invasion.castleHp)}/${invasion.castleMax} · 남은 적 ${invasion.queue.length + monsters.filter((m) => m.kind === 'raider' && m.alive).length}`;
+        const base = '왕국: 거리를 따라 가게가 늘어서 있다. 가운데 성의 왕에게 말을 걸자(E). 왼쪽 끝 문에서 E: 마을로';
+        return missions.pending ? `왕의 의뢰 ${missions.pending}건이 쌓였다! 왕에게 가자.  ${base}` : base;
+      },
       banner: { title: 'CHAPTER 2', sub: '왕이 다스리는 도시', dur: 6.5, caption: '…하얀 성이 하늘 높이 솟아 있다. 끝이 보이지 않는 큰 도시, 여기가 왕국이다.' },
     },
     darkhub: { // 다크월드 입구: 무기 상점, 아이템 상점, 던전으로 오르는 문
@@ -192,6 +196,8 @@
   const chestTaken = {};            // 이미 연 보물 상자 (같은 상자로 코인을 또 벌 수 없다)
   let nextStage = null;             // 클리어 연출이 끝나면 갈 곳 {name, near}
   let skipBanner = false; // 마을에 처음 왔을 때의 소개/말은 한 번만
+  const missions = { pending: 0, done: 0, timer: null }; // 왕의 의뢰(챕터 2): 1~30분마다 하나씩 도착해 쌓인다
+  let invasion = null;         // 진행 중인 몬스터 군단 {waves, wave, castleHp, ...} (왕국에서만)
   const seenStages = {};
   let fanfare = false;          // 왕국에 처음 들어선 직후 (loadStage 끝에서 소리와 빛을 터뜨린다)
   let equipUI = null;   // 인벤토리 창 {cur(선택한 칸 번호), msg, msgT, ok}
@@ -1135,6 +1141,7 @@
     shop = null;
     equipUI = null;
     dialog = null;
+    invasion = null; // 왕국을 떠나면 군단전은 끝난다 (쌓인 의뢰는 그대로)
     popups.length = 0;
     G.Magic.clear(magic);
     sword = null;
@@ -2295,7 +2302,6 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { label: '설산', hint: '털복숭이 침팬지', img: 'snow', run: goto(() => loadStage('snow', true)) },
       { label: '화산', hint: '용 · 신성의 제단', img: 'volcano', run: goto(() => loadStage('volcano', true)) },
       { label: '시작 동굴', hint: '첫 동굴 (보물 지도)', img: 'cave', run: goto(() => loadStage('cave', true)) },
-      { label: '왕국 (챕터 2)', hint: '왕 · 거대한 도시', img: 'village', run: goto(() => loadStage('kingdom', true)) },
       { head: '다크월드' },
       { label: '다크월드 입구', hint: '상점들', img: 'darkhub', run: goto(() => { story.revealed = true; story.pending = false; loadStage('darkhub', true); }) },
       { label: '던전 1층', hint: '어둠의 탑', img: 'd1', run: goto(() => goFloor(1)) },
@@ -2359,6 +2365,10 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { label: `무적 ${god ? '끄기' : '켜기'}`, hint: god ? '지금 켜짐' : '지금 꺼짐', run: () => { god = !god; devUI.msg = god ? '무적 켜짐' : '무적 꺼짐'; devUI.msgT = 2; G.Audio.play('pickup'); } },
       { label: '시크너 이야기 건너뛰기', hint: '다크월드 열기', run: give('다크월드가 열렸다', () => { story.revealed = true; story.pending = false; }) },
       { label: '오프닝 컷신 다시 보기', hint: '보물 지도', run: goto(() => { loadStage('cave', true); cutscene = new G.Cutscene(terrain, player); }) },
+      { head: '챕터 2' },
+      { label: '챕터 2로 순간이동', hint: '왕국 · 왕 · 음식점', run: goto(() => { story.cleared = true; story.revealed = true; loadStage('kingdom', true); }) },
+      { label: '왕의 의뢰 +1 (치트)', hint: '쌓인 의뢰가 늘어난다', run: give('왕의 의뢰가 도착했다', () => { story.cleared = true; addMission(1, true); }) },
+      { label: '몬스터 군단 바로 시작', hint: '왕국에서 쌓인 의뢰만큼', run: goto(() => { story.cleared = true; story.revealed = true; story.kingMet = true; if (!missions.pending) addMission(1, true); loadStage('kingdom', true); startInvasion(); }) },
     ];
   }
 
@@ -2807,7 +2817,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function eatBest() {
     const has = (id) => inv.consumables[id] > 0;
     const lowSt = stamina < stMax() - 25;
-    const order = lowSt ? ['st30', 'st70'] : ['st30', 'st70']; // 스태미나 물약 (작은 것부터)
+    const foods = ['f_bread', 'f_stew', 'f_fish', 'f_cake', 'f_steak', 'f_feast']; // 음식점 요리 (작은 것부터)
+    const order = lives < maxLives() ? foods.concat(['st30', 'st70']) : ['st30', 'st70'].concat(foods); // 다치면 요리 먼저, 아니면 스태미나 물약부터
     for (const id of order) {
       if (!has(id)) continue;
       const r = useConsumable(id);
@@ -2900,7 +2911,127 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       effects.shake(5, 0.3);
       popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '왕의 사례금 +3000 G', t: 3, color: 'rgba(255,225,120,A)' });
       startDialogs(KING_FIRST);
-    } else dialog = { text: KING_LINES[(story.kingTalk = (story.kingTalk || 0) + 1) % KING_LINES.length], t: 4 };
+      addMission(1, true); // 첫 의뢰: 곧바로 다시 말을 걸면 군단이 몰려온다
+      missions.timer = rollMissionTimer();
+    } else if (invasion) dialog = { text: '왕: "아직 적이 남았다! 성을 지켜 주게!"', t: 3 };
+    else if (missions.pending > 0) {
+      dialog = { text: `왕: "몬스터 군단이 성을 노린다! 쌓인 의뢰가 ${missions.pending}건이네… 부탁하네, 용사여!"`, t: 3.5 };
+      startInvasion();
+    } else dialog = { text: KING_LINES[(story.kingTalk = (story.kingTalk || 0) + 1) % KING_LINES.length] + '  (다음 의뢰는 곧 도착할 걸세)', t: 4 };
+  }
+
+  // ---- 왕의 의뢰와 몬스터 군단 ----
+  const MISSION_MIN = 60, MISSION_MAX = 1800; // 1분 ~ 30분마다 새 의뢰가 도착한다
+  const rollMissionTimer = () => MISSION_MIN + Math.random() * (MISSION_MAX - MISSION_MIN);
+  function addMission(n = 1, quiet = false) {
+    missions.pending += n;
+    if (!quiet) {
+      popups.push({ x: player.x + player.w / 2, y: player.y - 90, text: `왕의 의뢰 도착! (쌓인 의뢰 ${missions.pending}건) — 왕국의 왕에게 가자`, t: 4, color: 'rgba(255,225,120,A)' });
+      G.Audio.play('treasure');
+    }
+  }
+  function updateMissions(dt) {
+    if (!story.cleared || shop || cutscene) return;
+    if (missions.timer === null) missions.timer = rollMissionTimer();
+    missions.timer -= dt;
+    if (missions.timer <= 0) { missions.timer = rollMissionTimer(); addMission(1); } // 의뢰는 처리하지 못해도 계속 쌓인다
+  }
+  const waveQueue = (w) => { // w번째(0부터) 웨이브의 군단: 뒤로 갈수록 종류가 늘고 수가 많다
+    const pool = ['spear', 'spear', 'rusher', 'shield'];
+    if (w >= 1) pool.push('archer', 'archer');
+    if (w >= 3) pool.push('shield', 'archer', 'rusher');
+    const n = Math.min(26, 6 + w * 3);
+    const out = [];
+    let ogres = 0;
+    for (let i = 0; i < n; i++) {
+      if (w >= 2 && ogres < 1 + Math.floor(w / 2) && i % 5 === 4) { out.push('ogre'); ogres += 1; continue; }
+      out.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
+    return out;
+  };
+  function startInvasion() {
+    if (stageName !== 'kingdom' || invasion || missions.pending <= 0) return;
+    const waves = Math.min(8, missions.pending);
+    invasion = { waves, wave: 0, castleMax: 15, castleHp: 15, queue: [], spawnT: 0, state: 'intro', t: 3 };
+    terrain.invasion = invasion;
+    popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `몬스터 군단이 몰려온다! (${waves}웨이브)`, t: 3, color: 'rgba(255,120,100,A)' });
+    G.Audio.play('spawn');
+    effects.shake(6, 0.6);
+  }
+  function spawnRaider(variant) {
+    const T = C.TILE;
+    const V = G.Raider.VARIANTS[variant];
+    const left = Math.random() < 0.5;
+    const castleCol = terrain.castles[0].col;
+    const col = left ? castleCol - 62 - Math.floor(Math.random() * 4) : castleCol + 62 + Math.floor(Math.random() * 4); // 성에서 60칸쯤 떨어진 양쪽 거리에서 몰려온다
+    const p = terrain.placeOnTile(col, 15, V.w, V.h);
+    const mo = new G.Raider(p.x, p.y, variant);
+    const castle = terrain.castles[0];
+    mo.marchX = castle.col * T + T / 2;
+    mo.stageSpeed = 1.4 + Math.min(0.5, invasion.wave * 0.06); // 행진은 평소보다 빠르다
+    mo.dir = left ? 1 : -1;
+    mo.contactDmg = 1;
+    mo.temp = true;
+    monsters.push(mo);
+    effects.spawn(p.x + V.w / 2, p.y + V.h);
+  }
+  const endInvasion = () => { invasion = null; if (terrain) terrain.invasion = null; };
+  function updateInvasion(dt) {
+    const iv = invasion;
+    if (!iv || stageName !== 'kingdom') return;
+    const T = C.TILE;
+    for (let k = monsters.length - 1; k >= 0; k--) if (monsters[k].kind === 'raider' && !monsters[k].alive && !monsters[k].vanished) monsters.splice(k, 1); // 쓰러진 군단병은 정리
+    if (iv.state === 'intro' || iv.state === 'rest') {
+      iv.t -= dt;
+      if (iv.t <= 0) {
+        iv.state = 'wave'; iv.queue = waveQueue(iv.wave); iv.spawnT = 0;
+        popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `${iv.wave + 1}웨이브 시작!`, t: 2, color: 'rgba(255,200,120,A)' });
+        G.Audio.play('spawn');
+      }
+      return;
+    }
+    iv.spawnT -= dt;
+    if (iv.queue.length && iv.spawnT <= 0) { spawnRaider(iv.queue.shift()); iv.spawnT = 0.8 + Math.random() * 0.8; }
+    const castleX = terrain.castles[0].col * T + T / 2;
+    for (let k = monsters.length - 1; k >= 0; k--) { // 성문에 닿은 군단병은 성을 공격하고 사라진다
+      const m = monsters[k];
+      if (m.kind !== 'raider' || !m.alive || m.flying) continue;
+      if (Math.abs(m.x + m.w / 2 - castleX) < 70 && m.onGround) {
+        iv.castleHp -= m.V.castle;
+        effects.vanish(m.x + m.w / 2, m.y + m.h / 2);
+        effects.shake(5, 0.2);
+        G.Audio.play('hurt');
+        popups.push({ x: castleX, y: terrain.castles[0].row * T - 90, text: `성이 공격받고 있다! -${m.V.castle}`, t: 1.2, color: 'rgba(255,120,100,A)' });
+        monsters.splice(k, 1);
+      }
+    }
+    if (iv.castleHp <= 0) { // 성이 무너질 뻔했다: 의뢰는 그대로 남는다
+      for (let k = monsters.length - 1; k >= 0; k--) if (monsters[k].kind === 'raider') { effects.vanish(monsters[k].x + monsters[k].w / 2, monsters[k].y + monsters[k].h / 2); monsters.splice(k, 1); }
+      endInvasion();
+      popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: '성이 무너질 뻔했다… 의뢰 실패 (의뢰는 그대로 남아 있다)', t: 4, color: 'rgba(255,150,130,A)' });
+      return;
+    }
+    if (!iv.queue.length && !monsters.some((m) => m.kind === 'raider' && m.alive)) {
+      iv.wave += 1;
+      if (iv.wave >= iv.waves) { // 모두 막아냈다
+        const reward = Math.round((400 * iv.waves + 150 * iv.waves * (iv.waves - 1) / 2) * (1 + G.Shop.homeBonuses(inv).coin));
+        const gainExp = 25 * iv.waves;
+        coins += reward; exp += gainExp;
+        missions.pending = Math.max(0, missions.pending - iv.waves);
+        missions.done += iv.waves;
+        let extra = '';
+        for (let i = 0; i < iv.waves; i++) if (Math.random() < 0.3) { G.Shop.addMaterial(inv, 'darkshard'); extra = ' · 어둠의 크리스탈 조각 획득'; }
+        popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `성을 지켜냈다! +${reward} G, +${gainExp} EXP${extra}`, t: 4, color: 'rgba(255,225,120,A)' });
+        G.Audio.play('treasure');
+        effects.treasure(player.x + player.w / 2, player.y);
+        effects.shake(6, 0.4);
+        endInvasion();
+      } else {
+        iv.state = 'rest'; iv.t = 4;
+        popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `${iv.wave}웨이브 방어 성공! 곧 다음 군단이 온다`, t: 3, color: 'rgba(160,255,160,A)' });
+        G.Audio.play('pickup');
+      }
+    }
   }
 
   function startDialogs(lines) {
@@ -3234,7 +3365,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           G.Audio.play('vanish');
         }
         if (s.golden) effects.treasure(s.x + s.w / 2, s.y + s.h / 2); // 황금박쥐는 금화가 쏟아진다
-        const base = s.kind === 'darkstone' ? C.DARKSTONE_COIN : s.kind === 'shade' ? C.SHADE_COIN : s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'golem' ? C.GOLEM_COIN : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
+        const base = s.coinVal !== undefined ? s.coinVal : s.kind === 'darkstone' ? C.DARKSTONE_COIN : s.kind === 'shade' ? C.SHADE_COIN : s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'golem' ? C.GOLEM_COIN : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
         const floorMul = STAGES[stageName].dark ? 1 + darkFloor * 0.05 : 1; // 던전은 올라갈수록 코인과 경험치가 늘어난다
         const drop = Math.round(base * floorMul * (G.Shop.ITEMS[inv.equipped.weapon].elem === 'gold' ? 1.5 : 1) * (1 + G.Shop.homeBonuses(inv).coin) * dungeonEvents.rewardMul()); // 황금 검은 코인 +50%, 집 장식 보너스, 던전 층 이벤트(혈월 등)
         if (drop) {
@@ -3242,7 +3373,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           popups.push({ x: s.x + s.w / 2, y: s.y - 6, text: `+${drop} G`, t: 1.2 });
           G.Audio.play('coin');
         }
-        const gain = Math.round(({ slime: C.SLIME_EXP, bat: C.BAT_EXP, crab: C.CRAB_EXP, golem: C.GOLEM_EXP, darkstone: C.DARKSTONE_EXP, shade: C.SHADE_EXP }[s.kind] || 0) * (STAGES[stageName].dark ? 1 + darkFloor * 0.1 : 1) * dungeonEvents.rewardMul()); // 경험치: 슬라임 1, 박쥐 2, 꽃게 3, 흙골렘 3 (던전은 층마다 늘어난다)
+        const gain = Math.round(((s.expVal !== undefined ? s.expVal : { slime: C.SLIME_EXP, bat: C.BAT_EXP, crab: C.CRAB_EXP, golem: C.GOLEM_EXP, darkstone: C.DARKSTONE_EXP, shade: C.SHADE_EXP }[s.kind] || 0)) * (STAGES[stageName].dark ? 1 + darkFloor * 0.1 : 1) * dungeonEvents.rewardMul()); // 경험치: 슬라임 1, 박쥐 2, 꽃게 3, 흙골렘 3 (던전은 층마다 늘어난다)
         if (STAGES[stageName].dark && !s.noExp && Math.random() < 0.07) pickups.push({ x: s.x + s.w / 2, y: s.y + s.h - 16, id: PICKUP_TABLE[Math.floor(Math.random() * PICKUP_TABLE.length)], t: 0 }); // 가끔 아이템을 떨어뜨린다
         const wd = G.Shop.ITEMS[inv.equipped.weapon];
         if (wd.elem === 'reap' && !s.noExp) { // 낫: 처치하면 스태미나를 거둔다
@@ -3289,6 +3420,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         break;
       }
     }
+    updateInvasion(dt);
+    updateMissions(dt);
     if (boss && !boss.started && !boss.done && player.x > boss.left + 100) { // 경기장에 들어섰다: 용머리 등장, 화면과 길이 막힌다
       boss.started = true;
       if (boss.onStart) boss.onStart(terrain); // (침팬지 경기장: 입구가 벽으로 막힌다)
@@ -3481,6 +3614,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get stamina() { return stamina; },
     set stamina(v) { stamina = v; },
     story, pickups, enemyShots, dungeonEvents, oreNodes, popups, spawnDungeonMonster,
+    missions, addMission, startInvasion, get invasion() { return invasion; },
     get darkFloor() { return darkFloor; },
     set darkFloor(v) { darkFloor = v; },
     get darkBest() { return darkBest; },

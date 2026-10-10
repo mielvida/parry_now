@@ -21,6 +21,7 @@
     miner: { robe: '#8a6a2b', trim: '#d4a017', hat: '#e0b12f', beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070' },
     king: { robe: '#a01830', trim: '#ffd54a', hat: '#ffd54a', beard: '#f2f2f2', hair: '#f2f2f2', skin: '#e8b98a', staff: true },
     guard: { robe: '#3a4a7a', trim: '#c9d2dc', hat: '#c9d2dc', beard: null, hair: '#3a2f22', skin: '#e8b98a', staff: true },
+    chef: { robe: '#f4f1e8', trim: '#d4a017', hat: '#ffffff', beard: null, hair: '#6b4423', skin: '#e8b98a', apron: '#e8e0d0' },
     smith: { robe: '#5b5f6b', trim: '#8b90a0', hat: null, beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070', apron: '#3a2f22' },
   };
 

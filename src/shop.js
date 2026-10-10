@@ -183,7 +183,15 @@
   add({ id: 'st70', name: '스태미나 +70', desc: '스태미나를 70 회복', price: 120, consumable: true, stamina: 70, look: ['#7dffd0', '#2fa88a'] });
   add({ id: 'st30', name: '스태미나 +30', desc: '스태미나를 30 회복', price: 60, consumable: true, stamina: 30, look: ['#bfffe8', '#4fc8a0'] });
   add({ id: 'icebomb', name: '얼음 폭탄', desc: '던지면 주변 3칸 몬스터가 얼어붙는다', price: 150, consumable: true, bomb: 'ice', look: ['#bfe8ff', '#5fa8d9'], note: 'B 키로 던진다' });
-  const CONSUMABLE_IDS = ['st70', 'st30', 'icebomb'];
+  // 음식점(왕국): 먹으면(V) 피와 스태미나가 함께 찬다. 피 칸은 0.5 단위
+  add({ id: 'f_bread', name: '갓 구운 빵', desc: '피 ½칸, 스태미나 20 회복', price: 40, consumable: true, food: 0.5, stamina: 20, look: ['#e0a458', '#8a5a2a'] });
+  add({ id: 'f_stew', name: '따끈한 스튜', desc: '피 1칸, 스태미나 35 회복', price: 90, consumable: true, food: 1, stamina: 35, look: ['#c0703a', '#6a3a1a'] });
+  add({ id: 'f_fish', name: '구운 생선', desc: '피 1칸, 스태미나 50 회복', price: 130, consumable: true, food: 1, stamina: 50, look: ['#8fb4d0', '#4a6a88'] });
+  add({ id: 'f_steak', name: '왕실 스테이크', desc: '피 2칸, 스태미나 60 회복', price: 260, consumable: true, food: 2, stamina: 60, look: ['#b0453a', '#5a1a1a'] });
+  add({ id: 'f_cake', name: '크림 케이크', desc: '스태미나 100 회복 (달콤하다!)', price: 200, consumable: true, stamina: 100, look: ['#ffd0e0', '#d46a90'] });
+  add({ id: 'f_feast', name: '왕의 만찬', desc: '피 3칸, 스태미나 120 회복', price: 650, consumable: true, food: 3, stamina: 120, look: ['#ffd54a', '#a87a1a'] });
+  const FOOD_IDS = ['f_bread', 'f_stew', 'f_fish', 'f_steak', 'f_cake', 'f_feast'];
+  const CONSUMABLE_IDS = ['st70', 'st30', 'icebomb'].concat(FOOD_IDS);
 
   // 물약: 사서 인벤토리에 쌓아 두었다가 나중에 마신다 (heal = 회복하는 피 칸 수)
   add({ id: 'potion1', name: '치유 물약', desc: '피 1칸 회복', price: 100, heal: 1, look: ['#e8334a'] });
@@ -500,6 +508,13 @@
       title: '강화소 (EXP)',
       exp: true,
       tabs: [{ name: '강화', items: ids('wup', 'aup') }],
+    },
+    food: {
+      title: '음식점',
+      tabs: [
+        { name: '든든한 요리', items: ids('f_bread', 'f_stew', 'f_fish', 'f_steak') },
+        { name: '간식·만찬', items: ids('f_cake', 'f_feast') },
+      ],
     },
     ditem: {
       title: '다크월드 아이템 상점',

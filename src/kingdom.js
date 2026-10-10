@@ -36,7 +36,7 @@
   }
 
   // 큰 성: 가운데 높은 탑, 양옆 탑, 아치 문, 붉은 카펫
-  function castle(ctx, x, y, time) {
+  function castle(ctx, x, y, time, inv) {
     const stone = '#d6cfbd', stoneD = '#a89f8a', roofR = '#b02a3a', roofG = '#e0b12f';
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath(); ctx.ellipse(x, y, 330, 8, 0, 0, Math.PI * 2); ctx.fill();
@@ -83,6 +83,13 @@
       ctx.fillStyle = '#b02a3a'; ctx.fillRect(x + dx - 12, y - 160, 24, 80);
       ctx.beginPath(); ctx.moveTo(x + dx - 12, y - 80); ctx.lineTo(x + dx, y - 66); ctx.lineTo(x + dx + 12, y - 80); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffd54a'; ctx.fillRect(x + dx - 4, y - 140, 8, 22);
+    }
+    // 성 HP 막대 (군단전 중)
+    if (inv) {
+      const bw = 160, k = Math.max(0, inv.castleHp / inv.castleMax);
+      ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(x - bw / 2 - 2, y - 232, bw + 4, 14);
+      ctx.fillStyle = k > 0.5 ? '#6fd25a' : k > 0.25 ? '#ffd54a' : '#ff5a4a'; ctx.fillRect(x - bw / 2, y - 230, bw * k, 10);
+      if (G.TextLayer) G.TextLayer.add(`성 ${Math.max(0, inv.castleHp)}/${inv.castleMax}`, x, y - 240, 'bold 13px sans-serif', '#fff');
     }
     // 붉은 카펫
     ctx.fillStyle = '#a01830'; ctx.fillRect(x - 30, y - 3, 60, 3);
@@ -188,7 +195,7 @@
       for (const C2 of terrain.castles) {
         const bx = C2.col * T + T / 2;
         if (bx < camera.x - 400 || bx > camera.x + view + 200) continue;
-        castle(ctx, bx, (C2.row + 1) * T, time);
+        castle(ctx, bx, (C2.row + 1) * T, time, terrain.invasion);
       }
       Beach.drawDecor(ctx, terrain, camera, time); // 가게, 문, 시민
       for (const K of terrain.kings) {

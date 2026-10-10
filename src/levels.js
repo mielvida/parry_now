@@ -189,8 +189,8 @@ Game.Levels.kingdom = (function () {
   for (let r = 0; r < 18; r++) rows.push(new Array(W).fill(r >= 16 ? '#' : '.'));
   const put = (r, c, ch) => { rows[r][c] = ch; };
   put(15, 2, 'X'); put(15, 5, 'P');
-  for (const c of [12, 28, 52, 76, 100, 118, 180, 200, 228, 252, 272, 290]) put(15, c, 'V');
-  const shops = { K: 16, A: 32, p: 46, W: 60, f: 74, g: 88, U: 104, E: 192, a: 206, I: 220, O: 234, R: 248, Q: 262, m: 278, n: 296 };
+  for (const c of [12, 28, 52, 76, 100, 120, 180, 200, 228, 252, 272, 290]) put(15, c, 'V');
+  const shops = { r: 114, K: 16, A: 32, p: 46, W: 60, f: 74, g: 88, U: 104, E: 192, a: 206, I: 220, O: 234, R: 248, Q: 262, m: 278, n: 296 };
   for (const ch of Object.keys(shops)) put(15, shops[ch], ch);
   for (let c = 126; c <= 174; c++) put(15, c, '#'); // 성이 놓인 단
   put(14, 150, 'e'); put(14, 150, 'e');

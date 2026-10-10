@@ -271,9 +271,10 @@
     const mgTarget = shop.kind === 'mgtarget';
     const mgDuel = shop.kind === 'mgduel';
     const mgGun = shop.kind === 'mggun';
+    const food = shop.kind === 'food';
     const w = 140;
     const x = baseX - w / 2;
-    const stripeA = potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
+    const stripeA = food ? '#e0803a' : potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
     ctx.fillStyle = 'rgba(0,0,0,0.14)';
     ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒤쪽 벽 + 기둥
@@ -293,6 +294,9 @@
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(bx + 2, baseY - 82, 5, 6);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(bx + 2, baseY - 84, 5, 3);
       });
+    } else if (food) { // 매달린 소시지와 빵 바구니, 솥에서 피어오르는 김
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 66, w - 20, 4);
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = '#b0453a'; ctx.fillRect(x + 18 + i * 22, baseY - 62, 7, 18); ctx.fillStyle = '#e0a458'; ctx.fillRect(x + 20 + i * 22, baseY - 44, 3, 3); }
     } else if (dweapon) { // 벽에 걸린 총, 활, 방패, 폭탄
       ctx.fillStyle = '#4a2f1a'; ctx.fillRect(x + 12, baseY - 70, 36, 7); ctx.fillRect(x + 16, baseY - 64, 7, 14); // 총
       ctx.fillStyle = '#8a8f9a'; ctx.fillRect(x + 12, baseY - 76, 40, 6);
@@ -409,7 +413,7 @@
       }
     }
     // 주인
-    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
+    G.Npc.draw(ctx, { food: 'chef', potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);
@@ -453,6 +457,11 @@
     } else if (decor) { // 계산대 위 꽃병
       ctx.fillStyle = '#7ac0e8'; ctx.fillRect(x + w - 38, baseY - 44, 12, 14);
       ctx.fillStyle = '#e8334a'; ctx.fillRect(x + w - 36, baseY - 50, 3, 7); ctx.fillRect(x + w - 31, baseY - 52, 3, 9);
+    } else if (food) { // 계산대 위 솥과 김
+      ctx.fillStyle = '#3a3f4a'; ctx.fillRect(x + w - 42, baseY - 42, 24, 12);
+      ctx.fillStyle = '#c0703a'; ctx.fillRect(x + w - 40, baseY - 44, 20, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      for (let i = 0; i < 3; i++) ctx.fillRect(x + w - 38 + i * 7, baseY - 54 - ((time * 14 + i * 5) % 12), 2, 6);
     } else if (mine) { // 계산대 위 금화 주머니
       ctx.fillStyle = '#b8860b'; ctx.fillRect(x + w - 40, baseY - 44, 16, 12);
       ctx.fillStyle = '#ffd54a'; ctx.fillRect(x + w - 37, baseY - 47, 10, 4);
@@ -481,7 +490,7 @@
     ctx.fillRect(baseX - 34, topY - 26, 68, 22);
     ctx.fillStyle = '#e9d8a6';
     ctx.fillRect(baseX - 31, topY - 23, 62, 16);
-    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    G.TextLayer.add(food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
