@@ -186,9 +186,11 @@
     const decor = shop.kind === 'decor';
     const dweapon = shop.kind === 'dweapon';
     const ditem = shop.kind === 'ditem';
+    const dupgrade = shop.kind === 'dupgrade';
+    const darmor = shop.kind === 'darmor';
     const w = 140;
     const x = baseX - w / 2;
-    const stripeA = potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : '#4f7fd4';
+    const stripeA = potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : '#4f7fd4';
     ctx.fillStyle = 'rgba(0,0,0,0.14)';
     ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒤쪽 벽 + 기둥
@@ -221,6 +223,19 @@
       ctx.fillStyle = '#bfffe8'; ctx.fillRect(x + 54, baseY - 76, 10, 14); ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + 56, baseY - 81, 6, 6); // 작은 스태미나 병
       ctx.fillStyle = '#5fa8d9'; ctx.beginPath(); ctx.arc(x + 98, baseY - 70, 9, 0, Math.PI * 2); ctx.fill(); // 얼음 폭탄
       ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.arc(x + 95, baseY - 73, 3, 0, Math.PI * 2); ctx.fill();
+    } else if (darmor) { // 선반 위 검은 투구와 갑옷
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
+      [['#3a3f4d', '#6a7388', 20], ['#2a1250', '#c07aff', 60], ['#1a0a30', '#8a60d0', 100]].forEach(([c0, c1, dx]) => {
+        ctx.fillStyle = c0; ctx.fillRect(x + dx, baseY - 82, 24, 20);
+        ctx.fillStyle = c1; ctx.fillRect(x + dx, baseY - 82, 24, 5); ctx.fillRect(x + dx - 4, baseY - 82, 5, 9); ctx.fillRect(x + dx + 23, baseY - 82, 5, 9);
+      });
+    } else if (dupgrade) { // 선반 위 빛나는 수정과 두루마리
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
+      [['#7dd0ff', 22], ['#ff9a7a', 62], ['#e0a8ff', 100]].forEach(([col, dx]) => {
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.moveTo(x + dx, baseY - 62); ctx.lineTo(x + dx + 8, baseY - 86); ctx.lineTo(x + dx + 16, baseY - 62); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(x + dx + 6, baseY - 78, 3, 10);
+      });
     } else if (estate) { // 선반 위 작은 집 모형들
       ctx.fillStyle = '#7a5530';
       ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
@@ -277,7 +292,7 @@
       }
     }
     // 주인
-    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', sword: 'smith', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant' }[shop.kind], baseX, baseY - 16, 1, time);
+    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', sword: 'smith', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);
@@ -294,6 +309,13 @@
     } else if (ditem) { // 계산대 위 스태미나 병
       ctx.fillStyle = '#7dffd0'; ctx.fillRect(x + w - 38, baseY - 46, 12, 14);
       ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + w - 35, baseY - 52, 6, 7);
+    } else if (darmor) { // 계산대 위 어둠의 투구
+      ctx.fillStyle = '#2a1250'; ctx.fillRect(x + w - 40, baseY - 46, 22, 14);
+      ctx.fillStyle = '#c07aff'; ctx.fillRect(x + w - 40, baseY - 46, 22, 4);
+      ctx.fillStyle = '#0d0618'; ctx.fillRect(x + w - 34, baseY - 40, 10, 3);
+    } else if (dupgrade) { // 계산대 위 모루와 불꽃
+      ctx.fillStyle = '#4a4a52'; ctx.fillRect(x + w - 42, baseY - 42, 28, 8); ctx.fillRect(x + w - 36, baseY - 34, 16, 4);
+      ctx.fillStyle = '#ffb347'; ctx.fillRect(x + w - 30, baseY - 48, 4, 5); ctx.fillRect(x + w - 24, baseY - 51, 3, 4);
     } else if (estate) { // 계산대 위 열쇠
       ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(x + w - 36, baseY - 40, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillRect(x + w - 31, baseY - 41, 16, 3); ctx.fillRect(x + w - 20, baseY - 41, 3, 8);
@@ -328,7 +350,7 @@
     ctx.fillRect(baseX - 34, topY - 26, 68, 22);
     ctx.fillStyle = '#e9d8a6';
     ctx.fillRect(baseX - 31, topY - 23, 62, 16);
-    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 

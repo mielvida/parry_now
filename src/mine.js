@@ -17,7 +17,7 @@
   function generate(run, rnd = Math.random, opts = {}) {
     const target = opts.length || lengthFor(run);
     const MIN_TOP = opts.minTop || DEFAULT_MIN_TOP;
-    const wt = Object.assign({ flat: 0.28, bump: 0.18, up: 0.16, down: 0.12, pit: 0.16, wide: 0.10 }, opts.weights || {});
+    const wt = Object.assign({ flat: 0.38, bump: 0.18, up: 0.16, down: 0.12, pit: 0.12, wide: 0.04 }, opts.weights || {});
     const total = wt.flat + wt.bump + wt.up + wt.down + wt.pit + wt.wide;
     const cum = [wt.flat, wt.flat + wt.bump, wt.flat + wt.bump + wt.up, wt.flat + wt.bump + wt.up + wt.down, wt.flat + wt.bump + wt.up + wt.down + wt.pit];
     const pick = (a, b) => a + Math.floor(rnd() * (b - a + 1));
@@ -43,12 +43,12 @@
         for (let i = 0; i < steps && cur + 1 <= BASE_TOP; i++) { cur += 1; push(pick(2, 3), cur); }
         push(2, cur);
       } else if (roll < cum[4]) {
-        push(3, cur); push(pick(2, 3), null); push(3, cur); // 구덩이 (폭 2~3)
+        push(4, cur); push(2, null); push(4, cur); // 구덩이 (폭 2)
       } else {
-        push(3, cur);                                 // 넓은 구덩이 (폭 4) + 가운데 공중 발판
-        floats.push({ c: top.length + 1, r: cur - 2 });
-        push(4, null);
-        push(3, cur);
+        push(4, cur);                                 // 넓은 구덩이 (폭 3) + 가운데 공중 발판
+        floats.push({ c: top.length, r: cur - 2, w: 3 });
+        push(3, null);
+        push(4, cur);
       }
     }
     // 끝: 평지 -> 계단 2단 -> 보물 상자가 있는 발판

@@ -184,6 +184,26 @@
     }
 
     // 대시를 시작한 순간: 발밑에서 먼지가 뒤쪽으로 흩날리고, 몸 높이로 바람줄이 길게 뻗는다 (dir = 먼지가 날아가는 방향)
+    // 착지: 발밑에서 먼지가 양옆으로 퍼진다 (power 0~1: 떨어진 속도)
+    landDust(x, y, power) {
+      const n = 4 + Math.round(power * 6);
+      for (let i = 0; i < n; i++) {
+        const dir = i % 2 ? 1 : -1;
+        this.particles.push({
+          kind: 'blob', x: x + dir * rand(0, 8), y: y - rand(0, 3), vx: dir * rand(30, 90 + power * 140), vy: -rand(8, 40 + power * 50),
+          life: rand(0.2, 0.4), max: 0.4, size: rand(2, 4), gravity: 120, color: i % 3 ? '215,195,150' : '240,230,210',
+        });
+      }
+    }
+
+    // 달릴 때 뒤꿈치에서 나는 작은 먼지
+    footDust(x, y, dir) {
+      this.particles.push({
+        kind: 'blob', x: x - dir * 4, y: y - 1, vx: -dir * rand(10, 40), vy: -rand(6, 26),
+        life: rand(0.15, 0.3), max: 0.3, size: rand(1.5, 3), gravity: 60, color: '215,195,150',
+      });
+    }
+
     dashDust(x, y, dir) {
       for (let i = 0; i < 8; i++) {
         this.particles.push({

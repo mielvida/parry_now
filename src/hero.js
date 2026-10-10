@@ -170,6 +170,12 @@
       ctx.lineTo(16.5, 1.8);
       ctx.closePath();
       ctx.fill();
+    } else if (weaponType === 'scythe') { // 낫: 긴 자루 끝에 굽은 칼날
+      rect(ctx, '#6b4423', -9, -1.5, 40, 3);
+      ctx.fillStyle = blade[0];
+      ctx.beginPath(); ctx.moveTo(28, -2); ctx.quadraticCurveTo(38, -20, 56, -10); ctx.quadraticCurveTo(42, -13, 33, 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = blade[1];
+      ctx.beginPath(); ctx.moveTo(30, -2); ctx.quadraticCurveTo(38, -13, 52, -9); ctx.quadraticCurveTo(40, -9, 33, 1); ctx.closePath(); ctx.fill();
     } else if (weaponType === 'great') { // 대검: 길고 넓은 칼날
       rect(ctx, '#6b4423', -7, -1.5, 8, 3);
       rect(ctx, '#e0b12f', 1, -7, 3, 14);

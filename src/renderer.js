@@ -89,10 +89,12 @@
       if (this.theme.drawDecor) this.theme.drawDecor(ctx, terrain, camera, time); // 집/짐더미 (테마에 있을 때만): 땅과 캐릭터 뒤에 깔리는 장식
       if (extras.boss) extras.boss.drawBack(ctx); // 땅 뒤: 용암에서 올라오는 목
       this._drawTerrain(ctx, terrain, camera);
-      if (extras.chest) this._drawChest(ctx, extras.chest);
+      this._drawGroundDecor(ctx, terrain, camera, time);
+      if (extras.chest) (extras.chest.door ? this._drawDoor(ctx, extras.chest) : this._drawChest(ctx, extras.chest));
       if (extras.pickups) for (const p of extras.pickups) this._drawPickup(ctx, p, time);
       if (extras.enemyShots) for (const f of extras.enemyShots) this._drawEnemyShot(ctx, f);
       if (extras.boss) extras.boss.drawFront(ctx); // 머리, 꼬리, 화염구
+      this._drawShadows(ctx, terrain, monsters, player, camera);
       const crisp = !G.Config.SMOOTH_SPRITES;
       this.snapOn = crisp; // 몬스터와 플레이어: 반 도트 단위로 부드럽게 움직인다
       for (const m of monsters) if (m.alive && this._inView(m, camera)) this._drawMonster(ctx, m); // 화면 밖은 그리지 않음 (대량 소환 대비)
@@ -105,6 +107,8 @@
       if (sword) G.Hero.drawThrownSword(ctx, sword);
       if (effects) effects.draw(ctx);
       if (extras.magic) G.Magic.draw(ctx, extras.magic);
+      this._drawPlayerLight(ctx, player, time);
+      this._drawAmbient(ctx, camX, camY, time);
       this.snapOn = true;
       ctx.restore();
       this.theme.drawVignette(ctx, this.viewW, this.viewH);
@@ -112,7 +116,7 @@
 
       // ---- 2) 버퍼를 보간 없이 정수배로 키워 화면에 ----
       main.setTransform(1, 0, 0, 1, 0, 0);
-      main.imageSmoothingEnabled = false;
+      main.imageSmoothingEnabled = this.px === 1; // 픽셀 화면이 꺼져 있으면 부드럽게
       main.drawImage(this.buffer, 0, 0, this.buffer.width, this.buffer.height, 0, 0, this.canvas.width, this.canvas.height);
 
       // ---- 3) 글자와 인터페이스: 선명하게 (이후는 게임 좌표 960x576) ----
@@ -318,7 +322,7 @@
       const y = (vh - h) / 2;
       return {
         panel: { x, y, w, h },
-        tabs: hasTabs ? def.tabs.map((t, i) => ({ x: x + 28 + i * 132, y: y + 66, w: 120, h: 36 })) : [],
+        tabs: hasTabs ? def.tabs.map((t, i) => { const step = Math.min(132, (w - 56) / def.tabs.length); return { x: x + 28 + i * step, y: y + 66, w: step - 12, h: 36 }; }) : [],
         rows: items.map((it, i) => ({ x: x + 20, y: y + top + i * rowH, w: w - 40, h: 72 })),
       };
     }
@@ -423,6 +427,13 @@
         ctx.fillStyle = L[0]; ctx.fillRect(-4, -24, 8, 30);
         ctx.fillStyle = L[1]; ctx.fillRect(1, -24, 3, 30);
         ctx.beginPath(); ctx.moveTo(-4, -24); ctx.lineTo(0, -34); ctx.lineTo(4, -24); ctx.closePath(); ctx.fillStyle = L[0]; ctx.fill();
+      } else if (item.slot === 'weapon' && item.type === 'scythe') {
+        ctx.rotate(-0.5);
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(-2, -36, 5, 70);
+        ctx.fillStyle = L[0];
+        ctx.beginPath(); ctx.moveTo(1, -36); ctx.quadraticCurveTo(30, -50, 36, -20); ctx.quadraticCurveTo(24, -36, 1, -26); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[1];
+        ctx.beginPath(); ctx.moveTo(1, -30); ctx.quadraticCurveTo(22, -38, 33, -20); ctx.quadraticCurveTo(20, -30, 1, -26); ctx.closePath(); ctx.fill();
       } else if (item.slot === 'weapon' && item.type === 'great') {
         ctx.rotate(-0.8);
         ctx.fillStyle = '#6b4423'; ctx.fillRect(-4, 18, 8, 16);
@@ -484,7 +495,7 @@
       ctx.textAlign = 'right';
       ctx.font = 'bold 22px sans-serif';
       ctx.fillStyle = '#fff';
-      ctx.fillText(`보유 ${s.coins} G   피 ${s.lives}/${s.maxLives}`, x + w - 28, y + 36);
+      ctx.fillText(s.def.exp ? `보유 ${s.exp} EXP   피 ${s.lives}/${s.maxLives}` : `보유 ${s.coins} G   피 ${s.lives}/${s.maxLives}`, x + w - 28, y + 36);
       geo.tabs.forEach((t, i) => { // 탭 (클릭해서 전환)
         const on = i === s.tab;
         ctx.fillStyle = on ? '#e0b12f' : 'rgba(255,255,255,0.1)';
@@ -502,7 +513,7 @@
         const placing = s.mode === 'place'; // 꾸미기 창: 가격 대신 놓기/치우기
         const lives_here = !!it.house && s.inv.home.type === it.id;
         const owned = maxed || lives_here || (!!it.slot && s.inv.items.includes(it.id));
-        const afford = s.coins >= price;
+        const afford = (it.expCost ? s.exp : s.coins) >= price;
         const hover = s.hover === i;
         ctx.fillStyle = hover ? 'rgba(255,213,74,0.16)' : 'rgba(255,255,255,0.07)';
         ctx.fillRect(row.x, row.y, row.w, row.h);
@@ -526,7 +537,7 @@
         ctx.textAlign = 'right';
         ctx.font = 'bold 23px sans-serif';
         ctx.fillStyle = placing ? (it.id === s.slotItem ? '#8a93a8' : '#7dffa0') : owned ? '#8a93a8' : afford ? '#ffd54a' : '#ff6b7a';
-        const label = placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : `${price} G`;
+        const label = placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : it.expCost ? `${price} EXP` : `${price} G`;
         const twoLine = it.heal !== undefined || it.consumable || (it.decor && !it.clear);
         ctx.fillText(label, row.x + row.w - 16, row.y + row.h / 2 - (twoLine ? 8 : 0));
         if (twoLine) { // 물약/장식품은 가진 개수를 보여준다
@@ -726,6 +737,285 @@
       }
     }
 
+    // 땅 위의 작은 디테일: 풀, 꽃, 버섯, 눈 더미, 용암 균열, 보랏빛 룬, 종유석/고드름 (타일 좌표로 정해져 항상 같은 자리에 난다)
+    _kindOfTheme() {
+      const th = this.theme;
+      return th === G.Snow ? 'snow' : th === G.Volcano ? 'volcano' : th === G.DarkTheme ? 'dark' : th === G.Cave ? 'cave' : th === G.Beach ? 'beach' : 'grass';
+    }
+
+    _drawGroundDecor(ctx, terrain, camera, time) {
+      const kind = this._kindOfTheme();
+      const c0 = Math.max(0, Math.floor(camera.x / TILE));
+      const c1 = Math.min(terrain.cols - 1, Math.floor((camera.x + this.viewW) / TILE));
+      const r0 = Math.max(0, Math.floor(camera.y / TILE));
+      const r1 = Math.min(terrain.rows - 1, Math.floor((camera.y + this.viewH) / TILE));
+      const solid = (c, r) => r >= 0 && r < terrain.rows && c >= 0 && c < terrain.cols && !!terrain.grid[r][c];
+      ctx.save();
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          if (!solid(c, r)) continue;
+          const h0 = (Math.imul(c, 73856093) ^ Math.imul(r, 19349663)) >>> 0;
+          const rnd = (k) => ((Math.imul(h0 ^ (k * 2246822519), 2654435761) >>> 0) % 10000) / 10000;
+          const x0 = c * TILE;
+          const y0 = r * TILE;
+          if (!solid(c, r - 1)) { // 위가 트인 땅
+            if (kind === 'grass') {
+              for (let i = 0; i < 6; i++) { // 풀잎 (바람에 살랑)
+                const bx = x0 + 2 + rnd(i) * (TILE - 4);
+                const bh = 4 + rnd(i + 10) * 5;
+                const sw = Math.sin(time * 2 + c * 0.7 + i) * 1.6;
+                ctx.strokeStyle = i % 2 ? '#4fae45' : '#6ccf5a';
+                ctx.lineWidth = 1.6;
+                ctx.beginPath(); ctx.moveTo(bx, y0 + 1); ctx.quadraticCurveTo(bx + sw * 0.5, y0 - bh * 0.6, bx + sw, y0 - bh); ctx.stroke();
+              }
+              if (rnd(20) < 0.16) { // 꽃
+                const fx = x0 + 6 + rnd(21) * 20;
+                const col = ['#ffd54a', '#ff7aa8', '#f4f1e8', '#9a8cff'][Math.floor(rnd(22) * 4)];
+                ctx.strokeStyle = '#3f8f3a'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(fx, y0 + 1); ctx.lineTo(fx, y0 - 8); ctx.stroke();
+                ctx.fillStyle = col;
+                for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; ctx.beginPath(); ctx.arc(fx + Math.cos(a) * 2.4, y0 - 9 + Math.sin(a) * 2.4, 1.8, 0, Math.PI * 2); ctx.fill(); }
+                ctx.fillStyle = '#fff3a0'; ctx.beginPath(); ctx.arc(fx, y0 - 9, 1.5, 0, Math.PI * 2); ctx.fill();
+              } else if (rnd(23) < 0.07) { // 버섯
+                const mx = x0 + 8 + rnd(24) * 16;
+                ctx.fillStyle = '#f1e6d2'; ctx.fillRect(mx - 1.5, y0 - 5, 3, 6);
+                ctx.fillStyle = '#d9473f'; ctx.beginPath(); ctx.arc(mx, y0 - 5, 5, Math.PI, 0); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.fillRect(mx - 2, y0 - 8, 2, 2); ctx.fillRect(mx + 1, y0 - 7, 2, 2);
+              }
+            } else if (kind === 'beach') {
+              for (let i = 0; i < 3; i++) { // 모래 위 조약돌과 마른 풀
+                const bx = x0 + 3 + rnd(i) * (TILE - 8);
+                if (rnd(i + 5) < 0.5) { ctx.fillStyle = i % 2 ? '#b8a27a' : '#d8c8a0'; ctx.beginPath(); ctx.ellipse(bx, y0 + 1, 3 + rnd(i + 8) * 2, 2, 0, Math.PI, 0); ctx.fill(); }
+                else { ctx.strokeStyle = '#a89460'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(bx, y0 + 1); ctx.lineTo(bx + Math.sin(time * 2 + c + i) * 1.5, y0 - 5); ctx.stroke(); }
+              }
+              if (rnd(30) < 0.1) { // 불가사리
+                const sx = x0 + 10 + rnd(31) * 12; ctx.fillStyle = '#f08a5a';
+                for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 5; ctx.beginPath(); ctx.moveTo(sx, y0 - 2); ctx.lineTo(sx + Math.cos(a) * 5, y0 - 2 + Math.sin(a) * 5); ctx.lineTo(sx + Math.cos(a + 0.5) * 2, y0 - 2 + Math.sin(a + 0.5) * 2); ctx.fill(); }
+              }
+            } else if (kind === 'snow') {
+              ctx.fillStyle = '#ffffff';
+              for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x0 + 6 + i * 10 + rnd(i) * 4, y0 + 1, 6 + rnd(i + 3) * 3, 3 + rnd(i + 6) * 2, 0, Math.PI, 0); ctx.fill(); }
+              if (rnd(40) < 0.5) { // 반짝이는 눈 결정
+                const a = 0.4 + 0.6 * Math.max(0, Math.sin(time * 3 + c * 1.7 + r));
+                ctx.fillStyle = `rgba(190,235,255,${a})`; const sx = x0 + 6 + rnd(41) * 20; ctx.fillRect(sx, y0 - 3, 1.5, 1.5);
+              }
+              if (rnd(42) < 0.08) { // 눈 덮인 작은 바위
+                ctx.fillStyle = '#9aa7b8'; ctx.beginPath(); ctx.arc(x0 + 14, y0 - 1, 4, Math.PI, 0); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x0 + 14, y0 - 2, 4, Math.PI * 1.1, Math.PI * 1.9); ctx.fill();
+              }
+            } else if (kind === 'volcano') {
+              const pulse = 0.55 + 0.45 * Math.sin(time * 2.4 + c * 0.9 + r);
+              ctx.strokeStyle = `rgba(255,${110 + pulse * 70},40,${0.5 + pulse * 0.4})`; ctx.lineWidth = 1.6;
+              ctx.beginPath(); ctx.moveTo(x0 + 3, y0 + 3); ctx.lineTo(x0 + 10, y0 + 6); ctx.lineTo(x0 + 15, y0 + 3); ctx.lineTo(x0 + 24, y0 + 7); ctx.stroke(); // 빛나는 균열
+              if (rnd(50) < 0.25) { ctx.fillStyle = `rgba(255,200,90,${pulse})`; ctx.fillRect(x0 + 6 + rnd(51) * 20, y0 - 2 - ((time * 12 + c * 5) % 8), 2, 2); } // 튀는 불똥
+              if (rnd(52) < 0.18) { ctx.fillStyle = '#3a2a2a'; ctx.beginPath(); ctx.moveTo(x0 + 8, y0 + 1); ctx.lineTo(x0 + 12, y0 - 6); ctx.lineTo(x0 + 18, y0 + 1); ctx.closePath(); ctx.fill(); } // 화산암
+            } else if (kind === 'dark') {
+              const pulse = 0.5 + 0.5 * Math.sin(time * 1.6 + c + r * 2);
+              if (rnd(60) < 0.45) { // 보랏빛 룬
+                ctx.strokeStyle = `rgba(190,130,255,${0.25 + pulse * 0.5})`; ctx.lineWidth = 1.4;
+                const rx = x0 + 8 + rnd(61) * 12;
+                ctx.beginPath(); ctx.moveTo(rx, y0 + 4); ctx.lineTo(rx + 3, y0 + 8); ctx.lineTo(rx + 6, y0 + 4); ctx.moveTo(rx + 3, y0 + 8); ctx.lineTo(rx + 3, y0 + 13); ctx.stroke();
+              }
+              if (rnd(62) < 0.12) { // 어둠의 수정 조각
+                const kx = x0 + 6 + rnd(63) * 20; ctx.fillStyle = '#8a4fe0';
+                ctx.beginPath(); ctx.moveTo(kx, y0 + 1); ctx.lineTo(kx + 2, y0 - 8); ctx.lineTo(kx + 5, y0 + 1); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = `rgba(230,200,255,${0.4 + pulse * 0.5})`; ctx.fillRect(kx + 2, y0 - 6, 1.5, 4);
+              }
+              if (rnd(64) < 0.08) { // 타오르는 작은 초
+                const cx2 = x0 + 8 + rnd(65) * 16; ctx.fillStyle = '#d8d0c0'; ctx.fillRect(cx2, y0 - 7, 4, 8);
+                ctx.fillStyle = `rgba(255,200,110,${0.7 + pulse * 0.3})`; ctx.beginPath(); ctx.ellipse(cx2 + 2, y0 - 10, 2, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+              }
+            } else { // 동굴
+              if (rnd(70) < 0.5) { ctx.fillStyle = rnd(71) < 0.5 ? '#6f7686' : '#868ea0'; ctx.beginPath(); ctx.ellipse(x0 + 6 + rnd(72) * 20, y0 + 1, 3 + rnd(73) * 3, 2.5, 0, Math.PI, 0); ctx.fill(); } // 자갈
+              if (rnd(74) < 0.35) { ctx.fillStyle = '#3f7a4a'; ctx.beginPath(); ctx.ellipse(x0 + 8 + rnd(75) * 16, y0 + 1, 7, 3, 0, Math.PI, 0); ctx.fill(); } // 이끼
+              if (rnd(76) < 0.1) { // 푸른 수정
+                const kx = x0 + 8 + rnd(77) * 16; const a = 0.7 + 0.3 * Math.sin(time * 2 + c);
+                ctx.fillStyle = `rgba(120,225,255,${a})`;
+                ctx.beginPath(); ctx.moveTo(kx, y0 + 1); ctx.lineTo(kx + 2, y0 - 9); ctx.lineTo(kx + 4, y0 + 1); ctx.closePath(); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(kx + 3, y0 + 1); ctx.lineTo(kx + 6, y0 - 5); ctx.lineTo(kx + 8, y0 + 1); ctx.closePath(); ctx.fill();
+              }
+            }
+          }
+          if (!solid(c, r + 1)) { // 아래가 트인 땅 (천장): 종유석, 고드름, 덩굴, 용암 방울
+            if (kind === 'cave' || kind === 'snow' || kind === 'dark') {
+              if (rnd(80) < 0.6) {
+                const sx = x0 + 4 + rnd(81) * (TILE - 12);
+                const len = 5 + rnd(82) * 10;
+                ctx.fillStyle = kind === 'snow' ? 'rgba(200,238,255,0.92)' : kind === 'dark' ? '#3a2a5a' : '#6a7080';
+                ctx.beginPath(); ctx.moveTo(sx, y0 + TILE - 1); ctx.lineTo(sx + 5, y0 + TILE - 1); ctx.lineTo(sx + 2.5, y0 + TILE - 1 + len); ctx.closePath(); ctx.fill();
+                if (kind === 'snow') { ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(sx + 1, y0 + TILE - 1, 1.5, len * 0.5); }
+                if (kind !== 'snow' && rnd(83) < 0.4) { // 떨어지는 물방울
+                  const ph = (time * 0.9 + rnd(84) * 5) % 2;
+                  if (ph < 0.6) { ctx.fillStyle = kind === 'dark' ? 'rgba(190,150,255,0.85)' : 'rgba(150,200,255,0.85)'; ctx.fillRect(sx + 1.5, y0 + TILE + len + ph * 60, 2, 3); }
+                }
+              }
+            } else if (kind === 'grass') {
+              if (rnd(90) < 0.25) { // 늘어진 덩굴
+                const vx = x0 + 6 + rnd(91) * 20; ctx.strokeStyle = '#3f8f3a'; ctx.lineWidth = 1.5;
+                const L = 8 + rnd(92) * 14; const sw = Math.sin(time * 1.5 + c) * 2;
+                ctx.beginPath(); ctx.moveTo(vx, y0 + TILE - 1); ctx.quadraticCurveTo(vx + sw, y0 + TILE + L * 0.5, vx + sw * 1.5, y0 + TILE + L); ctx.stroke();
+                ctx.fillStyle = '#5fcf5a'; ctx.beginPath(); ctx.ellipse(vx + sw * 1.2, y0 + TILE + L * 0.6, 3, 1.6, 0.5, 0, Math.PI * 2); ctx.fill();
+              }
+            } else if (kind === 'volcano') {
+              if (rnd(95) < 0.25) { const lx = x0 + 6 + rnd(96) * 20; const ph = (time * 0.7 + rnd(97) * 4) % 2; ctx.fillStyle = 'rgba(255,140,40,0.9)'; ctx.fillRect(lx, y0 + TILE + ph * 40, 2.5, 4); }
+            }
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    // 발밑 그림자: 아래 땅까지의 거리가 멀수록 작고 옅어진다
+    _shadowAt(ctx, terrain, o) {
+      const cx = o.x + o.w / 2;
+      const col = Math.floor(cx / TILE);
+      const startRow = Math.floor((o.y + o.h - 1) / TILE);
+      for (let r = startRow; r < Math.min(terrain.rows, startRow + 9); r++) {
+        if (terrain.grid[r] && terrain.grid[r][col]) {
+          const gy = r * TILE;
+          const d = Math.max(0, gy - (o.y + o.h));
+          const k = Math.max(0, 1 - d / 260);
+          if (k <= 0.02) return;
+          ctx.fillStyle = `rgba(0,0,0,${0.28 * k})`;
+          ctx.beginPath(); ctx.ellipse(cx, gy + 1, (o.w * 0.5) * (0.5 + 0.5 * k), 3 * (0.6 + 0.4 * k), 0, 0, Math.PI * 2); ctx.fill();
+          return;
+        }
+      }
+    }
+
+    _drawShadows(ctx, terrain, monsters, player, camera) {
+      ctx.save();
+      for (const m of monsters) if (m.alive && !m.flying && this._inView(m, camera)) this._shadowAt(ctx, terrain, m);
+      this._shadowAt(ctx, terrain, player);
+      ctx.restore();
+    }
+
+    // 어두운 스테이지(동굴, 다크월드)에서는 용사 주변이 은은하게 밝다
+    _drawPlayerLight(ctx, player, time) {
+      const kind = this._kindOfTheme();
+      if (kind !== 'cave' && kind !== 'dark') return;
+      const cx = player.x + player.w / 2;
+      const cy = player.y + player.h / 2;
+      const rad = 190 + Math.sin(time * 3) * 6;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      g.addColorStop(0, kind === 'dark' ? 'rgba(190,150,255,0.20)' : 'rgba(255,220,150,0.20)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
+      ctx.restore();
+    }
+
+    // 스테이지 분위기 입자: 설산의 눈송이, 화산의 불씨, 다크월드의 영혼불, 숲의 반딧불, 동굴의 먼지 (화면 안에서 계속 맴돈다)
+    _drawAmbient(ctx, camX, camY, time) {
+      const th = this.theme;
+      const kind = th === G.Snow ? 'snow' : th === G.Volcano ? 'ember' : th === G.DarkTheme ? 'wisp' : th === G.Forest ? 'firefly' : th === G.Cave ? 'mote' : null;
+      if (!kind) return;
+      const W = this.viewW;
+      const H = this.viewH;
+      const n = kind === 'snow' ? 46 : 26;
+      ctx.save();
+      for (let i = 0; i < n; i++) {
+        const sx = (Math.sin(i * 91.7) * 0.5 + 0.5) * W;
+        const sy = (Math.sin(i * 53.3 + 2) * 0.5 + 0.5) * H;
+        const sp = 0.5 + (i % 5) * 0.18;
+        let x;
+        let y;
+        let a = 1;
+        let r = 1.5;
+        let col = '255,255,255';
+        if (kind === 'snow') { // 천천히 흩날리며 내린다
+          x = sx + Math.sin(time * 0.8 * sp + i) * 22 + time * 10 * sp;
+          y = sy + time * 34 * sp;
+          r = 1.5 + (i % 3) * 0.7;
+          a = 0.55 + (i % 4) * 0.1;
+        } else if (kind === 'ember') { // 위로 피어오르며 사그라든다
+          const ph = (time * 0.22 * sp + i * 0.137) % 1;
+          x = sx + Math.sin(time * 1.5 + i) * 14;
+          y = H - ph * H * 0.9;
+          a = 1 - ph;
+          r = 1.6 + (i % 3) * 0.6;
+          col = i % 2 ? '255,170,60' : '255,110,40';
+        } else if (kind === 'wisp') { // 보랏빛 영혼불이 느리게 떠오른다
+          const ph = (time * 0.07 * sp + i * 0.211) % 1;
+          x = sx + Math.sin(time * 0.6 * sp + i * 2) * 30;
+          y = H - ph * H;
+          a = Math.sin(ph * Math.PI) * 0.7;
+          r = 2 + (i % 3);
+          col = i % 2 ? '190,130,255' : '130,160,255';
+        } else if (kind === 'firefly') { // 깜빡이는 반딧불
+          x = sx + Math.sin(time * 0.5 * sp + i * 3) * 40;
+          y = sy * 0.8 + H * 0.15 + Math.cos(time * 0.4 * sp + i) * 26;
+          a = Math.max(0, Math.sin(time * 1.6 * sp + i * 5)) * 0.9;
+          r = 2;
+          col = '210,255,140';
+        } else { // 동굴의 먼지
+          x = sx + Math.sin(time * 0.3 * sp + i) * 26;
+          y = sy + Math.cos(time * 0.25 * sp + i * 2) * 20;
+          a = 0.12 + 0.1 * Math.sin(time + i);
+          r = 1.2;
+          col = '200,210,230';
+        }
+        x = camX + (((x % W) + W) % W);
+        y = camY + (((y % H) + H) % H);
+        if (a <= 0.02) continue;
+        if (kind === 'wisp' || kind === 'firefly' || kind === 'ember') { // 은은한 빛무리
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
+          g.addColorStop(0, `rgba(${col},${a * 0.5})`);
+          g.addColorStop(1, `rgba(${col},0)`);
+          ctx.fillStyle = g;
+          ctx.fillRect(x - r * 4, y - r * 4, r * 8, r * 8);
+        }
+        ctx.fillStyle = `rgba(${col},${a})`;
+        ctx.fillRect(Math.round(x), Math.round(y), r, r);
+      }
+      ctx.restore();
+    }
+
+    // 던전 위층으로 오르는 문: 가까이 가면 열리고 문틈으로 금빛이 새어 나온다 (open 0~1)
+    _drawDoor(ctx, ch) {
+      const x = Math.round(ch.x);
+      const y = Math.round(ch.y);
+      const w = ch.w;
+      const h = ch.h;
+      const t = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+      const a = ch.open > 0 ? 0.55 * ch.open : 0.18 + 0.1 * Math.sin(t * 3); // 닫혀 있을 땐 은은하게 깜빡여 위치를 알린다
+      const g = ctx.createRadialGradient(x + w / 2, y + h / 2, 0, x + w / 2, y + h / 2, 70);
+      g.addColorStop(0, `rgba(255,225,110,${a})`);
+      g.addColorStop(1, 'rgba(255,225,110,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 60, y - 40, w + 120, h + 80);
+      ctx.fillStyle = '#4a2c14'; // 문틀
+      ctx.fillRect(x - 3, y - 3, w + 6, h + 3);
+      ctx.fillStyle = '#2b1a0c'; // 문 안쪽 (열리면 금빛)
+      ctx.fillRect(x, y, w, h);
+      if (ch.open > 0) {
+        ctx.fillStyle = `rgba(255,222,120,${0.4 + 0.6 * ch.open})`;
+        ctx.fillRect(x + 2, y + 2, w - 4, h - 2);
+      }
+      for (let i = 0; i < 4; i++) { // 문틈에서 피어오르는 금빛 반짝임
+        const ph = (t * 0.6 + i * 0.25) % 1;
+        ctx.fillStyle = `rgba(255,235,150,${(1 - ph) * 0.8})`;
+        ctx.fillRect(Math.round(x + 4 + ((i * 7) % (w - 8))), Math.round(y - ph * 26), 2, 2);
+      }
+      const doorW = Math.max(3, Math.round((w - 4) * (1 - ch.open * 0.85))); // 문짝이 왼쪽 경첩을 축으로 접힌다
+      ctx.fillStyle = '#8a5428';
+      ctx.fillRect(x + 2, y + 2, doorW, h - 2);
+      ctx.fillStyle = '#a66a33';
+      ctx.fillRect(x + 2, y + 2, doorW, 3);
+      ctx.fillStyle = '#6e4120';
+      if (doorW > 12) { // 판자 홈과 위/아래 패널
+        ctx.fillRect(x + 2 + Math.floor(doorW / 2), y + 5, 1, h - 7);
+        ctx.fillRect(x + 6, y + 8, doorW - 8, 2);
+        ctx.fillRect(x + 6, y + h - 12, doorW - 8, 2);
+      }
+      if (ch.open < 0.5) { // 손잡이
+        ctx.fillStyle = '#ffd54a';
+        ctx.fillRect(x + doorW - 4, y + Math.round(h / 2), 3, 3);
+      }
+    }
+
     // 보물 상자: 열리면 뚜껑이 젖혀지고 금빛이 새어 나온다 (open 0~1)
     _drawChest(ctx, ch) {
       const x = Math.round(ch.x);
@@ -744,6 +1034,11 @@
         g.addColorStop(1, 'rgba(255,215,90,0)');
         ctx.fillStyle = g;
         ctx.fillRect(x - 40, y - 50, ch.w + 80, 110);
+      }
+      for (let i = 0; i < 3; i++) { // 상자 위로 오르는 금빛 반짝임
+        const ph = (t * 0.5 + i * 0.33) % 1;
+        ctx.fillStyle = `rgba(255,235,150,${(1 - ph) * 0.9})`;
+        ctx.fillRect(Math.round(x + 4 + ((i * 9) % (ch.w - 8))), Math.round(y - ph * 22), 2, 2);
       }
       // 몸통
       ctx.fillStyle = '#7a4a22';
@@ -1356,14 +1651,21 @@
       this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Shift(또는 X): 3칸 대시   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   R: 처음 위치로', 12, 10);
       ctx.font = '16px sans-serif';
       if (!hud) return;
-      const test = '   [테스트] 0: 해변  9: 마을  7: 마을 동굴  4: 다크월드  8: 코인+1000   1: 장비';
+      const test = '   [테스트] 0: 해변  9: 마을  7: 마을 동굴  4: 다크월드  5: 위층  8: 코인+1000   1: 장비';
       if (hud.summon) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리${test}`, 12, 32);
       else if (hud.monsterless) this._text(ctx, `몬스터가 없는 평화로운 마을${test}`, 12, 32);
       else if (hud.crabCount !== undefined) this._text(ctx, `꽃게 ${hud.crabCount}마리${test}`, 12, 32);
 
       // 목숨: 우측 상단 하트
       for (let i = 0; i < hud.maxLives; i++) {
-        this._drawHeart(ctx, this.viewW - 28 - (hud.maxLives - 1 - i) * 34, 10, 26, i < hud.lives);
+        const hx = this.viewW - 28 - (hud.maxLives - 1 - i) * 34;
+        this._drawHeart(ctx, hx, 10, 26, i + 1 <= hud.lives);
+        if (hud.lives - i === 0.5) { // 반 칸: 왼쪽 절반만 채운다
+          ctx.save();
+          ctx.beginPath(); ctx.rect(hx - 20, 0, 20, 60); ctx.clip();
+          this._drawHeart(ctx, hx, 10, 26, true);
+          ctx.restore();
+        }
       }
 
       if (hud.coins !== undefined) this._drawCoinHud(ctx, hud.coins, hud.potions, hud.exp);

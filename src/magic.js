@@ -67,6 +67,25 @@
       s.t += dt;
       s.life -= dt;
       if (s.g) s.vy = (s.vy || 0) + s.g * dt; // 폭탄은 포물선
+      if (s.el === 'bullet') { // 총알은 앞쪽의 가장 가까운 몬스터를 향해 휘어 날아간다
+        let best = null;
+        let bd = 640;
+        for (const m of monsters) {
+          if (!alive(m) || s.hitSet.has(m)) continue;
+          const dx = m.x + m.w / 2 - s.x;
+          if (Math.sign(dx) !== s.dir && Math.abs(dx) > 24) continue;
+          const d = Math.hypot(dx, m.y + m.h / 2 - s.y);
+          if (d < bd) { bd = d; best = m; }
+        }
+        if (best) {
+          const dx = best.x + best.w / 2 - s.x;
+          const dy = best.y + best.h / 2 - s.y;
+          const d = Math.max(1, Math.hypot(dx, dy));
+          const k = Math.min(1, dt * 14);
+          s.vx += ((dx / d) * EL.bullet.speed - s.vx) * k;
+          s.vy = (s.vy || 0) + ((dy / d) * EL.bullet.speed - (s.vy || 0)) * k;
+        }
+      }
       const nx = s.x + s.vx * dt;
       const ny = s.y + (s.vy || 0) * dt;
       if (terrain.isSolid(Math.floor(nx / T), Math.floor(ny / T))) { // 벽/땅에 부딪힘
@@ -118,10 +137,14 @@
         ctx.beginPath(); ctx.moveTo(s.x + s.dir * 12, s.y); ctx.lineTo(s.x + s.dir * 4, s.y - 4); ctx.lineTo(s.x + s.dir * 4, s.y + 4); ctx.fill();
         ctx.fillStyle = '#c0504d'; ctx.fillRect(s.x - s.dir * 24 - 2, s.y - 3, 5, 6);
       } else if (s.el === 'bullet') { // 탄환: 빛나는 짧은 줄
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(Math.atan2(s.vy || 0, s.vx)); // 휘어 날아가는 방향으로 기울인다
         ctx.fillStyle = 'rgba(255,230,140,0.45)';
-        ctx.fillRect(Math.min(s.x, s.x - s.dir * 34), s.y - 2, 34, 4);
+        ctx.fillRect(-34, -2, 34, 4);
         ctx.fillStyle = '#fff6c0';
-        ctx.fillRect(Math.min(s.x, s.x - s.dir * 12), s.y - 2, 12, 4);
+        ctx.fillRect(-12, -2, 12, 4);
+        ctx.restore();
       } else if (s.el === 'bomb' || s.el === 'icebomb') { // 폭탄: 둥근 몸 + 타는 심지
         const ice = s.el === 'icebomb';
         ctx.fillStyle = ice ? '#5fa8d9' : '#2a2a32';

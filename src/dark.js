@@ -226,9 +226,9 @@
     let prev = { row: TOWER_H - 2, x0: 2, x1: TOWER_W - 3 }; // 바닥
     let guard = 0;
     while (prev.row > 9 && guard++ < 80) {
-      const rise = rand() < 0.08 + 0.3 * t ? 3 : 2;
-      const maxGap = rise === 3 ? 2 : 3;
-      const w = pick(4, Math.max(5, 7 - Math.floor(t * 3)));
+      const rise = rand() < 0.03 + 0.12 * t ? 3 : 2;
+      const maxGap = rise === 3 ? 1 : 2;
+      const w = pick(5, Math.max(6, 8 - Math.floor(t * 2)));
       const last = prev.row - rise <= 9;
       const row = last ? Math.max(6, prev.row - rise) : prev.row - rise;
       const ww = last ? 10 : w;

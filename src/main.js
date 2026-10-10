@@ -146,6 +146,8 @@
   let won = false;       // 스테이지 클리어 연출 중
   let wonTime = 0;
   let ending = null;     // 클리어 연출 ('cave': 코인 -> 해변, 'house': 노인과 대화 -> 마을)
+  let footT = 0;                 // 달리기 먼지 간격
+  let reapKills = 0;             // 낫으로 잡은 몬스터 수: 20마리마다 피 반 칸
   let stamina = C.STAMINA_MAX;   // 스태미나: 대시와 폭탄/총/활 공격에 쓴다
   let staminaWait = 0;           // 스태미나를 쓴 직후 회복이 잠깐 멈추는 시간
   const story = { caves: 0, pending: false, revealed: false, cleared: false }; // 이야기: 동굴 15번 클리어 -> 시크너 이야기 -> 다크월드 문
@@ -165,7 +167,12 @@
   // 스테이지를 처음 상태로 불러온다 (지형, 몬스터, 목숨, 플레이어, 카메라)
   // keepLives=false(기본)면 목숨을 가득 채우고 시작한다. 코인과 산 검은 항상 유지된다
   // near='D'면 마을의 동굴 입구 앞에서 시작한다 (동굴에서 돌아올 때)
-  const makeChest = () => Object.assign(terrain.placeOnTile(terrain.treasure.col, terrain.treasure.row, C.CHEST_W, C.CHEST_H), { w: C.CHEST_W, h: C.CHEST_H, open: 0 });
+  const makeChest = () => { // 던전(어둠의 탑)에서는 위층으로 오르는 문, 그 밖에는 보물 상자
+    const door = stageName === 'dungeon';
+    const w = door ? C.DOOR_W : C.CHEST_W;
+    const h = door ? C.DOOR_H : C.CHEST_H;
+    return Object.assign(terrain.placeOnTile(terrain.treasure.col, terrain.treasure.row, w, h), { w, h, open: 0, door });
+  };
 
   // 보스 이벤트: 보스 모듈은 판정만 하고, 피해/이펙트/소리는 여기서 처리한다
   const bossEv = {
@@ -242,7 +249,7 @@
     }
     return hits;
   }
-  const bossDamage = () => (killsInOne() ? 2 : 1) + (boss && G.Shop.ITEMS[inv.equipped.weapon].elem === boss.weak ? (boss.weak === 'ice' ? C.BOSS_ICE_BONUS : C.BOSS_FIRE_BONUS) : 0);
+  const bossDamage = () => (killsInOne() ? 2 : 1) + equipStats.bossBonus + (boss && G.Shop.ITEMS[inv.equipped.weapon].elem === boss.weak ? (boss.weak === 'ice' ? C.BOSS_ICE_BONUS : C.BOSS_FIRE_BONUS) : 0);
 
   // 던전: 층마다 0~3개의 아이템이 바닥에 떨어져 있다 (스태미나, 얼음 폭탄, 음식)
   const PICKUP_TABLE = ['st70', 'st30', 'st30', 'icebomb', 'st30'];
@@ -405,6 +412,14 @@
       story.revealed = true;
       story.pending = false;
       loadStage('darkhub', true);
+    } else if (e.code === 'Digit5' || e.code === 'Numpad5') { // 테스트: 5 = 던전에서 한 층씩 위로 (던전 밖이면 1층부터)
+      cutscene = null;
+      story.revealed = true;
+      story.pending = false;
+      if (stageName === 'dungeon') darkFloor = Math.min(C.DUNGEON_FLOORS, darkFloor + 1);
+      else darkFloor = 1;
+      darkBest = Math.max(darkBest, darkFloor);
+      loadStage('dungeon', true);
     } else if (e.code === 'KeyK') { // 내 스프라이트(editor.html에서 그린 모션) 켜기/끄기
       const S = G.Sprites;
       let text;
@@ -487,7 +502,7 @@
   }
 
   function wallet() {
-    return { coins, lives, maxLives: maxLives(), inv };
+    return { coins, exp, lives, maxLives: maxLives(), inv };
   }
 
   const shopItems = () => shop.def.tabs[shop.tab].items;
@@ -516,6 +531,7 @@
     const w = wallet();
     const res = G.Shop.buy(item, w);
     coins = w.coins;
+    exp = w.exp;
     lives = w.lives;
     applyEquipment();
     shop.msg = res.msg;
@@ -1057,7 +1073,14 @@
     }
     if (input.wasPressed('KeyB')) throwIceBomb();
     if (input.wasPressed('KeyV')) eatBest();
+    const wasAir = !player.onGround;
+    const fallV = player.vy;
     player.update(dt, input, terrain);
+    if (wasAir && player.onGround && fallV > 380) effects.landDust(player.x + player.w / 2, player.y + player.h, Math.min(1, (fallV - 380) / 700)); // 착지 먼지
+    if (player.onGround && Math.abs(player.vx) > 160 && (footT -= dt) <= 0) { // 달리는 발 먼지
+      footT = 0.12;
+      effects.footDust(player.x + player.w / 2, player.y + player.h, Math.sign(player.vx));
+    }
     if (player.dashFx) { // 대시 시작: 먼지 + 바람 소리
       player.dashFx = false;
       stamina -= C.DASH_STAMINA;
@@ -1097,7 +1120,7 @@
           stamina -= weaponDef.stamina;
           staminaWait = 0.8;
           const h = player.hand;
-          G.Magic.cast(magic, weaponDef.shot, h.x + player.facing * 26, h.y - 2, player.facing, terrain, magicTargets(), magicHooks, { dmg: weaponDef.dmg, radius: (weaponDef.radius || 0) * C.TILE, pierce: weaponDef.pierce, count: weaponDef.count });
+          G.Magic.cast(magic, weaponDef.shot, h.x + player.facing * 26, h.y - 2, player.facing, terrain, magicTargets(), magicHooks, { dmg: weaponDef.dmg + equipStats.dmgBonus, radius: (weaponDef.radius || 0) * C.TILE, pierce: weaponDef.pierce, count: weaponDef.count });
           G.Audio.play(weaponDef.shot === 'bullet' ? 'gun' : weaponDef.shot === 'arrow' ? 'bow' : 'throw');
         }
       } else if (weaponDef.element) { // 지팡이: 패링할 때마다 지팡이 끝에서 원소가 나간다
@@ -1149,6 +1172,20 @@
         }
         const gain = Math.round(({ slime: C.SLIME_EXP, bat: C.BAT_EXP, crab: C.CRAB_EXP, golem: C.GOLEM_EXP, darkstone: C.DARKSTONE_EXP, shade: C.SHADE_EXP }[s.kind] || 0) * (STAGES[stageName].dark ? 1 + darkFloor * 0.1 : 1)); // 경험치: 슬라임 1, 박쥐 2, 꽃게 3, 흙골렘 3 (던전은 층마다 늘어난다)
         if (STAGES[stageName].dark && !s.noExp && Math.random() < 0.07) pickups.push({ x: s.x + s.w / 2, y: s.y + s.h - 16, id: PICKUP_TABLE[Math.floor(Math.random() * PICKUP_TABLE.length)], t: 0 }); // 가끔 아이템을 떨어뜨린다
+        const wd = G.Shop.ITEMS[inv.equipped.weapon];
+        if (wd.elem === 'reap' && !s.noExp) { // 낫: 처치하면 스태미나를 거둔다
+          stamina = Math.min(C.STAMINA_MAX, stamina + wd.reapSt);
+          popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: `수확! 스태미나 +${wd.reapSt}`, t: 0.8, color: 'rgba(200,170,255,A)' });
+          reapKills += 1;
+          if (reapKills >= 20) { // 20마리를 거두면 피가 반 칸 찬다
+            reapKills = 0;
+            if (lives < maxLives()) {
+              lives = Math.min(maxLives(), lives + 0.5);
+              popups.push({ x: player.x + player.w / 2, y: player.y - 34, text: '피 +½', t: 1.2, color: 'rgba(255,140,160,A)' });
+              G.Audio.play('pickup');
+            }
+          }
+        }
         if (gain && !s.noExp) { // (왕슬라임이 낳은 슬라임은 경험치를 주지 않는다)
           exp += gain;
           popups.push({ x: s.x + s.w / 2, y: s.y - 22, text: `+${gain} EXP`, t: 1.2, color: 'rgba(150,215,255,A)' });
@@ -1316,7 +1353,7 @@
     const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)' };
     const prompt = near ? (near.type === 'shop' ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기` : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
-    const shopView = shop ? Object.assign({}, shop, { coins, lives, maxLives: maxLives(), inv, slotItem }) : null;
+    const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }) : null;
     const equipView = equipUI ? Object.assign({}, equipUI, { inv, lives, maxLives: maxLives(), coins, bonus: Object.assign({ critDamage: G.Shop.critDamage(inv) }, G.Shop.homeBonuses(inv)) }) : null;
     const house = terrain.houses[0];
     const npcs = ending && ending.mode === 'house' && house ? [{ kind: 'elder', x: house.col * C.TILE + C.TILE / 2 + 44, y: (house.row + 1) * C.TILE, facing: -1, alpha: ending.npcAlpha }] : [];
@@ -1358,6 +1395,7 @@
     get dialog_() { return dialog; },
     get coins() { return coins; },
     get exp() { return exp; },
+    set exp(v) { exp = v; },
     set coins(v) { coins = v; },
     get shop() { return shop; },
     get equip() { return equipUI; },

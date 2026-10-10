@@ -44,6 +44,8 @@
           if (ch === 'j') this.shadeSpawns.push({ col: c, row: r });
           if (ch === 'E') this.shops.push({ col: c, row: r, kind: 'dweapon' });
           if (ch === 'I') this.shops.push({ col: c, row: r, kind: 'ditem' });
+          if (ch === 'a') this.shops.push({ col: c, row: r, kind: 'darmor' });
+          if (ch === 'O') this.shops.push({ col: c, row: r, kind: 'dupgrade' });
           if (ch === 'Z') this.gates.push({ col: c, row: r, stage: 'darkhub' });
           if (ch === 'J') this.gates.push({ col: c, row: r, stage: 'dungeon' });
           if (ch === 'T') this.treasure = { col: c, row: r };

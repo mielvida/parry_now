@@ -5,7 +5,7 @@
 //  - 산 장비는 바로 장착되고, 인벤토리 창(1 키)에서 바꿔 낄 수 있다.
 (function (G) {
   const SLOT_NAMES = { weapon: '무기', helmet: '투구', armor: '갑옷', gloves: '장갑', boots: '신발' };
-  const TYPE_NAMES = { sword: '검', great: '대검', dagger: '단검', staff: '지팡이', bomb: '폭탄', gun: '총', bow: '활', shield: '방패' };
+  const TYPE_NAMES = { sword: '검', great: '대검', dagger: '단검', staff: '지팡이', bomb: '폭탄', gun: '총', bow: '활', shield: '방패', scythe: '낫' };
 
   const ITEMS = {};
   const add = (it) => { ITEMS[it.id] = it; };
@@ -57,6 +57,17 @@
   boots('boots2', '강철 신발', 300, 0.2, ['#b8c0cc', '#6c7686']);
   boots('boots3', '바람의 신발', 500, 0.3, ['#7dffd0', '#2fa88a']);
 
+  // ---- 다크월드 갑옷 가게: 일반 가게보다 훨씬 강한 장비 ----
+  armor('darmor1', '흑철 갑옷', 3000, 5, ['#3a3f4d', '#6a7388']);
+  armor('darmor2', '어둠의 갑옷', 6000, 7, ['#2a1250', '#8a60d0']);
+  armor('darmor3', '시크너의 갑옷', 12000, 10, ['#1a0a30', '#c07aff']);
+  helmet('dhelmet1', '흑철 투구', 2000, 1.4, ['#3a3f4d', '#6a7388']);
+  helmet('dhelmet2', '어둠의 투구', 4500, 1.8, ['#2a1250', '#c07aff']);
+  gloves('dgloves1', '흑철 장갑', 2000, 0.2, ['#3a3f4d', '#6a7388']);
+  gloves('dgloves2', '어둠의 장갑', 4500, 0.3, ['#6a2fb0', '#2a1250']);
+  boots('dboots1', '흑철 신발', 2000, 0.4, ['#3a3f4d', '#6a7388']);
+  boots('dboots2', '어둠의 신발', 4500, 0.5, ['#8a60d0', '#2a1250']);
+
   // ---- 다크월드 무기 상점: 폭탄 던지기 / 총 / 활 / 방패 (shot = 쏘는 것, dmg = 대미지, stamina = 한 번에 드는 스태미나) ----
   weapon('bomb1', 'bomb', '흑색 폭탄', 1500, 0.2, 0, 0.2, ['#3a3a44', '#ff9a3a'], { shot: 'bomb', dmg: 3, radius: 2, stamina: 15, note: '던지면 터져 주변 2칸에 피해 3' });
   weapon('bomb2', 'bomb', '화약 폭탄', 3000, 0.2, 0, 0.2, ['#5a3a2a', '#ffcf3a'], { shot: 'bomb', dmg: 5, radius: 2.5, stamina: 20, note: '주변 2.5칸에 피해 5' });
@@ -67,6 +78,9 @@
   weapon('bow1', 'bow', '사냥 활', 1500, 0.2, 0, 0, ['#8a5a2b', '#e8d8a8'], { shot: 'arrow', dmg: 3, stamina: 8, note: '화살 피해 3' });
   weapon('bow2', 'bow', '장궁', 3000, 0.2, 0, -0.1, ['#6b4423', '#9fd8f0'], { shot: 'arrow', dmg: 5, stamina: 10, note: '화살 피해 5, 쿨다운 짧음' });
   weapon('bow3', 'bow', '어둠의 활', 6500, 0.2, 0, 0, ['#2a1250', '#c07aff'], { shot: 'arrow', dmg: 7, stamina: 14, count: 3, note: '화살 세 발 (피해 7)' });
+  weapon('scythe1', 'scythe', '수확의 낫', 2200, 0.8, 0, 0.15, ['#c9d2dc', '#6c7686'], { elem: 'reap', oneHit: true, reapSt: 10, note: '수확: 처치할 때마다 스태미나 +10' });
+  weapon('scythe2', 'scythe', '사신의 낫', 4200, 1.0, 0, 0.15, ['#b8a0e8', '#4b2fb8'], { elem: 'reap', oneHit: true, reapSt: 18, note: '수확: 처치할 때마다 스태미나 +18' });
+  weapon('scythe3', 'scythe', '어둠의 낫', 7500, 1.2, 0, 0.1, ['#e0a8ff', '#2a1250'], { elem: 'reap', oneHit: true, reapSt: 30, note: '수확: 처치할 때마다 스태미나 +30' });
   weapon('shield1', 'shield', '나무 방패', 1200, 0.7, 0, 0.1, ['#a66a33', '#6b4423'], { windowAdd: 0.1, note: '방패: 패링 범위가 넓다' });
   weapon('shield2', 'shield', '철 방패', 2800, 0.8, 0, 0.1, ['#b8c0cc', '#6c7686'], { windowAdd: 0.2, note: '방패: 범위 넓고 패링이 오래 간다' });
   weapon('shield3', 'shield', '어둠 방패', 6000, 0.9, 0, 0.1, ['#6a2fb0', '#2a1250'], { windowAdd: 0.3, note: '방패: 가장 넓고 오래 막는다' });
@@ -150,17 +164,26 @@
   add({ id: 'speedup', name: '마을 달리기 업그레이드', upgrade: 'speed', look: ['#7dffd0', '#2fa88a'] });
   //  crit  치명타: 치명타가 터지면 이 대미지를 준다 (0레벨 10 -> 20레벨 30). 치명타 확률은 집에 장식품을 놓을수록 오른다
   add({ id: 'critup', name: '치명타 업그레이드', upgrade: 'crit', look: ['#ffd54a', '#e8334a'] });
+  //  weapon / armor: 다크월드 강화소. 경험치(EXP)로 지금 낀 무기(Lv은 무기마다)와 갑옷(피 +1칸/레벨)을 강화한다
+  add({ id: 'wup', name: '무기 강화', upgrade: 'weapon', expCost: true, look: ['#7dd0ff', '#2a6fb0'] });
+  add({ id: 'aup', name: '갑옷 강화', upgrade: 'armor', expCost: true, look: ['#ff9a7a', '#b0402a'] });
   const C = G.Config;
+  const UP_MAX = 5;                                  // 강화 최고 레벨 (무기마다 / 갑옷)
+  const WUP_PRICE = 40; const WUP_STEP = 40;         // 무기 강화 EXP: 40, 80, 120 ...
+  const AUP_PRICE = 60; const AUP_STEP = 60;         // 갑옷 강화 EXP: 60, 120, 180 ...
+  const weaponLevel = (inv) => (inv.wlevel && inv.wlevel[inv.equipped.weapon]) || 0;
   const mineReward = (level) => C.MINE_COINS + C.MINE_COINS_PER_LEVEL * (Math.min(level, C.MINE_MAX_LEVEL) - 1);
   const speedMult = (level) => 1 + ((C.VILLAGE_SPEED_MAX - 1) * Math.min(level, C.VILLAGE_SPEED_LEVELS)) / C.VILLAGE_SPEED_LEVELS;
   const critDamage = (inv) => C.CRIT_BASE_DAMAGE + Math.min(inv.critLevel, C.CRIT_MAX_LEVEL);
-  const levelOf = (item, inv) => (item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
-  const maxLevelOf = (item) => (item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
+  const levelOf = (item, inv) => (item.upgrade === 'weapon' ? weaponLevel(inv) : item.upgrade === 'armor' ? inv.armorLevel || 0 : item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
+  const maxLevelOf = (item) => (item.upgrade === 'weapon' || item.upgrade === 'armor' ? UP_MAX : item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
   const upMaxed = (item, inv) => !!item.upgrade && levelOf(item, inv) >= maxLevelOf(item);
   // 다음 레벨로 올리는 가격 (최고 레벨이면 0). 업그레이드가 아닌 아이템은 원래 가격
   function priceOf(item, inv) {
     if (!item.upgrade) return item.price;
     if (upMaxed(item, inv)) return 0;
+    if (item.upgrade === 'weapon') return WUP_PRICE + WUP_STEP * weaponLevel(inv);
+    if (item.upgrade === 'armor') return AUP_PRICE + AUP_STEP * (inv.armorLevel || 0);
     if (item.upgrade === 'crit') return C.CRIT_UPGRADE_PRICE + C.CRIT_UPGRADE_STEP * inv.critLevel;
     return item.upgrade === 'mine' ? C.MINE_UPGRADE_PRICE + C.MINE_UPGRADE_STEP * (inv.mineLevel - 1) : C.VILLAGE_SPEED_PRICE + C.VILLAGE_SPEED_STEP * inv.speedLevel;
   }
@@ -170,6 +193,20 @@
 
   // 아이템 한 개의 이름/설명 (상점과 인벤토리 창이 보여준다)
   function describe(item, inv) {
+    if (item.upgrade === 'weapon') {
+      const w = ITEMS[inv.equipped.weapon];
+      const lv = weaponLevel(inv);
+      const f = (v) => (Math.round(v * 10) / 10).toString();
+      const now = w.shot ? `대미지 ${w.dmg + lv}` : `범위 ${f(w.reach + 0.1 * lv)}칸`;
+      const next = w.shot ? `대미지 ${w.dmg + lv + 1}` : `범위 ${f(w.reach + 0.1 * (lv + 1))}칸`;
+      const desc = lv >= UP_MAX ? `최고 레벨! ${w.name} ${now}` : `${w.name} ${now} -> ${next}`;
+      return { name: `${item.name}  Lv ${lv}/${UP_MAX}`, desc, slotName: '강화', note: w.shot ? '낀 무기의 대미지 +1 / 레벨' : '낀 무기의 범위 +0.1칸 / 레벨, 레벨 2마다 보스 대미지 +1' };
+    }
+    if (item.upgrade === 'armor') {
+      const lv = inv.armorLevel || 0;
+      const desc = lv >= UP_MAX ? `최고 레벨! 최대 피 +${lv}칸` : `최대 피 +${lv}칸 -> +${lv + 1}칸`;
+      return { name: `${item.name}  Lv ${lv}/${UP_MAX}`, desc, slotName: '강화', note: '레벨마다 최대 피 +1칸 (어떤 갑옷이든)' };
+    }
     if (item.upgrade === 'mine') {
       const lv = inv ? inv.mineLevel : 1;
       const desc = lv >= C.MINE_MAX_LEVEL ? `최고 레벨! 동굴 보물 상자가 ${mineReward(lv)} G를 줍니다` : `동굴 보물 상자 ${mineReward(lv)} G -> ${mineReward(lv + 1)} G`;
@@ -206,7 +243,7 @@
         return { name: item.name, desc: parts.join(', '), slotName: TYPE_NAMES[item.type], note: item.note || '' };
       }
       parts.push(`범위 ${item.reach}칸`);
-      if (item.type === 'great') parts.push('던지기 불가');
+      if (item.type === 'great' || item.type === 'scythe') parts.push('던지기 불가');
       else if (item.throwTiles) parts.push(`던지기 +${item.throwTiles}칸`);
       if (item.cd) parts.push(`쿨다운 ${item.cd > 0 ? '+' : ''}${item.cd}초`);
       if (item.oneHit) parts.push('슬라임·꽃게 한 방');
@@ -240,8 +277,23 @@
         { name: '폭탄', items: ids('bomb1', 'bomb2', 'bomb3') },
         { name: '총', items: ids('gun1', 'gun2', 'gun3') },
         { name: '활', items: ids('bow1', 'bow2', 'bow3') },
+        { name: '낫', items: ids('scythe1', 'scythe2', 'scythe3') },
         { name: '방패', items: ids('shield1', 'shield2', 'shield3') },
       ],
+    },
+    darmor: {
+      title: '다크월드 갑옷 가게',
+      tabs: [
+        { name: '갑옷', items: ids('darmor1', 'darmor2', 'darmor3') },
+        { name: '투구', items: ids('dhelmet1', 'dhelmet2') },
+        { name: '장갑', items: ids('dgloves1', 'dgloves2') },
+        { name: '신발', items: ids('dboots1', 'dboots2') },
+      ],
+    },
+    dupgrade: {
+      title: '강화소 (EXP)',
+      exp: true,
+      tabs: [{ name: '강화', items: ids('wup', 'aup') }],
     },
     ditem: {
       title: '다크월드 아이템 상점',
@@ -286,6 +338,8 @@
       mineLevel: 1, // 동굴 보상 업그레이드 레벨 (동굴 보물 상자 코인)
       speedLevel: 0, // 마을 달리기 업그레이드 레벨 (마을에서의 이동 속도)
       critLevel: 0, // 치명타 업그레이드 레벨 (치명타 대미지 = 10 + 레벨)
+      wlevel: {}, // 무기 강화 레벨 (무기 id마다)
+      armorLevel: 0, // 갑옷 강화 레벨 (최대 피 +1칸 / 레벨)
       equipped: { weapon: 'sword0', helmet: null, armor: 'armor0', gloves: null, boots: null },
     };
   }
@@ -297,12 +351,15 @@
     const h = inv.equipped.helmet ? ITEMS[inv.equipped.helmet] : null;
     const g = inv.equipped.gloves ? ITEMS[inv.equipped.gloves] : null;
     const b = inv.equipped.boots ? ITEMS[inv.equipped.boots] : null;
+    const wl = (inv.wlevel && inv.wlevel[inv.equipped.weapon]) || 0;
     return {
-      reachTiles: w.reach,
+      reachTiles: w.reach + (w.shot ? 0 : 0.1 * wl), // 강화: 근접 무기는 범위가 넓어진다
+      dmgBonus: w.shot ? wl : 0,                     // 강화: 쏘는 무기는 대미지가 늘어난다
+      bossBonus: w.shot ? 0 : Math.floor(wl / 2),    // 강화: 근접 무기는 보스에게 더 아프다
       throwTiles: w.throwTiles,
       canThrow: ['sword', 'dagger', 'staff'].includes(w.type), // 대검/폭탄/총/활/방패는 검을 던질 수 없다
       cooldownAdd: w.cd,
-      hearts: a ? a.hearts : 0,
+      hearts: (a ? a.hearts : 0) + (inv.armorLevel || 0),
       invulnAdd: h ? h.invuln : 0,
       windowAdd: (g ? g.window : 0) + (w.windowAdd || 0),
       speedAdd: b ? b.speed : 0,
@@ -336,6 +393,21 @@
       const n = (wallet.inv.home.owned[item.id] || 0) + 1;
       wallet.inv.home.owned[item.id] = n;
       return { ok: true, msg: `${item.name} 구매! (보유 ${n}개) 집의 빈 자리에 놓을 수 있어요.` };
+    }
+    if (item.upgrade === 'weapon' || item.upgrade === 'armor') { // 강화소: 경험치로 강화
+      if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
+      const cost = priceOf(item, wallet.inv);
+      if ((wallet.exp || 0) < cost) return { ok: false, msg: '경험치가 부족해요.' };
+      wallet.exp -= cost;
+      if (item.upgrade === 'armor') {
+        wallet.inv.armorLevel = (wallet.inv.armorLevel || 0) + 1;
+        wallet.maxLives = maxLivesFor(wallet.inv, C.PLAYER_LIVES);
+        wallet.lives = Math.min(wallet.maxLives, wallet.lives + 1); // 늘어난 칸만큼 피도 채워 준다
+        return { ok: true, msg: `갑옷 Lv ${wallet.inv.armorLevel}! 최대 피 +${wallet.inv.armorLevel}칸.` };
+      }
+      const id = wallet.inv.equipped.weapon;
+      wallet.inv.wlevel[id] = (wallet.inv.wlevel[id] || 0) + 1;
+      return { ok: true, msg: `${ITEMS[id].name} Lv ${wallet.inv.wlevel[id]}! 강화 완료.` };
     }
     if (item.upgrade) { // 보상 상점 업그레이드
       if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
