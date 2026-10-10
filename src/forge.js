@@ -91,12 +91,12 @@
         note: `${base.note ? base.note + ' · ' : ''}합성 ${tier === 1 ? '1단계' : '최대(2단계)'}`,
       });
       if (base.shot) { // 쏘는 무기: 대미지와 폭발 범위가 늘고, 스태미나가 덜 들며, 최대 단계에서 탄이 관통한다
-        t.dmg = Math.round(base.dmg * (tier === 1 ? 1.6 : 2.4));
+        t.dmg = Math.round(base.dmg * (tier === 1 ? 2.8 : 5.5));
         t.stamina = Math.max(6, base.stamina - 2 * tier);
         if (base.radius) t.radius = Math.round((base.radius + 0.3 * tier) * 10) / 10;
         if ((base.shot === 'bullet' || base.shot === 'arrow') && tier === 2) t.pierce = true;
       } else { // 근접: 기본 대미지가 크게 늘고(보스에게 더 아프고 단단한 몬스터를 더 깎는다), 범위가 넓어지며, 1단계부터 슬라임·꽃게를 한 방에
-        t.baseDmg = Math.round(meleeBase(base) * (tier === 1 ? 2 : 3.5));
+        t.baseDmg = Math.round(meleeBase(base) * (tier === 1 ? 4 : 10));
         t.reach = Math.round(base.reach * (1 + 0.15 * tier) * 100) / 100;
         t.oneHit = true;
         if (base.throwTiles) t.throwTiles = base.throwTiles + tier;

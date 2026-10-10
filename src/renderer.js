@@ -102,6 +102,7 @@
       this.snapOn = crisp; // 몬스터와 플레이어: 반 도트 단위로 부드럽게 움직인다
       for (const m of monsters) if (m.alive && this._inView(m, camera)) this._drawMonster(ctx, m); // 화면 밖은 그리지 않음 (대량 소환 대비)
       this._drawPlayer(ctx, player);
+      if (extras.ores) extras.ores.drawFront(ctx, time); // 곡괭이 휘두르기
       this.snapOn = true;
       if (extras.npcs) for (const n of extras.npcs) G.Npc.draw(ctx, n.kind, n.x, n.y, n.facing, time, n.alpha);
       if (extras.cutscene) extras.cutscene.drawWorld(ctx); // 땅 위/들어 올린 병

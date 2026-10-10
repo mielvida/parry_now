@@ -989,6 +989,8 @@
     popup: (x, y, text, color, t = 1.2) => popups.push({ x, y, text, t, color }),
     giveOre(id, n) { inv.ores[id] = (inv.ores[id] || 0) + n; G.Forge.markDirty(); },
     pickTier: () => G.Forge.bestPick(inv),
+    pickLook: () => { const id = inv.equipped.pick; return id && G.Shop.ITEMS[id] ? G.Shop.ITEMS[id].look : null; },
+    hitStop: (sec) => { hitStop = Math.max(hitStop, sec); },
   });
 
   function loadStage(name, keepLives = false, near = null) {

@@ -125,6 +125,35 @@
       tone('triangle', 1400, 900, 0.05, 0.15);
       tone('triangle', 1400, 900, 0.05, 0.15, 0.1);
     },
+    pickhit: () => { // 곡괭이질: 묵직한 퍽 + 쇠 부딪히는 챙
+      noise(0.09, 2.6, 2200, 250, 'lowpass');
+      tone('triangle', 170, 55, 0.14, 0.4);
+      tone('square', 2300, 1500, 0.05, 0.1);
+      tone('triangle', 3100, 2400, 0.08, 0.09, 0.012);
+    },
+    pickhit_hi: () => { // 희귀한 광석: 더 묵직하고 맑은 울림이 겹친다
+      noise(0.1, 2.8, 2600, 250, 'lowpass');
+      tone('triangle', 150, 45, 0.18, 0.45);
+      tone('square', 2600, 1700, 0.05, 0.1);
+      tone('sine', 1568, 1568, 0.3, 0.16, 0.02);
+      tone('sine', 2349, 2349, 0.4, 0.12, 0.05);
+    },
+    orebreak: () => { // 광석이 쪼개지는 소리: 쾅 + 와르르
+      noise(0.3, 3, 3000, 200, 'lowpass');
+      tone('sawtooth', 200, 40, 0.28, 0.3);
+      noise(0.2, 1.8, 5000, 1500, 'highpass', 0.04);
+      tone('triangle', 1760, 1320, 0.2, 0.16, 0.03);
+    },
+    orebreak_rare: () => { // 희귀 광석: 쾅 + 반짝이는 종소리
+      noise(0.35, 3.2, 3200, 180, 'lowpass');
+      tone('sawtooth', 180, 35, 0.34, 0.34);
+      [1047, 1319, 1568, 2093].forEach((f, i) => tone('sine', f, f, 0.5, 0.17, 0.06 + i * 0.07));
+      tone('triangle', 3136, 3136, 0.6, 0.1, 0.3);
+    },
+    oredrop: () => { // 광석이 땅에 통통
+      tone('triangle', 520, 300, 0.07, 0.16);
+      tone('sine', 1760, 1400, 0.06, 0.07, 0.005);
+    },
     deny: () => tone('square', 180, 120, 0.15, 0.1), // 살 수 없을 때 부저
     crit: () => { // 치명타: 묵직한 쾅 + 높은 쨍 + 올라가는 반짝임
       noise(0.14, 2.4, 1800, 200, 'lowpass');
@@ -322,7 +351,7 @@
   }
 
   // 멜로디가 있는 소리는 음높이를 흔들지 않는다
-  const FIXED_PITCH = new Set(['gameover', 'treasure', 'pickup', 'charge']);
+  const FIXED_PITCH = new Set(['gameover', 'treasure', 'pickup', 'charge', 'orebreak_rare']);
 
   const Audio = {
     play(name) {
