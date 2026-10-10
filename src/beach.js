@@ -183,7 +183,7 @@
     const job = inv && G.Forge ? G.Forge.jobOf(inv) : null;
     const done = !!(job && job.done);
     const bob = Math.sin(time * 2.4 + x * 0.01) * 4;
-    const ty = y - 78 + bob;
+    const ty = y - 64 + bob; // 머리 바로 위
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(x - 33, ty - 10, 66, 20);
@@ -241,8 +241,8 @@
       ctx.fillStyle = 'rgba(160,155,170,' + (0.35 * (1 - t)) + ')';
       ctx.beginPath(); ctx.arc(baseX + 26 + Math.sin(time + i * 2) * 8 + t * 16, baseY - 160 - t * 70, 7 + t * 12, 0, Math.PI * 2); ctx.fill();
     }
-    G.Npc.draw(ctx, 'smith', baseX - 70, baseY - 16, 1, time); // 대장장이 아저씨
-    drawSmithTag(ctx, baseX - 70, baseY - 16, time);
+    G.Npc.draw(ctx, 'smith', baseX - 70, baseY, 1, time); // 대장장이 아저씨 (마을에 한 명뿐): 발이 땅에 닿는다
+    drawSmithTag(ctx, baseX - 70, baseY, time);
     // 앞의 모루와 주괴 틀
     ctx.fillStyle = '#3a3a44'; ctx.fillRect(baseX + 50, baseY - 14, 26, 8); ctx.fillRect(baseX + 56, baseY - 6, 14, 6);
     ctx.fillStyle = '#d98a3a'; ctx.fillRect(baseX + 56, baseY - 18, 12, 4);
@@ -409,8 +409,7 @@
       }
     }
     // 주인
-    if (shop.kind === 'sword') drawSmithTag(ctx, baseX, baseY - 16, time);
-    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'smith', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'smith', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
+    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);

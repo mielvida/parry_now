@@ -226,9 +226,24 @@
   // 집에 놓은 장식품 수에 따른 보너스: 놓을 때마다 코인 획득량과 치명타 확률이 오른다
   const placedTotal = (inv) => inv.home.placed.floor.filter(Boolean).length + inv.home.placed.wall.filter(Boolean).length;
   // 지금 든 무기에 붙인 주괴가 주는 보너스 (대장간 forge.js). 없으면 모두 0
-  const NO_ATTACH = { dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false };
+  const NO_ATTACH = { dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false, crack: false, elems: [], elemLv: {}, hp: 0, inv: 0, spd: 0, perkList: [] };
   const attachOf = (inv, w) => (G.Forge && w ? G.Forge.attachBonus(inv, w) : NO_ATTACH);
-  const homeBonuses = (inv) => { const n = placedTotal(inv); const ab = attachOf(inv, ITEMS[inv.equipped.weapon]); return { n, coin: n * C.DECOR_COIN_BONUS + (ITEMS[inv.equipped.armor] && ITEMS[inv.equipped.armor].perk === 'gold' ? 0.3 : 0) + (inv.equipped.pants && ITEMS[inv.equipped.pants].coinAdd ? ITEMS[inv.equipped.pants].coinAdd : 0) + ab.coin, crit: Math.min(1, C.CRIT_BASE_CHANCE + n * C.DECOR_CRIT_BONUS + (ITEMS[inv.equipped.helmet] && ITEMS[inv.equipped.helmet].critAdd ? ITEMS[inv.equipped.helmet].critAdd : 0) + ab.crit) }; };
+  // 입은 방어구(갑옷·투구·장갑·바지·신발)에 붙인 주괴와 속성 능력 합계. lv = 속성별 개수 (갑옷 자체 속성 + 붙인 속성 광석)
+  function armorInfo(inv) {
+    const out = { hp: 0, inv: 0, spd: 0, coin: 0, perks: [], lv: {} };
+    for (const slot of ['armor', 'helmet', 'gloves', 'pants', 'boots']) {
+      const it = inv.equipped[slot] && ITEMS[inv.equipped[slot]];
+      if (!it) continue;
+      if (it.perk) out.lv[it.perk] = (out.lv[it.perk] || 0) + 1;
+      const ab = attachOf(inv, it);
+      out.hp += ab.hp; out.inv += ab.inv; out.spd += ab.spd; out.coin += ab.coin;
+      for (const p of ab.perkList) out.lv[p] = (out.lv[p] || 0) + 1;
+    }
+    out.perks = Object.keys(out.lv);
+    return out;
+  }
+  const goldBonus = (info) => (info.lv.gold ? 0.3 + 0.15 * (info.lv.gold - 1) : 0); // 탐욕: 첫 번째 +30%, 같은 속성이 늘 때마다 +15%
+  const homeBonuses = (inv) => { const n = placedTotal(inv); const ab = attachOf(inv, ITEMS[inv.equipped.weapon]); return { n, coin: n * C.DECOR_COIN_BONUS + (() => { const ai = armorInfo(inv); return goldBonus(ai) + ai.coin; })() + (inv.equipped.pants && ITEMS[inv.equipped.pants].coinAdd ? ITEMS[inv.equipped.pants].coinAdd : 0) + ab.coin, crit: Math.min(1, C.CRIT_BASE_CHANCE + n * C.DECOR_CRIT_BONUS + (ITEMS[inv.equipped.helmet] && ITEMS[inv.equipped.helmet].critAdd ? ITEMS[inv.equipped.helmet].critAdd : 0) + ab.crit) }; };
   const decorLeft = (inv, id) => (inv.home.owned[id] || 0) - placedCount(inv, id); // 아직 안 놓은 개수
   // 방의 자리(kind, index)에 장식품을 놓는다 (id가 null이면 치우기). 결과 { ok, msg }
   function placeDecor(inv, kind, index, id) {
@@ -558,6 +573,7 @@
     const pn = inv.equipped.pants ? ITEMS[inv.equipped.pants] : null;
     const wl = (inv.wlevel && inv.wlevel[inv.equipped.weapon]) || 0;
     const ab = attachOf(inv, w); // 붙인 주괴 보너스
+    const ai = armorInfo(inv);   // 방어구에 붙인 주괴 보너스
     return {
       reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl + ab.reach) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
       dmgBonus: w.shot ? wBonus(wl) + ab.gdmg : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
@@ -567,15 +583,19 @@
       staminaAdd: ab.st,                              // 쏘는 무기: 한 번에 드는 스태미나 증감 (티타늄 등은 줄여 준다)
       radiusAdd: ab.radius,                           // 폭탄 폭발 범위 증가(칸)
       pierceAdd: !!ab.pierce,                         // 탄환 관통
+      ignoreCrack: !!ab.crack,                        // 균열 무시: 단단한 몬스터도 금이 가는 단계 없이 한 방
+      elems: ab.elems,                                // 붙인 원소 광석의 속성들 (무기 자체 속성에 더해진다)
       throwTiles: w.throwTiles,
       canThrow: ['sword', 'dagger', 'staff', 'spear', 'katana', 'rapier'].includes(w.type), // 대검/도끼/망치/채찍/폭탄/총/활/방패는 던질 수 없다
       cooldownAdd: w.cd + (g && g.cdAdd ? g.cdAdd : 0) + ab.cd,
       dashCostAdd: b && b.dashCostAdd ? b.dashCostAdd : 0,
-      hearts: (a ? a.hearts : 0) + (pn ? pn.hearts || 0 : 0) + (inv.armorLevel || 0),
-      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0), // 투구 + 그림자 갑옷
-      perk: a && a.perk ? a.perk : null,               // 속성 갑옷의 능력 (thorn/fire/ice/volt/toxic/regen/gold)
+      hearts: (a ? a.hearts : 0) + (pn ? pn.hearts || 0 : 0) + (inv.armorLevel || 0) + ai.hp,
+      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0) + ai.inv, // 투구 + 그림자 갑옷
+      perk: a && a.perk ? a.perk : null,
+      perks: ai.perks, perkLv: ai.lv,                   // 속성 능력들과 단계 (갑옷 자체 + 붙인 속성 광석)
+      elemLv: ab.elemLv,                                // 무기에 붙인 원소 광석의 속성별 개수               // 속성 갑옷의 능력 (thorn/fire/ice/volt/toxic/regen/gold)
       windowAdd: (g ? g.window : 0) + (w.windowAdd || 0),
-      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0),
+      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0) + ai.spd,
     };
   }
 
@@ -608,9 +628,9 @@
       return { ok: true, msg: `${item.name} 구매! (보유 ${n}개) 집의 빈 자리에 놓을 수 있어요.` };
     }
     if (item.upgrade === 'holy') { // 대장간: 신성 크리스탈을 칼에 붙인다
-      const wd = ITEMS[wallet.inv.equipped.weapon];
+      const wd = G.Forge && G.Forge.hasTarget() ? G.Forge.targetItem(wallet.inv) : ITEMS[wallet.inv.equipped.weapon];
       if (!HOLY_TYPES.includes(wd.type)) return { ok: false, msg: '칼에만 붙일 수 있어요. (검, 대검, 단검, 낫)' };
-      if (holyLevel(wallet.inv) >= HOLY_MAX) return { ok: false, msg: '이 칼은 더 붙일 수 없어요.' };
+      if ((wallet.inv.holy[wd.id] || 0) >= HOLY_MAX) return { ok: false, msg: '이 칼은 더 붙일 수 없어요.' };
       if ((wallet.inv.materials.holycrystal || 0) < 1) return { ok: false, msg: '신성 크리스탈이 없어요. 보스의 어둠의 크리스탈을 숲의 샘물로 씻고, 화산의 제단에서 바꿔 오세요.' };
       wallet.inv.materials.holycrystal -= 1;
       wallet.inv.holy[wd.id] = (wallet.inv.holy[wd.id] || 0) + 1;

@@ -279,50 +279,56 @@
   let perkT = 0;
   let regenT = 0;
   let usedT = 0; // 방어구를 입은 시간(초) 세기
+  const perkScale = (perk) => 1 + 0.25 * Math.max(0, ((equipStats.perkLv && equipStats.perkLv[perk]) || 1) - 1); // 같은 속성이 하나 늘 때마다 범위 +25%
   function updateArmorPerks(dt) {
-    const perk = equipStats.perk;
-    if (!perk) return;
-    if (perk === 'regen') {
+    const perks = equipStats.perks || [];
+    if (!perks.length) return;
+    if (perks.includes('regen')) {
       regenT += dt;
-      if (regenT >= 10) {
+      const gap = Math.max(3, 10 - 2.5 * (((equipStats.perkLv && equipStats.perkLv.regen) || 1) - 1)); // 재생 속성이 많을수록 더 자주
+      if (regenT >= gap) {
         regenT = 0;
         if (lives < maxLives()) {
           lives = Math.min(maxLives(), lives + 0.5);
           popups.push({ x: player.x + player.w / 2, y: player.y - 30, text: '재생 +½', t: 1.2, color: 'rgba(255,140,170,A)' });
         }
       }
-      return;
     }
-    if (perk !== 'fire' && perk !== 'toxic') return;
+    const fire = perks.includes('fire');
+    const toxic = perks.includes('toxic');
+    if (!fire && !toxic) return;
     perkT += dt;
     if (perkT < 0.5) return;
     perkT = 0;
-    const r = (perk === 'fire' ? 2 : 2.5) * C.TILE;
     const px = player.x + player.w / 2;
     const py = player.y + player.h / 2;
     for (const mo of monsters) {
       if (!mo.alive || mo.flying || mo.appear > 0) continue;
-      if (Math.hypot(mo.x + mo.w / 2 - px, mo.y + mo.h / 2 - py) > r) continue;
-      if (perk === 'fire') mo.applyBurn(); else mo.applyPoison();
+      const d = Math.hypot(mo.x + mo.w / 2 - px, mo.y + mo.h / 2 - py);
+      if (fire && d <= 2 * C.TILE * perkScale('fire')) mo.applyBurn();
+      if (toxic && d <= 2.5 * C.TILE * perkScale('toxic')) mo.applyPoison();
     }
   }
   // 몬스터에게 맞았을 때 일어나는 갑옷 능력 (s = 나를 친 몬스터)
   function armorHurtPerk(s) {
-    const perk = equipStats.perk;
-    if (!perk) return;
+    const perks = equipStats.perks || [];
+    if (!perks.length) return;
     const T = C.TILE;
     const px = player.x + player.w / 2;
     const py = player.y + player.h / 2;
     const near = (rad) => monsters.filter((mo) => mo.alive && !mo.flying && mo.appear <= 0 && Math.hypot(mo.x + mo.w / 2 - px, mo.y + mo.h / 2 - py) <= rad);
-    if (perk === 'thorn' || perk === 'toxic') {
+    if (perks.includes('thorn') || perks.includes('toxic')) {
       s.knockback(Math.sign(s.x + s.w / 2 - px) || 1);
       effects.crystalShards(s.x + s.w / 2, s.y + s.h / 2);
-    } else if (perk === 'ice') {
-      for (const mo of near(T * 3)) mo.freeze();
+    }
+    if (perks.includes('ice')) {
+      for (const mo of near(T * 3 * perkScale('ice'))) mo.freeze();
       effects.crystalShards(px, py);
-    } else if (perk === 'volt') {
-      for (const mo of near(T * 4)) mo.stagger(Math.sign(mo.x + mo.w / 2 - px) || 1);
-      effects.lightBurst(px, py, T * 4);
+    }
+    if (perks.includes('volt')) {
+      const r = T * 4 * perkScale('volt');
+      for (const mo of near(r)) mo.stagger(Math.sign(mo.x + mo.w / 2 - px) || 1);
+      effects.lightBurst(px, py, r);
     }
   }
 
@@ -904,7 +910,14 @@
   const bossDamage = () => equipStats.baseDmg + equipStats.bossBonus; // 약점은 hitBoss에서 x3
   const WEAK_NAMES = { fire: '불꽃', ice: '얼음', light: '빛', quake: '대지', crystal: '수정', shadow: '그림자', poison: '독' };
   // 무기의 속성: 근접 무기는 elem, 지팡이는 element (번개 = 빛)
-  const weaponElemOf = () => { const w = G.Shop.ITEMS[inv.equipped.weapon]; const e = w.elem || w.element || null; return e === 'lightning' ? 'light' : e === 'random' ? null : e; };
+  const weaponElemOf = () => { // 보스 약점 판정용 속성: 붙인 원소 광석의 속성도 센다 (약점과 맞으면 그것을 돌려준다)
+    const w = G.Shop.ITEMS[inv.equipped.weapon];
+    const e = w.elem || w.element || null;
+    const base = e === 'lightning' ? 'light' : e === 'random' ? null : e;
+    const all = [base].concat((equipStats && equipStats.elems) || []).filter(Boolean);
+    if (boss && boss.weak && all.includes(boss.weak)) return boss.weak;
+    return all[0] || null;
+  };
 
   // 던전: 층마다 0~3개의 아이템이 바닥에 떨어져 있다 (스태미나, 얼음 폭탄, 음식)
   const PICKUP_TABLE = ['st70', 'st30', 'st30', 'icebomb', 'st30'];
@@ -1082,7 +1095,7 @@
     stageTime = 0;
     if (name === 'village' && story.pending) dialog = null; // 이야기는 잠시 뒤에 시작한다 (step)
     player.respawn(spawn.x, spawn.y);
-    player.slippery = !!st.slippery && equipStats.perk !== 'ice'; // 설산은 바닥이 미끄럽다 (얼음 갑옷은 안 미끄러진다)
+    player.slippery = !!st.slippery && !(equipStats.perks || []).includes('ice'); // 설산은 바닥이 미끄럽다 (얼음 갑옷은 안 미끄러진다)
     applySpeed(); // 마을에서만 달리기 업그레이드가 적용된다
     setupBoss();
     camera.follow(player, terrain, C.DT, true);
@@ -1109,7 +1122,7 @@
     player.parryWindow = C.PARRY_WINDOW + equipStats.windowAdd;
     player.parryCooldownTime = Math.max(0.25, C.PARRY_COOLDOWN + equipStats.cooldownAdd);
     applySpeed();
-    player.slippery = !!(STAGES[stageName] && STAGES[stageName].slippery) && equipStats.perk !== 'ice';
+    player.slippery = !!(STAGES[stageName] && STAGES[stageName].slippery) && !(equipStats.perks || []).includes('ice');
     lives = Math.min(lives, maxLives()); // 갑옷을 벗어 최대 피가 줄면 넘치는 피는 사라진다
   }
 
@@ -1303,6 +1316,56 @@
   }
   const smithInfo = () => { const sm = G.Forge.smithOf(inv); return { lv: sm.lv, xp: sm.xp, need: sm.lv >= G.Forge.SMITH_MAX_LV ? 0 : G.Forge.smithNeed(sm.lv), max: G.Forge.SMITH_MAX_LV }; };
 
+  // ---- 용광로 대상 고르기: 먼저 검 / 투척 무기 / 갑옷 중 하나를 고르고, 그 종류로 가진 것을 모두 보여 준다. 하나를 고르면 그것을 합치고 붙이는 용광로가 열린다 ----
+  let fp = null;
+  const FP_CATS = [
+    { id: 'sword', name: '검', desc: '근접 무기\n(검 · 대검 · 단검 · 창 · 도끼 …)', icon: 'sword0' },
+    { id: 'gun', name: '투척 무기', desc: '쏘고 던지는 무기\n(총 · 활 · 석궁 · 폭탄 …)', icon: 'gun1' },
+    { id: 'armor', name: '갑옷', desc: '방어구\n(갑옷 · 투구 · 장갑 · 바지 · 신발)', icon: 'armor1' },
+  ];
+  const fpItemsOf = (cat) => inv.items.filter((id, i, arr) => { const it = G.Shop.ITEMS[id]; return it && it.slot && !it.lens && arr.indexOf(id) === i && G.Forge.classOf(it) === cat; });
+  function openForgePick() { fp = { step: 'cat', cat: null, cur: 0, list: [], msg: '', msgT: 0 }; G.Audio.play('pickup'); }
+  function fpChoose(i) {
+    const c = FP_CATS[i];
+    const list = fpItemsOf(c.id);
+    if (!list.length) { fp.msg = `가진 ${c.name}이(가) 없어요.`; fp.msgT = 2; G.Audio.play('deny'); return; }
+    fp.step = 'item'; fp.cat = c.id; fp.list = list; fp.cur = Math.max(0, list.indexOf(inv.equipped.weapon)); G.Audio.play('catch');
+  }
+  function fpPick(id) {
+    G.Forge.setTarget(id);
+    fp = null;
+    shop = { kind: 'furnace', def: G.Shop.SHOPS.furnace, tab: 0, hover: -1, msg: '', msgT: 0, ok: true, target: id };
+    G.Audio.play('pickup');
+  }
+  const FP_ROWS = 6;
+  const fpMove = (d) => { fp.cur = Math.max(0, Math.min(fp.list.length - 1, fp.cur + d)); };
+  function updateForgePick(dt) {
+    fp.msgT = Math.max(0, fp.msgT - dt);
+    const pressed = (...c) => c.some((k) => input.wasPressed(k));
+    if (fp.step === 'cat') {
+      if (pressed('Escape')) { fp = null; return; }
+      if (pressed('ArrowLeft', 'KeyA')) fp.cur = (fp.cur + 2) % 3;
+      if (pressed('ArrowRight', 'KeyD')) fp.cur = (fp.cur + 1) % 3;
+      for (let i = 0; i < 3; i++) if (pressed('Digit' + (i + 1), 'Numpad' + (i + 1))) { fp.cur = i; fpChoose(i); return; }
+      if (pressed('Enter', 'Space')) fpChoose(fp.cur);
+    } else {
+      if (pressed('Escape', 'Backspace')) { fp.step = 'cat'; fp.cur = FP_CATS.findIndex((c) => c.id === fp.cat); return; }
+      if (pressed('ArrowUp', 'KeyW')) fpMove(-1);
+      if (pressed('ArrowDown', 'KeyS')) fpMove(1);
+      if (pressed('PageUp')) fpMove(-FP_ROWS);
+      if (pressed('PageDown')) fpMove(FP_ROWS);
+      if (pressed('Enter', 'Space')) fpPick(fp.list[fp.cur]);
+    }
+  }
+  const fpView = () => {
+    const I = G.Shop.ITEMS;
+    return Object.assign({}, fp, {
+      cats: FP_CATS.map((c) => Object.assign({ item: I[c.icon], n: fpItemsOf(c.id).length }, c)),
+      items: fp.step === 'item' ? fp.list.map((id) => ({ item: I[id], copies: G.Forge.copiesOf(inv, id), used: (inv.attach[id] || []).length, slots: G.Forge.slotsOf(I[id]), equipped: Object.values(inv.equipped).includes(id) })) : [],
+      rows: FP_ROWS,
+    });
+  };
+
   // ---- 작업 선택: 제련/부착 광석을 고르면 '직접 하기(미니게임)' 또는 '대장장이에게 맡기기(확실히 성공, 비쌈)' ----
   let wc = null;
   function openWorkChoice(kind, oreId) {
@@ -1330,7 +1393,7 @@
   function startAttachGame(oreId) {
     const ore = G.Forge.ORES.find((o) => o.id === oreId);
     shop = null;
-    ag = { ore: oreId, oreName: ore.name, weaponId: inv.equipped.weapon, t: G.Forge.ATTACH_TIME, progress: 0, tier: ore.tier, ...attachDifficulty(ore.tier), drift: 0, phase: 0, zone: 0.3 + Math.random() * 0.4, perfect: 0, good: 0, miss: 0, msg: '두드려서 붙이자! 눈금이 초록 칸에 올 때 Space', msgT: 3, swing: 0, flash: 0, result: null, resultT: 0, sparks: [] };
+    ag = { ore: oreId, oreName: ore.name, weaponId: G.Forge.targetId(inv), t: G.Forge.ATTACH_TIME, progress: 0, tier: ore.tier, ...attachDifficulty(ore.tier), drift: 0, phase: 0, zone: 0.3 + Math.random() * 0.4, perfect: 0, good: 0, miss: 0, msg: '두드려서 붙이자! 눈금이 초록 칸에 올 때 Space', msgT: 3, swing: 0, flash: 0, result: null, resultT: 0, sparks: [] };
     G.Audio.play('pickup');
   }
   // 눈금 위치: 3단계 이상 광석은 속도가 들쭉날쭉해서 타이밍을 읽기 어렵다
@@ -1511,6 +1574,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
 
   // 상점: ←→ 탭 전환, 숫자 키 또는 마우스 클릭으로 구매, E/Esc로 닫기
   function updateShop(dt) {
+    if (shop.kind === 'furnace' && input.wasPressed('Backspace')) { shop = null; openForgePick(); return; } // 대상 바꾸기
     if (input.wasPressed('KeyE') || input.wasPressed('Escape')) {
       shop = null;
       return;
@@ -1889,6 +1953,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { label: '곡괭이 4종 받기', hint: '나무 · 철 · 강철 · 미스릴', run: give('곡괭이를 모두 받았다', () => { for (const p of G.Forge.PICKS) if (!inv.items.includes(p.id)) inv.items.push(p.id); inv.equipped.pick = G.Forge.bestOwnedPick(inv); G.Forge.markDirty(); }) },
       { label: '검용 광석 +6씩', hint: '철 구리 은 금 …', run: give('검용 광석 +6', () => { for (const o of G.Forge.ORES) if (o.cls === 'sword') inv.ores[o.id] = (inv.ores[o.id] || 0) + 6; G.Forge.markDirty(); }) },
       { label: '총용 광석 +6씩', hint: '초석 납 황철석 …', run: give('총용 광석 +6', () => { for (const o of G.Forge.ORES) if (o.cls === 'gun') inv.ores[o.id] = (inv.ores[o.id] || 0) + 6; G.Forge.markDirty(); }) },
+      { label: '갑옷용 광석 +6씩', hint: '철갑석 수호석 용린석 …', run: give('갑옷용 광석 +6', () => { for (const o of G.Forge.ORES) if (o.cls === 'armor') inv.ores[o.id] = (inv.ores[o.id] || 0) + 6; G.Forge.markDirty(); }) },
       { label: '모든 주괴 +2씩', hint: '제련 없이 바로', run: give('주괴 +2', () => { for (const o of G.Forge.ORES) inv.ingots[o.id] = (inv.ingots[o.id] || 0) + 2; G.Forge.markDirty(); }) },
       { head: '설정' },
       { label: `무적 ${god ? '끄기' : '켜기'}`, hint: god ? '지금 켜짐' : '지금 꺼짐', run: () => { god = !god; devUI.msg = god ? '무적 켜짐' : '무적 꺼짐'; devUI.msgT = 2; G.Audio.play('pickup'); } },
@@ -2014,6 +2079,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   window.addEventListener('mouseup', () => { if (sg) sg.mouse = false; });
   canvas.addEventListener('mousemove', (ev) => {
     const p = canvasPoint(ev);
+    if (fp) { // 대상 고르기: 올려 놓으면 선택
+      const g = G.Renderer.forgePickGeometry(C.VIEW_W, C.VIEW_H);
+      if (fp.step === 'cat') { const i = g.cats.findIndex((r) => inRect(p, r)); if (i >= 0) fp.cur = i; }
+      else { const top = Math.max(0, Math.min(fp.cur - (FP_ROWS - 1), fp.list.length - FP_ROWS)); const i = g.rows.findIndex((r) => inRect(p, r)); if (i >= 0 && top + i < fp.list.length) fp.cur = top + i; }
+    }
     if (mini) { mini.mouse = p; mini.useMouse = true; } // 놀이마당: 마우스로 조준/선택
     if (equipUI && equipUI.drag) {
       const d = equipUI.drag;
@@ -2033,6 +2103,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
   });
   canvas.addEventListener('wheel', (ev) => { // 휠: 인벤토리/개발 메뉴 스크롤
+    if (fp && fp.step === 'item') { ev.preventDefault(); fpMove(ev.deltaY > 0 ? 1 : -1); return; }
     if (devUI) {
       ev.preventDefault();
       const L = devLayout();
@@ -2052,6 +2123,19 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   canvas.addEventListener('click', (ev) => {
     if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
+    if (fp) { // 대상 고르기: 종류 버튼 / 아이템 줄 / 뒤로
+      const g = G.Renderer.forgePickGeometry(C.VIEW_W, C.VIEW_H);
+      if (fp.step === 'cat') {
+        const i = g.cats.findIndex((r) => inRect(p, r));
+        if (i >= 0) { fp.cur = i; fpChoose(i); } else if (inRect(p, g.close)) fp = null;
+      } else {
+        if (inRect(p, g.back)) { fp.step = 'cat'; fp.cur = FP_CATS.findIndex((c) => c.id === fp.cat); return; }
+        const top = Math.max(0, Math.min(fp.cur - (FP_ROWS - 1), fp.list.length - FP_ROWS));
+        const i = g.rows.findIndex((r) => inRect(p, r));
+        if (i >= 0 && top + i < fp.list.length) fpPick(fp.list[top + i]);
+      }
+      return;
+    }
     if (wc) { // 작업 선택: 버튼 클릭
       const g = G.Renderer.workChoiceGeometry(C.VIEW_W, C.VIEW_H);
       if (inRect(p, g.self)) workChoiceDo(1);
@@ -2154,7 +2238,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function hitMonster(s, fromX, fallbackDir) {
     reapSteal(s);
     const away = Math.sign(s.x + s.w / 2 - fromX) || fallbackDir;
-    if (s.extraHits > 0 && !s.flying && !rollCrit()) { // 다크월드의 단단한 몬스터: 여러 번 때려야 쓰러진다
+    if (s.extraHits > 0 && !s.flying && !equipStats.ignoreCrack && !rollCrit()) { // 다크월드의 단단한 몬스터: 여러 번 때려야 쓰러진다
       s.extraHits = Math.max(0, s.extraHits - equipStats.hitPower); // 무기를 강화할수록 단단한 몬스터를 더 많이 깎는다
       s.hitGrace = C.HIT_GRACE;
       if (s.hurt) s.hurt(away);
@@ -2182,54 +2266,62 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   let cleaving = false; // 관통(강철 단검)이 다시 관통을 부르지 않게
   function weaponElementHit(s, away, fromX) {
     const w = G.Shop.ITEMS[inv.equipped.weapon];
-    if (!w.elem) return;
+    const list = [];
+    if (w.elem) list.push(w.elem);
+    for (const e of equipStats.elems || []) if (!list.includes(e)) list.push(e); // 붙인 원소 광석의 속성도 같이 적용된다
+    for (const el of list) {
+      const lv = (w.elem === el ? 1 : 0) + ((equipStats.elemLv && equipStats.elemLv[el]) || 0); // 무기 자체 속성 + 붙인 같은 속성 광석 수
+      weaponElementOne(el, w, s, away, fromX, 1 + 0.35 * Math.max(0, lv - 1));
+    }
+  }
+  function weaponElementOne(el, w, s, away, fromX, f = 1) {
     const T = C.TILE;
     const cx = s.x + s.w / 2;
     const cy = s.y + s.h / 2;
     const near = (r) => monsters.filter((m) => m !== s && m.alive && !m.flying && m.appear <= 0 && Math.hypot(m.x + m.w / 2 - cx, m.y + m.h / 2 - cy) <= r);
     const dirFrom = (m) => Math.sign(m.x + m.w / 2 - cx) || away;
-    if (s.immune && ((w.elem === 'fire' && s.immune.fire) || (w.elem === 'ice' && s.immune.ice))) popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: w.elem === 'fire' ? '불에 타지 않는다!' : '얼지 않는다!', t: 0.9, color: 'rgba(200,200,220,A)' });
-    if (w.elem === 'poison') { // 독: 맞은 몬스터와 주변이 중독된다
+    if (s.immune && ((el === 'fire' && s.immune.fire) || (el === 'ice' && s.immune.ice))) popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: el === 'fire' ? '불에 타지 않는다!' : '얼지 않는다!', t: 0.9, color: 'rgba(200,200,220,A)' });
+    if (el === 'poison') { // 독: 맞은 몬스터와 주변이 중독된다
       s.applyPoison();
-      for (const m of near(T * 1.3)) m.applyPoison();
+      for (const m of near(T * 1.3 * f)) m.applyPoison();
       effects.sparkle(cx, cy);
-    } else if (w.elem === 'fire') { // 불타며 죽는다. 불이 주변으로 옮겨붙는다
+    } else if (el === 'fire') { // 불타며 죽는다. 불이 주변으로 옮겨붙는다
       s.applyBurn();
-      for (const m of near(T * 1.5)) m.applyBurn();
+      for (const m of near(T * 1.5 * f)) m.applyBurn();
       effects.fireBurst(cx, cy);
-    } else if (w.elem === 'ice') { // 얼어붙은 채 날아가 부서진다. 주변도 얼어붙는다
+    } else if (el === 'ice') { // 얼어붙은 채 날아가 부서진다. 주변도 얼어붙는다
       if (s.flying) {
         if (!(s.immune && s.immune.ice)) { s.frozen = true; s.deathStyle = 'ice'; }
       } else {
         s.freeze();
       }
-      for (const m of near(T * 1.5)) m.freeze();
+      for (const m of near(T * 1.5 * f)) m.freeze();
       effects.crystalShards(cx, cy);
-    } else if (w.elem === 'crystal') { // 수정 파편이 주변 몬스터에게 피해
+    } else if (el === 'crystal') { // 수정 파편이 주변 몬스터에게 피해
       for (const m of near(T * 1.5)) {
         m.damage(1);
         effects.crystalShards(m.x + m.w / 2, m.y + m.h / 2);
       }
       effects.crystalShards(cx, cy);
-    } else if (w.elem === 'light') { // 빛이 퍼져 주변을 기절시킨다 (박쥐는 기절하지 않으니 피해 1)
-      const r = (w.lightRadius || 3) * T;
+    } else if (el === 'light') { // 빛이 퍼져 주변을 기절시킨다 (박쥐는 기절하지 않으니 피해 1)
+      const r = (w.lightRadius || 3) * T * f;
       for (const m of near(r)) {
         if (m.twoHit && !m.staggered) m.stagger(dirFrom(m));
         else m.damage(1);
       }
       effects.lightBurst(cx, cy, r);
-    } else if (w.elem === 'quake') { // 내리친 충격이 땅을 타고 퍼져 주변을 기절시킨다
-      for (const m of near(T * 2.5)) if (m.onGround && m.twoHit && !m.staggered) m.stagger(dirFrom(m));
-      effects.quakeDust(cx, s.y + s.h, T * 2.5);
-    } else if (w.elem === 'thief') { // 맞힐 때마다 코인을 훔친다
+    } else if (el === 'quake') { // 내리친 충격이 땅을 타고 퍼져 주변을 기절시킨다
+      for (const m of near(T * 2.5 * f)) if (m.onGround && m.twoHit && !m.staggered) m.stagger(dirFrom(m));
+      effects.quakeDust(cx, s.y + s.h, T * 2.5 * f);
+    } else if (el === 'thief') { // 맞힐 때마다 코인을 훔친다
       coins += 1;
       popups.push({ x: cx, y: s.y - 14, text: '+1 G', t: 1, color: 'rgba(255,213,74,A)' });
       G.Audio.play('coin');
-    } else if (w.elem === 'cleave' && !cleaving) { // 같은 방향의 앞쪽 몬스터까지 함께 벤다
+    } else if (el === 'cleave' && !cleaving) { // 같은 방향의 앞쪽 몬스터까지 함께 벤다
       cleaving = true;
       for (const m of near(T * 1.6)) if (dirFrom(m) === away && Math.abs(m.y + m.h / 2 - cy) < T) hitMonster(m, fromX, away);
       cleaving = false;
-    } else if (w.elem === 'shadow') { // 그림자처럼 사라져 잠시 공격을 받지 않는다
+    } else if (el === 'shadow') { // 그림자처럼 사라져 잠시 공격을 받지 않는다
       player.invuln = Math.max(player.invuln, 0.6);
       player.shadowTime = 0.6;
     }
@@ -2456,6 +2548,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       input.endFrame();
       return;
     }
+    if (fp) { // 대상 고르기 창이 열려 있는 동안 멈춘다
+      updateForgePick(dt);
+      input.endFrame();
+      return;
+    }
     if (wc) { // 작업 선택 창이 열려 있는 동안 멈춘다
       updateWorkChoice(dt);
       input.endFrame();
@@ -2562,8 +2659,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         input.endFrame();
         return;
       } else if (near && near.type === 'shop') {
-        shop = { kind: near.shop.kind, def: G.Shop.SHOPS[near.shop.kind], tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
-        G.Audio.play('pickup');
+        if (near.shop.kind === 'furnace') openForgePick(); // 용광로: 검 / 투척 무기 / 갑옷 중 무엇을 강화할지 먼저 고른다
+        else {
+          shop = { kind: near.shop.kind, def: G.Shop.SHOPS[near.shop.kind], tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
+          G.Audio.play('pickup');
+        }
       } else if (near && near.type === 'water') {
         washCrystals();
       } else if (near && near.type === 'altar') {
@@ -2911,7 +3011,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function drawFrame() {
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
-    const near = !shop && !equipUI && !devUI && !mini && !ag && !sg && !wc && !dialog && !won && !cutscene ? nearbyInteract() : null;
+    const near = !shop && !equipUI && !devUI && !mini && !ag && !sg && !wc && !fp && !dialog && !won && !cutscene ? nearbyInteract() : null;
     const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
     const prompt = near ? (near.type === 'shop' ? (near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
@@ -2936,7 +3036,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
+      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
     }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   requestAnimationFrame(frame);
@@ -2973,12 +3073,13 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get settings() { return settingsUI; },
     get attachGame() { return ag; },
     get workChoice() { return wc; },
+    get forgePick() { return fp; },
     get smeltGame() { return sg; },
     get mini() { return mini; },
     get duelRun() { return duelRun; },
     get analysis() { return analysis; },
     analysisText,
-    hitBoss, weaponElemOf,
+    hitBoss, weaponElemOf, hitMonster, applyEquipment,
     devItems,
     get inv() { return inv; },
     get maxLives() { return maxLives(); },

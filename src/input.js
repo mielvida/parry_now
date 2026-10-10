@@ -5,7 +5,7 @@
   const JUMP = ['Space', 'ArrowUp', 'KeyW', 'KeyZ'];
   const PARRY = ['Enter', 'NumpadEnter'];
   const DASH = ['ShiftLeft', 'ShiftRight', 'KeyX']; // Shift(또는 X). Windows는 Shift를 연타하면 고정키 창이 떠서 입력이 끊길 수 있어 X도 쓸 수 있게
-  const PREVENT = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'F1', 'Tab']);
+  const PREVENT = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'F1', 'Tab', 'Backspace']);
 
   class Input {
     constructor(target) {

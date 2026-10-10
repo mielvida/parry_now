@@ -768,6 +768,68 @@
       ctx.restore();
     }
 
+    static forgePickGeometry(vw, vh) {
+      const w = 800, h = 470;
+      const x = (vw - w) / 2, y = (vh - h) / 2;
+      return {
+        panel: { x, y, w, h },
+        cats: [0, 1, 2].map((i) => ({ x: x + 30 + i * 252, y: y + 100, w: 232, h: 270 })),
+        rows: [0, 1, 2, 3, 4, 5].map((i) => ({ x: x + 24, y: y + 96 + i * 52, w: w - 48, h: 46 })),
+        back: { x: x + 24, y: y + h - 52, w: 120, h: 34 }, close: { x: x + w - 144, y: y + h - 52, w: 120, h: 34 },
+      };
+    }
+
+    // 용광로 대상 고르기: 검 / 투척 무기 / 갑옷 → 가진 것 모두 보여 주고 강화할 것 하나를 고른다
+    _drawForgePick(ctx, f) {
+      const g = Renderer.forgePickGeometry(this.viewW, this.viewH);
+      const P = g.panel;
+      const box = (r, on) => { ctx.fillStyle = on ? 'rgba(255,213,74,0.16)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.lineWidth = on ? 3 : 1; ctx.strokeStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.16)'; ctx.strokeRect(r.x, r.y, r.w, r.h); };
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, this.viewW, this.viewH);
+      ctx.fillStyle = '#1d2233'; ctx.fillRect(P.x, P.y, P.w, P.h);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#e0b12f'; ctx.strokeRect(P.x, P.y, P.w, P.h);
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 28px sans-serif'; ctx.fillStyle = '#ffd54a';
+      ctx.fillText(f.step === 'cat' ? '용광로 — 무엇을 강화할까요?' : `용광로 — ${f.cats.find((c) => c.id === f.cat).name} 고르기`, P.x + 28, P.y + 38);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#b8c2dc';
+      ctx.fillText(f.step === 'cat' ? '먼저 종류를 고르세요. 그 종류로 가진 것을 모두 보여 줍니다.' : '강화할 것을 고르세요. 합치기 · 제련 · 부착을 이것에 합니다.', P.x + 28, P.y + 72);
+      if (f.step === 'cat') {
+        f.cats.forEach((c, i) => {
+          const r = g.cats[i];
+          box(r, f.cur === i);
+          this._drawItemIcon(ctx, c.item, r.x + r.w / 2, r.y + 70, 1.35);
+          ctx.textAlign = 'center'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#fff';
+          ctx.fillText(`${i + 1}. ${c.name}`, r.x + r.w / 2, r.y + 140);
+          ctx.font = '14px sans-serif'; ctx.fillStyle = '#b8c2dc';
+          c.desc.split('\n').forEach((ln, k) => ctx.fillText(ln, r.x + r.w / 2, r.y + 176 + k * 20));
+          ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = c.n ? '#ffd54a' : '#ff9a9a';
+          ctx.fillText(c.n ? `가진 것 ${c.n}개` : '가진 것 없음', r.x + r.w / 2, r.y + r.h - 28);
+        });
+        ctx.textAlign = 'center'; ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = f.msgT > 0 ? '#ff8a8a' : 'rgba(0,0,0,0)';
+        ctx.fillText(f.msg, P.x + P.w / 2, P.y + P.h - 74);
+      } else {
+        const top = Math.max(0, Math.min(f.cur - (f.rows - 1), f.items.length - f.rows));
+        for (let i = 0; i < f.rows; i++) {
+          const k = top + i;
+          if (k >= f.items.length) break;
+          const it = f.items[k];
+          const r = g.rows[i];
+          box(r, f.cur === k);
+          this._drawItemIcon(ctx, it.item, r.x + 30, r.y + r.h / 2 + 2, 0.55);
+          ctx.textAlign = 'left'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#fff';
+          ctx.fillText(it.item.name + (it.equipped ? '  (끼고 있음)' : ''), r.x + 64, r.y + r.h / 2);
+          ctx.textAlign = 'right'; ctx.font = '15px sans-serif'; ctx.fillStyle = '#9fe8a8';
+          const mergeable = it.item.slot === 'weapon' && G.Forge.nextOf(it.item);
+          ctx.fillText(`${mergeable ? `보유 ${it.copies}개 · ` : ''}붙인 칸 ${it.used}/${it.slots}${it.item.slot === 'weapon' && !it.item.lens ? ` · ${(it.item.tier || 0) + 1}레벨` : ''}`, r.x + r.w - 18, r.y + r.h / 2);
+        }
+        if (f.items.length > f.rows) { ctx.textAlign = 'center'; ctx.font = '13px sans-serif'; ctx.fillStyle = '#9fe0ff'; ctx.fillText(`${f.cur + 1} / ${f.items.length}  (↑↓ · 휠로 넘기기)`, P.x + P.w / 2, P.y + P.h - 70); }
+        box(g.back, false); ctx.textAlign = 'center'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#b8c2dc'; ctx.fillText('◀ 종류 다시', g.back.x + g.back.w / 2, g.back.y + g.back.h / 2);
+      }
+      box(g.close, false); ctx.textAlign = 'center'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#b8c2dc'; ctx.fillText('Esc 닫기', g.close.x + g.close.w / 2, g.close.y + g.close.h / 2);
+      ctx.font = '14px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(f.step === 'cat' ? '←→ / 1·2·3 / 클릭: 고르기     Enter: 결정' : '↑↓ / 휠: 고르기     Enter / 클릭: 이것을 강화     Backspace: 뒤로', P.x + P.w / 2, P.y + P.h - 35);
+      ctx.restore();
+    }
+
     static workChoiceGeometry(vw, vh) {
       const w = 600, h = 300;
       const x = (vw - w) / 2, y = (vh - h) / 2;
@@ -1074,6 +1136,7 @@
       ctx.font = 'bold 18px sans-serif';
       ctx.fillStyle = s.msgT > 0 ? (s.ok ? '#7dffa0' : '#ff8a8a') : 'rgba(0,0,0,0)';
       ctx.fillText(s.msg, x + w / 2, y + h - 54);
+      if (s.kind === 'furnace' && s.target && s.msgT <= 0 && G.Shop.ITEMS[s.target]) { const ti = G.Shop.ITEMS[s.target]; ctx.fillStyle = '#ffd9a0'; ctx.font = 'bold 16px sans-serif'; ctx.fillText(`강화 대상: ${ti.name}  (붙인 칸 ${((s.inv.attach && s.inv.attach[s.target]) || []).length}/${G.Forge.slotsOf(ti)})   Backspace: 대상 바꾸기`, x + w / 2, y + h - 54); }
       ctx.font = '16px sans-serif';
       ctx.fillStyle = '#9aa4c0';
       ctx.fillText(custom === 'merge' ? '↑↓: 무기 고르기     1: 직접     2: 대장장이에게 맡기기     3: 찾기     ←→: 탭     E / Esc: 닫기' : `클릭 또는 숫자 키: 구매     ${geo.tabs.length ? '←→: 탭 전환     ' : ''}${geo.pager ? '↑↓: 페이지     ' : ''}E / Esc: 닫기`, x + w / 2, y + h - 26);
@@ -2910,6 +2973,7 @@
       if (hud.dialog) this._drawBottomText(ctx, hud.dialog.text + (hud.dialog.queue ? '   ▶ E' : ''), Math.min(1, hud.dialog.t / 0.3));
       else if (hud.prompt) this._drawBottomText(ctx, hud.prompt);
       if (hud.shop) this._drawShop(ctx, hud.shop);
+      if (hud.forgePick) this._drawForgePick(ctx, hud.forgePick);
       if (hud.work) this._drawWorkChoice(ctx, hud.work);
       if (hud.attach) this._drawAttachGame(ctx, hud.attach);
       if (hud.smelt) this._drawSmeltGame(ctx, hud.smelt);
@@ -2918,7 +2982,7 @@
       if (hud.mini) this._drawMini(ctx, hud.mini);
       if (hud.settings) this._drawSettings(ctx, hud.settings);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.attach && !hud.smelt && !hud.work) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

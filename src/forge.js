@@ -32,6 +32,28 @@
     { id: 'obsidian', name: '흑요석', cls: 'sword', tier: 3, weight: 3, look: ['#6a4fb0', '#1a1030'], bonus: { dmg: 16, boss: 16 } },
     { id: 'starsteel', name: '별철', cls: 'sword', tier: 4, weight: 1.6, look: ['#fff2a8', '#7a8ae8'], bonus: { dmg: 40, hit: 1, crit: 0.03 } },
     { id: 'abyss', name: '심연석', cls: 'sword', tier: 4, weight: 1.4, look: ['#c07aff', '#2a1250'], bonus: { dmg: 30, boss: 60, hit: 1 } },
+    // 원소 광석: 붙이면 그 속성이 무기에 같이 적용된다 (무기 자체 속성에 더해진다). elem = 맞힐 때 일어나는 원소 효과
+    { id: 'flame', name: '화염석', cls: 'sword', tier: 3, weight: 2.2, look: ['#ff9a4a', '#b02a10'], bonus: { dmg: 12, elem: 'fire' } },
+    { id: 'frost', name: '서리석', cls: 'sword', tier: 3, weight: 2.2, look: ['#bfeaff', '#3a8fd0'], bonus: { dmg: 12, elem: 'ice' } },
+    { id: 'venom', name: '독석', cls: 'sword', tier: 3, weight: 2.2, look: ['#9aff6a', '#2a7a2a'], bonus: { dmg: 12, elem: 'poison' } },
+    { id: 'terra', name: '대지석', cls: 'sword', tier: 3, weight: 2.2, look: ['#c9a070', '#6a4a2a'], bonus: { dmg: 12, elem: 'quake' } },
+    { id: 'volt', name: '번개석', cls: 'sword', tier: 4, weight: 1.2, look: ['#fff27a', '#3a6af0'], bonus: { dmg: 32, elem: 'light' } },
+    { id: 'umbra', name: '그림자석', cls: 'sword', tier: 4, weight: 1.2, look: ['#9a8ab0', '#1a1428'], bonus: { dmg: 32, elem: 'shadow' } },
+    // 균열 무시 광석: 단단한 몬스터(금이 가는 몬스터)를 금이 가는 단계 없이 한 번에 쓰러뜨린다
+    { id: 'cleaver', name: '균열석', cls: 'sword', tier: 3, weight: 2.2, look: ['#ff6a8a', '#7a1030'], bonus: { dmg: 14, crack: true } },
+    // 갑옷 광석(방어구 어디에든 붙인다): hp 최대 피(칸), inv 피격 후 무적(초), spd 이동 속도, coin 코인, perk 속성 능력 (같은 속성이 많을수록 강해진다)
+    { id: 'ironplate', name: '철갑석', cls: 'armor', tier: 1, weight: 9, look: ['#b8c0cc', '#5a6272'], bonus: { hp: 1 } },
+    { id: 'swiftstone', name: '날쌘석', cls: 'armor', tier: 1, weight: 8, look: ['#9ae8c0', '#2a8a60'], bonus: { hp: 1, spd: 0.03 } },
+    { id: 'guardstone', name: '수호석', cls: 'armor', tier: 2, weight: 5, look: ['#ffd9a0', '#b0782a'], bonus: { hp: 2, inv: 0.15 } },
+    { id: 'thornstone', name: '가시석', cls: 'armor', tier: 2, weight: 5, look: ['#c9a86a', '#6a4a3a'], bonus: { hp: 1, perk: 'thorn' } },
+    { id: 'dragonscale', name: '용린석', cls: 'armor', tier: 3, weight: 2.4, look: ['#7ad0a0', '#1a5a3a'], bonus: { hp: 3, inv: 0.3 } },
+    { id: 'emberscale', name: '화린석', cls: 'armor', tier: 3, weight: 2.4, look: ['#ff8a4a', '#a02a10'], bonus: { hp: 2, perk: 'fire' } },
+    { id: 'frostscale', name: '냉린석', cls: 'armor', tier: 3, weight: 2.4, look: ['#bfe8ff', '#3a7ab8'], bonus: { hp: 2, perk: 'ice' } },
+    { id: 'toxscale', name: '독린석', cls: 'armor', tier: 3, weight: 2.4, look: ['#8cff6b', '#2a7a2a'], bonus: { hp: 2, perk: 'toxic' } },
+    { id: 'greedstone', name: '탐욕석', cls: 'armor', tier: 3, weight: 2.4, look: ['#fff0a0', '#c9961a'], bonus: { hp: 1, coin: 0.1, perk: 'gold' } },
+    { id: 'voltscale', name: '뇌린석', cls: 'armor', tier: 4, weight: 1.2, look: ['#fff27a', '#3a6af0'], bonus: { hp: 3, perk: 'volt' } },
+    { id: 'lifestone', name: '생명석', cls: 'armor', tier: 4, weight: 1.2, look: ['#ffa0c0', '#d94a7a'], bonus: { hp: 5, perk: 'regen' } },
+    { id: 'titanscale', name: '거인석', cls: 'armor', tier: 4, weight: 1.2, look: ['#e0c8ff', '#6a4fb0'], bonus: { hp: 6, inv: 0.5, spd: 0.04 } },
     { id: 'saltpeter', name: '초석', cls: 'gun', tier: 1, weight: 9, look: ['#f0eadc', '#b8a98a'], bonus: { gdmg: 2 } },
     { id: 'lead', name: '납', cls: 'gun', tier: 1, weight: 9, look: ['#8a93a3', '#4a5262'], bonus: { gdmg: 2, st: -1 } },
     { id: 'pyrite', name: '황철석', cls: 'gun', tier: 2, weight: 6, look: ['#f0d83a', '#a89010'], bonus: { gdmg: 3, crit: 0.03 } },
@@ -44,6 +66,7 @@
   const ORE = {};
   for (const o of ORES) ORE[o.id] = o;
 
+  const ELEM_NAME = { fire: '불', ice: '얼음', poison: '독', quake: '대지', light: '번개(빛)', shadow: '그림자' };
   const fmt = (v) => Math.round(v * 100) / 100;
   function bonusText(b) {
     const t = [];
@@ -58,9 +81,16 @@
     if (b.st) t.push(`스태미나 ${b.st > 0 ? '+' : ''}${b.st}`);
     if (b.radius) t.push(`폭발 범위 +${fmt(b.radius)}칸`);
     if (b.pierce) t.push('관통');
+    if (b.crack) t.push('균열 무시 (단단한 몬스터도 한 방)');
+    if (b.hp) t.push(`최대 피 +${b.hp}칸`);
+    if (b.inv) t.push(`피격 후 무적 +${fmt(b.inv)}초`);
+    if (b.spd) t.push(`이동 속도 +${Math.round(b.spd * 100)}%`);
+    if (b.perk) t.push(`${PERK_NAME[b.perk]} 능력 (같은 속성이 많을수록 강해져요)`);
+    if (b.elem) t.push(`${ELEM_NAME[b.elem]} 속성`);
     return t.join(', ');
   }
-  const CLS_NAME = { sword: '검', gun: '총' };
+  const CLS_NAME = { sword: '검', gun: '총', armor: '갑옷' };
+  const PERK_NAME = { thorn: '가시', fire: '화염', ice: '얼음', volt: '번개', toxic: '독가시', regen: '재생', gold: '탐욕' };
   for (const o of ORES) {
     ITEMS['ore_' + o.id] = { id: 'ore_' + o.id, name: `${o.name} 광석`, ore: o.id, quest: true, look: o.look, desc: `${o.tier}단계 광석 · ${CLS_NAME[o.cls]}용. 3개를 용광로에서 제련하면 주괴 1개` };
     ITEMS['ingot_' + o.id] = { id: 'ingot_' + o.id, name: `${o.name} 주괴`, ingot: o.id, quest: true, look: o.look, desc: `${CLS_NAME[o.cls]}에 붙인다: ${bonusText(o.bonus)}` };
@@ -107,8 +137,19 @@
 
   // ======================= 인벤토리 규칙 =======================
   const ensure = (inv) => { inv.copies = inv.copies || {}; inv.ores = inv.ores || {}; inv.ingots = inv.ingots || {}; inv.attach = inv.attach || {}; return inv; };
-  const classOf = (w) => (w && w.shot ? 'gun' : 'sword');
-  const slotsOf = (w) => Math.min(4, 2 + ((w && w.tier) || 0));
+  const classOf = (w) => (w && w.slot && w.slot !== 'weapon' ? 'armor' : w && w.shot ? 'gun' : 'sword');
+  // 붙일 수 있는 주괴 칸: 무기는 기본 1칸 → 합쳐서 2레벨 3칸 → 3레벨(최대) 5칸. 방어구는 값어치에 따라 1/3/5칸
+  const slotsOf = (w) => {
+    if (!w) return 1;
+    if (w.slot && w.slot !== 'weapon') return w.price < 600 ? 1 : w.price < 2500 ? 3 : 5;
+    return [1, 3, 5][Math.min(2, w.tier || 0)];
+  };
+  // 용광로에서 고른 강화 대상 (null이면 지금 든 무기). 합치기·부착·제련 탭이 이 아이템을 기준으로 한다
+  let target = null;
+  const targetItem = (inv) => ITEMS[target && inv.items.includes(target) ? target : inv.equipped.weapon];
+  const targetId = (inv) => targetItem(inv).id;
+  const setTarget = (id) => { target = id; dirty = true; };
+  const hasTarget = () => !!target;
   const copiesOf = (inv, id) => (inv.items.includes(id) ? (inv.copies && inv.copies[id]) || 1 : 0);
   const canMerge = (item) => !!item && item.slot === 'weapon' && item.id !== 'wood0' && !item.lens;
   const nextOf = (item) => (item && item.slot === 'weapon' && item.id !== 'wood0' && !item.lens && (item.tier || 0) < MAX_TIER ? ITEMS[`${item.baseId || item.id}_t${(item.tier || 0) + 1}`] : null);
@@ -123,7 +164,7 @@
   }
 
   // 붙인 주괴가 주는 능력 합계 (shop.js stats/powerOf/homeBonuses가 부른다)
-  const ZERO = () => ({ dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false });
+  const ZERO = () => ({ dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false, crack: false, elems: [], elemLv: {}, hp: 0, inv: 0, spd: 0, perkList: [] });
   function attachBonus(inv, w) {
     const out = ZERO();
     const list = inv.attach && w ? inv.attach[w.id] : null;
@@ -131,7 +172,12 @@
     for (const oid of list) {
       const b = ORE[oid] && ORE[oid].bonus;
       if (!b) continue;
-      for (const k of Object.keys(b)) { if (k === 'pierce') out.pierce = out.pierce || !!b[k]; else out[k] += b[k]; }
+      for (const k of Object.keys(b)) {
+        if (k === 'pierce' || k === 'crack') out[k] = out[k] || !!b[k];
+        else if (k === 'elem') { if (!out.elems.includes(b[k])) out.elems.push(b[k]); out.elemLv[b[k]] = (out.elemLv[b[k]] || 0) + 1; } // 같은 속성이 많을수록 강해진다
+        else if (k === 'perk') out.perkList.push(b[k]);
+        else out[k] += b[k];
+      }
     }
     return out;
   }
@@ -232,6 +278,7 @@
 
   // 합칠 수 있는 무기 목록 (1개 이상 가진 것, 3개 이상이면 합칠 수 있다)
   function mergeCandidates(inv) {
+    if (target && inv.items.includes(target)) { const t = ITEMS[target]; return nextOf(t) ? [t] : []; } // 용광로에서 고른 아이템만
     const list = inv.items.map((id) => ITEMS[id]).filter((it) => it && nextOf(it));
     list.sort((a, b) => (copiesOf(inv, b.id) >= 3) - (copiesOf(inv, a.id) >= 3) || copiesOf(inv, b.id) - copiesOf(inv, a.id) || (b.tier || 0) - (a.tier || 0));
     return list;
@@ -329,11 +376,11 @@
   // 붙일 수 있는지만 점검한다 (아무것도 바꾸지 않는다)
   function attachCheck(inv, oreId, wallet) {
     ensure(inv);
-    const w = ITEMS[inv.equipped.weapon];
+    const w = targetItem(inv);
     const o = ORE[oreId];
     if (classOf(w) !== o.cls) return { ok: false, msg: `${o.name} 주괴는 ${CLS_NAME[o.cls]}에만 붙일 수 있어요.` };
     const list = inv.attach[w.id] || [];
-    if (list.length >= slotsOf(w)) return { ok: false, msg: `${w.name}은(는) 더 붙일 칸이 없어요 (${list.length}/${slotsOf(w)}). 무기를 합치면 칸이 늘어요.` };
+    if (list.length >= slotsOf(w)) return { ok: false, msg: `${w.name}은(는) 더 붙일 칸이 없어요 (${list.length}/${slotsOf(w)}).${w.slot === 'weapon' ? ' 무기를 합치면 칸이 늘어요.' : ''}` };
     if ((inv.ingots[oreId] || 0) < 1) return { ok: false, msg: `${o.name} 주괴가 없어요.` };
     if (wallet.coins < attachFee(o)) return { ok: false, msg: '코인이 부족해요.' };
     return { ok: true };
@@ -342,7 +389,7 @@
   function attach(inv, oreId, wallet) {
     const chk = attachCheck(inv, oreId, wallet);
     if (!chk.ok) return chk;
-    const w = ITEMS[inv.equipped.weapon];
+    const w = targetItem(inv);
     const o = ORE[oreId];
     const list = (inv.attach[w.id] = inv.attach[w.id] || []);
     const fee = attachFee(o);
@@ -356,7 +403,7 @@
   // 떼어내기: 가장 나중에 붙인 주괴를 뗀다 (주괴는 부서져 사라진다)
   function detach(inv) {
     ensure(inv);
-    const w = ITEMS[inv.equipped.weapon];
+    const w = targetItem(inv);
     const list = inv.attach[w.id] || [];
     if (!list.length) return { ok: false, msg: '붙인 주괴가 없어요.' };
     const oid = list.pop();
@@ -370,7 +417,7 @@
   let cache = null;        // 마지막으로 만든 탭
   let cacheSig = '';
   const sum = (o) => { let s = 0; for (const k in o) s += o[k] || 0; return s; };
-  const sigOf = (inv) => `${sum(inv.materials)}|${inv.equipped.weapon}|${inv.items.length}|${sum(inv.copies)}|${sum(inv.ores)}|${sum(inv.ingots)}|${(inv.attach[inv.equipped.weapon] || []).join(',')}|${inv.items.filter((i) => ITEMS[i] && ITEMS[i].pickaxe).length}`;
+  const sigOf = (inv) => `${sum(inv.materials)}|${target}|${inv.equipped.weapon}|${(inv.attach[targetId(inv)] || []).join(',')}|${inv.items.length}|${sum(inv.copies)}|${sum(inv.ores)}|${sum(inv.ingots)}|${(inv.attach[inv.equipped.weapon] || []).join(',')}|${inv.items.filter((i) => ITEMS[i] && ITEMS[i].pickaxe).length}`;
 
   const card = (p) => Object.assign({ forge: true, look: ['#c9d2dc', '#6c7686'] }, p);
   const infoCard = (title, lines, icon) => card({ id: 'info', kind: 'info', icon, name: title, view: () => ({ name: title, desc: lines[0], note: lines[1] || '' }), label: () => '안내', afford: () => false, run: () => ({ ok: false, msg: lines[0] }) });
@@ -392,7 +439,8 @@
   }
 
   function smeltCards(inv) {
-    const list = ORES.filter((o) => (inv.ores[o.id] || 0) > 0).sort((a, b) => ((inv.ores[b.id] >= SMELT_NEED) - (inv.ores[a.id] >= SMELT_NEED)) || a.tier - b.tier);
+    const cls = hasTarget() ? classOf(targetItem(inv)) : null;
+    const list = ORES.filter((o) => (inv.ores[o.id] || 0) > 0 && (!cls || o.cls === cls)).sort((a, b) => ((inv.ores[b.id] >= SMELT_NEED) - (inv.ores[a.id] >= SMELT_NEED)) || a.tier - b.tier);
     if (!list.length) return [infoCard('제련할 광석이 없어요', ['광물 동굴에서 곡괭이로 광석을 캐 오세요 (마을의 동굴 문).', `광석 ${SMELT_NEED}개를 녹이면 주괴 1개가 돼요`], ITEMS.ore_iron)];
     return list.map((o) => card({
       id: `smelt:${o.id}`, kind: 'smelt', icon: ITEMS['ore_' + o.id],
@@ -414,12 +462,12 @@
   }
 
   function attachCards(inv) {
-    const w = ITEMS[inv.equipped.weapon];
+    const w = targetItem(inv);
     const cls = classOf(w);
     const list = inv.attach[w.id] || [];
     const head = card({
       id: 'attach:info', kind: 'info', icon: w,
-      view: (i) => { const l = i.attach[w.id] || []; return { name: `지금 든 무기: ${w.name}  (${CLS_NAME[cls]}용 주괴 · 붙인 칸 ${l.length}/${slotsOf(w)})`, desc: l.length ? `붙인 것: ${l.map((x) => ORE[x].name).join(', ')}` : '아직 붙인 주괴가 없어요', note: '다른 무기에 붙이려면 인벤토리(I)에서 그 무기를 들고 오세요' }; },
+      view: (i) => { const l = i.attach[w.id] || []; return { name: `${hasTarget() ? '강화 대상' : '지금 든 무기'}: ${w.name}  (${CLS_NAME[cls]}용 주괴 · 붙인 칸 ${l.length}/${slotsOf(w)})`, desc: l.length ? `붙인 것: ${l.map((x) => ORE[x].name).join(', ')}` : '아직 붙인 주괴가 없어요', note: '다른 무기에 붙이려면 인벤토리(I)에서 그 무기를 들고 오세요' }; },
       label: () => '안내', afford: () => false, run: () => ({ ok: false, msg: '붙일 주괴를 아래에서 고르세요.' }),
     });
     const out = [head];
@@ -452,7 +500,7 @@
     if (cache && sig === cacheSig && !dirty) return cache;
     ensure(inv);
     cache = [
-      { name: '합치기', custom: 'merge', items: [] },
+      ...(hasTarget() && classOf(targetItem(inv)) === 'armor' ? [] : [{ name: '합치기', custom: 'merge', items: [] }]),
       { name: '제련', items: smeltCards(inv) },
       { name: '부착', items: attachCards(inv) },
       { name: '곡괭이', items: pickCards() },
@@ -469,7 +517,7 @@
   // 대장간(무기 상점): 무기 + 곡괭이. 합치기·제련·부착·신성 강화는 용광로에서 한다
   Object.defineProperty(Shop.SHOPS.sword, 'tabs', { get: () => (bound ? baseTabs.concat(forgeTabs(bound).filter((t) => t.name === '곡괭이')) : baseTabs), configurable: true, enumerable: true });
   Shop.SHOPS.furnace = { title: '용광로' };
-  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name !== '곡괭이' && t.name !== '크리스탈').concat(holyTab, forgeTabs(bound).filter((t) => t.name === '크리스탈')) : holyTab), configurable: true, enumerable: true });
+  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name !== '곡괭이' && t.name !== '크리스탈').concat(!hasTarget() || classOf(targetItem(bound)) === 'sword' ? holyTab : [], forgeTabs(bound).filter((t) => t.name === '크리스탈')) : holyTab), configurable: true, enumerable: true });
 
   function act(item, wallet) {
     const r = item.run(wallet);
@@ -516,6 +564,6 @@
     bind: (inv) => { bound = ensure(inv); dirty = true; },
     ensure, classOf, slotsOf, copiesOf, canMerge, nextOf, mergeFee, addCopy,
     attachBonus, bonusText, merge, smelt, attach, detach, act,
-    gridExtra, describeExtra, forgeTabs, JOB_TIME, SMITH_MAX_LV, smithNeed, smithOf, smithEase, addSmithXp, XP, smithWorkFee, entrustWork, crystalMerge, ATTACH_TIME, SMELT_TIME, smeltCheck, smeltFee, SMITH_FEE, attachCheck, attachFee, jobOf, mergeCandidates, startMerge, tickJob, collectJob, bestPick, bestOwnedPick, autoEquipPick, togglePick, markDirty: () => { dirty = true; },
+    gridExtra, describeExtra, forgeTabs, JOB_TIME, setTarget, targetItem, targetId, hasTarget, classOf, slotsOf, PERK_NAME, SMITH_MAX_LV, smithNeed, smithOf, smithEase, addSmithXp, XP, smithWorkFee, entrustWork, crystalMerge, ATTACH_TIME, SMELT_TIME, smeltCheck, smeltFee, SMITH_FEE, attachCheck, attachFee, jobOf, mergeCandidates, startMerge, tickJob, collectJob, bestPick, bestOwnedPick, autoEquipPick, togglePick, markDirty: () => { dirty = true; },
   };
 })(window.Game);
