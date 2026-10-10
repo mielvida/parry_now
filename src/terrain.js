@@ -52,6 +52,7 @@
           if (ch === 'm') this.shops.push({ col: c, row: r, kind: 'mgshell' });
           if (ch === 'n') this.shops.push({ col: c, row: r, kind: 'mgtarget' });
           if (ch === 'd') this.shops.push({ col: c, row: r, kind: 'mgduel' });
+          if (ch === 'q') this.shops.push({ col: c, row: r, kind: 'mggun' });
           if (ch === 'O') this.shops.push({ col: c, row: r, kind: 'dupgrade' });
           if (ch === 'Z') this.gates.push({ col: c, row: r, stage: 'darkhub' });
           if (ch === 'J') this.gates.push({ col: c, row: r, stage: 'dungeon' });

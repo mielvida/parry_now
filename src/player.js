@@ -76,7 +76,15 @@
 
     // 대시하는 동안은 몬스터에게 맞지 않는다
     get dashing() {
-      return this.dashLeft > 0 || this.dashGrace > 0;
+      return this.dashLeft > 0 || this.dashGrace > 0 || this.slideT > 0.12; // 슬라이딩 초반에도 맞지 않는다
+    }
+
+    // C: 바라보는 쪽으로 낮게 미끄러진다 (땅 위에서만)
+    startSlide(dir) {
+      this.slideDir = dir || this.facing;
+      this.facing = this.slideDir;
+      this.slideT = 0.42;
+      this.slideFx = true;
     }
 
     // Shift: 입력한 방향(없으면 바라보는 쪽)으로 DASH_TILES칸을 순식간에 이동한다
@@ -103,12 +111,18 @@
 
     update(dt, input, terrain) {
       this._startDash(input);
+      this.slideT = Math.max(0, (this.slideT || 0) - dt);
+      if (this.slideT > 0 && (!this.onGround || input.jumpPressed || this.dashLeft > 0)) this.slideT = 0; // 점프하거나 대시하면 슬라이딩이 끝난다
+      this.blocking = !!input.blockHeld && this.onGround && this.slideT === 0 && this.dashLeft === 0 && this.swing < 0 && !this.swordOut; // F: 막기
       const airDash = this.dashLeft > 0 && !this.onGround;
       if (this.dashLeft > 0) { // 대시 중: 입력을 무시하고 정해진 거리만 곧게 날아간다 (공중이면 중력도 잠시 무시)
         this.vx = this.dashDir * Math.min(C.DASH_SPEED, this.dashLeft / dt);
         if (airDash) this.vy = 0;
+      } else if (this.slideT > 0) { // 슬라이딩: 점점 느려지며 미끄러진다
+        this.vx = this.slideDir * 470 * (0.35 + 0.65 * (this.slideT / 0.42)) * this.speedMult;
       } else {
         this._applyInput(dt, input);
+        if (this.blocking) this.vx *= 0.35; // 막는 동안은 천천히 움직인다
       }
       this._applyParry(dt, input);
       // 점프 키를 일찍 떼면 상승 중 중력을 키워 낮은 점프
@@ -123,6 +137,7 @@
       this.dashTrail = this.dashTrail.filter((g) => g.t > 0);
       this.invuln = Math.max(0, this.invuln - dt);
       this.guardTimer = Math.max(0, this.guardTimer - dt);
+      if (this.blocking) this.guardTimer = Math.max(this.guardTimer, 0.1); // 막는 동안은 검을 세운 자세
       this.shadowTime = Math.max(0, this.shadowTime - dt);
       this.animTime += dt;
       if (this.onGround) this.runPhase += Math.abs(this.vx) * dt * 0.09;

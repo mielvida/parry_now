@@ -249,7 +249,7 @@
   add({ id: 'darkcrystal', name: '어둠의 크리스탈', desc: '보스가 떨어뜨린 보랏빛 수정. 깊은 어둠의 힘이 느껴진다', quest: true, look: ['#8a4fe0', '#2a1250'] });
 
   // 도구: 한 번 사면 계속 쓴다 (인벤토리 '재료' 칸에 들어간다)
-  add({ id: 'magnifier', name: '약점 돋보기', price: 500, tool: true, desc: '보스의 약점 속성이 보스 체력 막대 아래에 보인다', look: ['#cfe8ff', '#6a8fb0'] });
+  add({ id: 'magnifier', name: '약점 돋보기', price: 500, tool: true, desc: '보스를 3번 때린 뒤 5초 동안 분석하면 약점이 드러나고, 이후 약점 노출 시간이 자주 찾아온다 (노출 중 대미지 x2)', look: ['#cfe8ff', '#6a8fb0'] });
 
   // 크리스탈 만들기: 어둠의 크리스탈(보스) -> 숲의 샘물로 씻기 -> 정화된 크리스탈 -> 화산의 제단 -> 신성 크리스탈 -> 대장간에서 칼에 붙이기
   add({ id: 'cleancrystal', name: '정화된 크리스탈', desc: '숲의 샘물로 씻어 어둠이 빠진 크리스탈. 화산의 제단에서 신성한 힘을 얻는다', quest: true, look: ['#a8ecff', '#3a8fc0'] });
@@ -452,6 +452,7 @@
     mgshell: { title: '야바위', tabs: [] },
     mgtarget: { title: '맞추기', tabs: [] },
     mgduel: { title: '다른 용사와 결투', tabs: [] },
+    mggun: { title: '총게임', tabs: [] },
     pants: {
       title: '바지 가게',
       tabs: [

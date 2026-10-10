@@ -1278,7 +1278,7 @@
       ctx.textAlign = 'left';
       ctx.font = 'bold 28px sans-serif';
       ctx.fillStyle = '#ffd54a';
-      ctx.fillText({ shell: '야바위', target: '맞추기 (공 던지기)', duel: '다른 용사와 결투' }[m.kind], px + 24, py + 34);
+      ctx.fillText({ shell: '야바위', target: '맞추기 (공 던지기)', gun: '총게임 (사격 서바이벌)', duel: '다른 용사와 결투' }[m.kind], px + 24, py + 34);
       ctx.textAlign = 'right';
       ctx.font = 'bold 20px sans-serif';
       ctx.fillStyle = '#fff';
@@ -1286,15 +1286,115 @@
       if (m.st === 'bet') this._miniBet(ctx, m, px, py, pw, ph);
       else if (m.kind === 'shell') this._miniShell(ctx, m, px, py, pw, ph);
       else if (m.kind === 'target') this._miniTarget(ctx, m, px, py, pw, ph);
-      else this._miniFight(ctx, m, px, py, pw, ph);
+      else if (m.kind === 'gun') this._miniGun(ctx, m, px, py, pw, ph);
+      else this._miniDuel(ctx, m, px, py, pw, ph);
       ctx.textAlign = 'center';
       ctx.font = '15px sans-serif';
       ctx.fillStyle = '#9aa4c0';
-      const hint = m.st === 'bet' ? (m.kind === 'target' ? 'Enter: 시작   Esc: 나가기' : `${m.kind === 'duel' ? '↑↓: 결투 종류   ' : ''}←→ 또는 1~3: 거는 돈   Enter: 시작   Esc: 나가기`)
+      const hint = m.st === 'bet' ? (m.kind === 'target' || m.kind === 'gun' ? 'Enter: 시작   Esc: 나가기' : `${m.kind === 'duel' ? '↑↓: 결투 종류   ' : ''}←→ 또는 1~3: 거는 돈   Enter: 시작   Esc: 나가기`)
         : m.st === 'result' ? 'Enter: 한 번 더   Esc: 나가기'
-        : m.kind === 'target' ? '방향키: 조준   Enter: 공 던지기' : m.kind === 'shell' ? '←→: 컵 고르기   Enter: 열기' : '←→ 이동   Space 점프   ↓ 막기   Enter 공격';
+        : m.kind === 'gun' ? '←→ 이동  Space 점프  Enter/클릭 사격  C 슬라이딩  F 막기' : m.kind === 'target' ? '방향키: 조준   Enter: 공 던지기' : m.kind === 'shell' ? '←→: 컵 고르기   Enter: 열기' : m.mode === 'ring' ? '←→ 이동   Space 점프   ↓ 막기   Enter 공격' : 'Enter: 베기 ("지금!"이 뜬 다음에!)';
       ctx.fillText(hint, W / 2, py + ph - 20);
       ctx.restore();
+    }
+
+    _miniDuel(ctx, m, px, py, pw, ph) {
+      if (m.mode === 'ring') { this._miniFight(ctx, m, px, py, pw, ph); return; }
+      const gy = 430;
+      const sky = ctx.createLinearGradient(0, py, 0, gy);
+      sky.addColorStop(0, '#2a3a6a'); sky.addColorStop(1, '#d9a070');
+      ctx.fillStyle = sky; ctx.fillRect(px + 8, py + 60, pw - 16, gy - py - 60);
+      ctx.fillStyle = '#6b5a3a'; ctx.fillRect(px + 8, gy, pw - 16, py + ph - gy - 8);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(px + 8, gy, pw - 16, 6);
+      const rv = m.rival || { armor: 'armor1', helmet: null, weapon: 'sword0' };
+      const e = G.Shop.ITEMS;
+      const frame = (who) => (m.st === 'result' && ((who === 'me') === !!m.won) ? Math.min(19, Math.floor(m.swingT * 40)) : -1);
+      const drawFighter = (x, facing, p, who) => {
+        ctx.save();
+        ctx.translate(x, gy);
+        ctx.scale(facing * 4, 4);
+        const lost = m.st === 'result' && ((who === 'me') !== !!m.won);
+        if (lost) ctx.globalAlpha = 0.6 + 0.4 * Math.sin(m.swingT * 30);
+        G.Hero.draw(ctx, Object.assign({ x: -12, y: -32, w: 24, h: 32, facing: 1, vx: 0, onGround: true, animTime: m.t, runPhase: 0, swing: frame(who), swordOut: false, guardTimer: 0 }, p));
+        ctx.restore();
+      };
+      const me = m.me || {};
+      drawFighter(300, 1, me, 'me');
+      drawFighter(660, -1, { weaponId: rv.weapon, armorId: rv.armor, helmetId: rv.helmet, glovesId: null, bootsId: null }, 'rival');
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#ffffff';
+      ctx.fillText('나', 300, py + 90);
+      ctx.fillText(`${rv.name || ''}  (Lv ${m.rlv || 1})`, 660, py + 90);
+      let big = ''; let col = '#ffffff';
+      if (m.st === 'ready') big = '준비…';
+      else if (m.st === 'wait') big = '.'.repeat(1 + Math.floor(m.t * 3) % 3);
+      else if (m.st === 'go') { big = '지금!'; col = '#ff4a4a'; }
+      else if (m.st === 'result') { big = m.msg; col = m.won ? '#7dffa0' : '#ff8a8a'; }
+      ctx.font = `bold ${m.st === 'go' ? 84 : 44}px sans-serif`;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(big, this.viewW / 2 + 3, 253);
+      ctx.fillStyle = col; ctx.fillText(big, this.viewW / 2, 250);
+      if (m.st === 'result' && !m.foul && m.reaction) {
+        ctx.font = '18px sans-serif'; ctx.fillStyle = '#e8ecff';
+        ctx.fillText(`내 반응 ${Math.round(m.reaction * 1000)}ms  ·  상대 ${Math.round(m.rt * 1000)}ms`, this.viewW / 2, 310);
+      }
+    }
+
+    // 총게임: 옆에서 본 사격장
+    _miniGun(ctx, m, px, py, pw, ph) {
+      const g = m.g;
+      const gy = 430;
+      const sky = ctx.createLinearGradient(0, py + 60, 0, gy);
+      sky.addColorStop(0, '#2a3a6a'); sky.addColorStop(1, '#e0a070');
+      ctx.fillStyle = sky; ctx.fillRect(px + 8, py + 60, pw - 16, gy - py - 60);
+      ctx.fillStyle = '#5a4a32'; ctx.fillRect(px + 8, gy, pw - 16, py + ph - gy - 8);
+      ctx.fillStyle = '#7a6040'; ctx.fillRect(px + 8, gy, pw - 16, 8);
+      const hero = (x, y, facing, p, slide, block, blink) => {
+        ctx.save();
+        ctx.translate(x, gy - y);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, y, 30, 6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.scale(facing * 3, slide ? 3 * 0.62 : 3);
+        if (slide) ctx.rotate(-0.5);
+        if (blink) ctx.globalAlpha = 0.4;
+        G.Hero.draw(ctx, Object.assign({ x: -12, y: -32, w: 24, h: 32, facing: 1, vx: 0, onGround: y === 0, animTime: m.t, runPhase: m.t * 10, swing: -1, swordOut: false, guardTimer: block ? 0.2 : 0 }, p));
+        ctx.restore();
+      };
+      if (g) {
+        for (const f of g.foes) {
+          if (f.aimT > 0) { ctx.strokeStyle = `rgba(255,70,70,${0.3 + 0.6 * (1 - f.aimT / 0.42)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x + f.face * 20, gy - 44 - f.y); ctx.lineTo(g.x, gy - 40 - g.y); ctx.stroke(); }
+          if (f.fly) { // 날아다니는 몹: 날개 달린 드론
+            const fy = gy - f.y - 30;
+            const flap = Math.sin(m.t * 25 + f.ph) * 10;
+            ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(f.x, gy, 18, 4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = f.hitFx > 0 ? '#ffffff' : '#5a2d82';
+            ctx.beginPath(); ctx.moveTo(f.x - 8, fy); ctx.lineTo(f.x - 34, fy - 10 - flap); ctx.lineTo(f.x - 22, fy + 8); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(f.x + 8, fy); ctx.lineTo(f.x + 34, fy - 10 - flap); ctx.lineTo(f.x + 22, fy + 8); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#2a2a3a'; ctx.beginPath(); ctx.ellipse(f.x, fy, 13, 11, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = f.aimT > 0 ? '#ff4a4a' : '#ffd54a'; ctx.beginPath(); ctx.arc(f.x + f.face * 4, fy - 2, 4, 0, Math.PI * 2); ctx.fill();
+            continue;
+          }
+          hero(f.x, 0, f.face, { weaponId: 'gun2', armorId: f.look.armor, helmetId: f.look.helmet, glovesId: null, bootsId: null }, false, false, f.hitFx > 0 && Math.floor(m.t * 30) % 2);
+          if (f.tough) { ctx.fillStyle = '#e0b12f'; ctx.fillRect(f.x - 10, gy - 112, 20, 5); }
+          if (f.flash > 0) { ctx.fillStyle = 'rgba(255,230,140,0.9)'; ctx.beginPath(); ctx.arc(f.x + f.face * 34, gy - 44, 9, 0, Math.PI * 2); ctx.fill(); }
+        }
+        hero(g.x, g.y, g.face, Object.assign({}, m.me || {}, { weaponId: 'gun2' }), g.slideT > 0, g.block, g.inv > 0 && Math.floor(m.t * 20) % 2);
+        if (g.flash > 0) { ctx.fillStyle = 'rgba(255,230,140,0.9)'; ctx.beginPath(); ctx.arc(g.x + g.face * 34, gy - 44 - g.y, 9, 0, Math.PI * 2); ctx.fill(); }
+        for (const b of g.bullets) { ctx.fillStyle = '#ff6a4a'; ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI * 2); ctx.fill(); }
+        for (const s of g.shots) { ctx.strokeStyle = '#fff8c0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 0.025, s.y - s.vy * 0.025); ctx.stroke(); }
+        for (const f of g.fx) { ctx.textAlign = 'center'; ctx.font = 'bold 24px sans-serif'; ctx.fillStyle = `rgba(255,230,120,${1 - f.t / 0.8})`; ctx.fillText(f.text, f.x, f.y - f.t * 50); }
+        // 체력, 막기 힘, 점수, 시간
+        for (let i = 0; i < 5; i++) this._drawHeart(ctx, px + 40 + i * 32, py + 70, 24, i < g.hp);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + 24, py + 104, 160, 12);
+        ctx.fillStyle = g.guardE >= 20 ? '#6fd0ff' : '#7a8aa0'; ctx.fillRect(px + 26, py + 106, 156 * g.guardE / 100, 8);
+        ctx.textAlign = 'left'; ctx.font = '13px sans-serif'; ctx.fillStyle = '#c8d0e8'; ctx.fillText('막기 힘', px + 192, py + 111);
+        ctx.textAlign = 'center'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = g.time < 10 ? '#ff8a8a' : '#ffffff';
+        ctx.fillText(`${Math.max(0, Math.ceil(g.time))}`, this.viewW / 2, py + 84);
+        ctx.textAlign = 'right'; ctx.font = 'bold 22px sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.fillText(`명중 ${g.kills}`, px + pw - 30, py + 84);
+        if (m.st === 'play' && m.useMouse && m.mouse) { ctx.strokeStyle = '#7dffa0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(m.mouse.x, m.mouse.y, 12, 0, Math.PI * 2); ctx.moveTo(m.mouse.x - 18, m.mouse.y); ctx.lineTo(m.mouse.x + 18, m.mouse.y); ctx.moveTo(m.mouse.x, m.mouse.y - 18); ctx.lineTo(m.mouse.x, m.mouse.y + 18); ctx.stroke(); }
+      }
+      let big = ''; let col = '#ffffff';
+      if (m.st === 'ready') big = m.t < 0.8 ? '준비…' : '사격!';
+      else if (m.st === 'result') { big = m.msg; col = m.win >= m.cost ? '#7dffa0' : '#ff8a8a'; }
+      if (big) { ctx.textAlign = 'center'; ctx.font = `bold ${m.st === 'result' ? 36 : 70}px sans-serif`; ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(big, this.viewW / 2 + 3, 233); ctx.fillStyle = col; ctx.fillText(big, this.viewW / 2, 230); }
     }
 
     // 링 격투: 링 위에서 AI 용사와 싸운다
@@ -1357,35 +1457,38 @@
       const cx = this.viewW / 2;
       const rules = {
         shell: ['공이 든 컵을 맞혀 보세요!', '컵을 보여 준 뒤 빠르게 섞어요. 맞히면 건 돈의 2배를 받아요.', `이길수록 컵이 점점 빨라져요  (지금 난이도 ${m.level + 1})`],
+        gun: ['총게임 — 45초 사격 서바이벌', '몰려오는 총잡이를 쏴서 쓰러뜨려요. 한 명에 6 G, 끝까지 버티면 +100 G!', 'Enter/클릭: 사격 · C: 슬라이딩(총알이 통과) · F: 막기(앞에서 오는 총알 막기) · 체력 5'],
         target: ['공 5개를 던져 빠르게 움직이는 작은 표적을 맞히세요!', '한가운데일수록 점수가 높아요 (50 · 30 · 20 · 10점). 던질수록 더 빨라져요.', '점수 x2 만큼 코인을 받아요. 참가비 100 G'],
         duel: m.mode === 'ring'
           ? ['링 격투 — 링 위에서 한 판', '화면 속 링에서 무작위 AI 용사(등급 1~5, 체력 4~10)와 싸워요. 나는 체력 10.', '←→ 이동, Space 점프, ↓ 막기, Enter 공격. 이기면 등급에 따라 건 돈의 1.8~2.6배']
           : m.mode === 'fight'
           ? ['공격! — 보스전처럼 칼싸움', '결투장에서 무작위 AI 용사(등급 1~5, 체력 4~10)가 칼로 달려들어요. 치켜들 때 피하거나 패링!', '평소 조작 그대로예요: 던지는 무기는 던지고, 쏘는 무기는 쏴요. 이기면 건 돈의 1.8~2.6배']
-          : ['카우보이 — 보스전처럼 총싸움', '결투장에서 무작위 AI 용사(등급 1~5, 체력 4~10)가 총을 쏴요. 조준선이 보이면 피하거나 패링!', '평소 조작 그대로예요: 던지는 무기는 던지고, 쏘는 무기는 쏴요. 이기면 건 돈의 1.8~2.6배'],
+          : m.mode === 'cowboy'
+          ? [`카우보이 — 상대: ${m.rname}  (Lv ${Math.min(8, m.level + 1)})`, '"지금!"이 뜨면 상대보다 먼저 Enter(또는 클릭)를 눌러요.', '너무 일찍 누르면 반칙패! 이기면 건 돈의 2배를 받아요.']
+          : ['총싸움 — 보스전처럼 총싸움', '결투장에서 무작위 AI 용사(등급 1~5, 체력 4~10)가 총을 쏴요. 조준선이 보이면 피하거나 패링!', '평소 조작 그대로예요: 던지는 무기는 던지고, 쏘는 무기는 쏴요. 이기면 건 돈의 1.8~2.6배'],
       }[m.kind];
       if (m.kind === 'duel') { // 결투 종류 고르기
-        [['cowboy', '카우보이'], ['fight', '공격!'], ['ring', '링 격투']].forEach(([id, name], i) => {
-          const x = cx - 290 + i * 200;
+        [['cowboy', '카우보이'], ['fight', '공격!'], ['ring', '링 격투'], ['gun', '총싸움']].forEach(([id, name], i) => {
+          const x = cx - 420 + i * 210;
           const on = m.mode === id;
           ctx.fillStyle = on ? 'rgba(111,208,255,0.28)' : 'rgba(255,255,255,0.07)';
-          ctx.fillRect(x, py + 62, 180, 40);
+          ctx.fillRect(x, py + 62, 190, 40);
           ctx.lineWidth = on ? 3 : 1.5;
           ctx.strokeStyle = on ? '#6fd0ff' : 'rgba(255,255,255,0.2)';
-          ctx.strokeRect(x, py + 62, 180, 40);
+          ctx.strokeRect(x, py + 62, 190, 40);
           ctx.textAlign = 'center';
           ctx.font = 'bold 20px sans-serif';
           ctx.fillStyle = on ? '#c8ecff' : '#9aa4c0';
-          ctx.fillText(name, x + 90, py + 83);
+          ctx.fillText(name, x + 95, py + 83);
         });
       }
       ctx.textAlign = 'center';
       rules.forEach((t, i) => { ctx.font = i === 0 ? 'bold 26px sans-serif' : '18px sans-serif'; ctx.fillStyle = i === 0 ? '#ffffff' : '#c8d0e8'; ctx.fillText(t, cx, py + (m.kind === 'duel' ? 150 : 130) + i * 44); });
-      const bets = m.kind === 'target' ? [100] : [100, 300, 1000];
+      const bets = m.kind === 'target' || m.kind === 'gun' ? [100] : [100, 300, 1000];
       bets.forEach((b, i) => {
         const x = cx - (bets.length * 190 - 20) / 2 + i * 190;
         const y = py + 300;
-        const on = m.kind === 'target' || i === m.bi;
+        const on = m.kind === 'target' || m.kind === 'gun' || i === m.bi;
         const ok = m.coins >= b;
         ctx.fillStyle = on ? 'rgba(255,213,74,0.22)' : 'rgba(255,255,255,0.07)';
         ctx.fillRect(x, y, 170, 80);
@@ -1397,7 +1500,7 @@
         ctx.fillText(`${b} G`, x + 85, y + 34);
         ctx.font = '14px sans-serif';
         ctx.fillStyle = '#9aa4c0';
-        ctx.fillText(m.kind === 'target' ? '참가비' : `이기면 +${b} G`, x + 85, y + 62);
+        ctx.fillText(m.kind === 'target' || m.kind === 'gun' ? '참가비' : `이기면 +${b} G`, x + 85, y + 62);
       });
       if (m.msgT > 0) { ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#ff8a8a'; ctx.fillText(m.msg, cx, py + 430); }
     }
@@ -1696,6 +1799,19 @@
     }
 
     _paintPlayer(ctx, p) {
+      const pl = p.slideT > 0;
+      if (pl) { // 슬라이딩: 몸을 눕혀 낮게 미끄러진다
+        const cx = p.x + p.w / 2;
+        const by = p.y + p.h;
+        ctx.save();
+        ctx.translate(cx, by);
+        ctx.scale(1, 0.62);
+        ctx.rotate(-0.5 * (p.facing >= 0 ? 1 : -1));
+        ctx.translate(-cx, -by);
+        G.Hero.draw(ctx, p);
+        ctx.restore();
+        return;
+      }
       G.Hero.draw(ctx, p);
     }
 
@@ -2251,7 +2367,7 @@
       ctx.font = '16px sans-serif';
       ctx.textBaseline = 'top';
       ctx.font = '14px sans-serif';
-      this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Shift(또는 X): 3칸 대시   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   R: 처음 위치로', 12, 62);
+      this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Shift(또는 X): 3칸 대시   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   C: 슬라이딩   F: 막기   R: 처음 위치로', 12, 62);
       ctx.font = '16px sans-serif';
       if (!hud) return;
       const test = '   F1: 개발 메뉴 (순간이동·아이템)   I 또는 ]: 인벤토리   1~5: 무기 바꾸기';

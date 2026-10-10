@@ -45,6 +45,9 @@
     get parryHeld() {
       return this._anyDown(PARRY);
     }
+    get blockHeld() {
+      return this.down.has('KeyF');
+    }
     get dashPressed() {
       return this.dashPressedThisFrame;
     }

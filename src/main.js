@@ -48,7 +48,7 @@
     duelarena: { // 결투장: 보스전처럼 AI 용사와 싸운다
       music: 'cave', label: '결투장', level: G.Levels.duelarena, theme: G.Beach, monsterless: true, returnNear: 'village', exitTo: 'village',
       boss: { col: 2, kind: 'duel' },
-      get goal() { return duelRun ? `결투! ${duelRun.mode === 'cowboy' ? '카우보이 (총싸움)' : '공격! (칼싸움)'} — 상대 체력을 0으로! 던지는 무기는 던지고, 쏘는 무기는 쏴요. 건 돈 ${duelRun.cost} G` : '결투장'; },
+      get goal() { return duelRun ? `결투! ${duelRun.mode === 'cowboy' ? '총싸움' : '공격! (칼싸움)'} — 상대 체력을 0으로! 던지는 무기는 던지고, 쏘는 무기는 쏴요. 건 돈 ${duelRun.cost} G` : '결투장'; },
       banner: { title: '결투!', sub: '링 위의 승부', dur: 2.5, caption: '…관중이 환호한다. 상대의 체력을 먼저 0으로 만들어라!' },
     },
     home: { // 우리 집 안 (마을의 내 집 터에서 E). 장식품을 놓고 치우는 곳
@@ -236,6 +236,7 @@
     },
   };
   function setupBoss() {
+    resetAnalysis();
     for (let k = monsters.length - 1; k >= 0; k--) if (monsters[k].fromBoss) monsters.splice(k, 1); // 이전 보스전에서 낳은 슬라임 정리
     const st = STAGES[stageName];
     camera.minX = 0;
@@ -339,30 +340,32 @@
     if (m.st === 'bet') {
       let betClick = false;
       if (m.clicked) {
-        if (m.kind === 'duel') ['cowboy', 'fight', 'ring'].forEach((id, i) => { if (hitBox(m.clicked, 480 - 290 + i * 200, 86, 180, 40) && m.mode !== id) { m.mode = id; G.Audio.play('catch'); } });
-        const n = m.kind === 'target' ? 1 : 3;
-        for (let i = 0; i < n; i++) if (hitBox(m.clicked, 480 - (n * 190 - 20) / 2 + i * 190, 324, 170, 80)) { if (m.kind !== 'target') m.bi = i; betClick = true; }
+        if (m.kind === 'duel') ['cowboy', 'fight', 'ring', 'gun'].forEach((id, i) => { if (hitBox(m.clicked, 480 - 420 + i * 210, 86, 190, 40) && m.mode !== id) { m.mode = id; G.Audio.play('catch'); } });
+        const n = m.kind === 'target' || m.kind === 'gun' ? 1 : 3;
+        for (let i = 0; i < n; i++) if (hitBox(m.clicked, 480 - (n * 190 - 20) / 2 + i * 190, 324, 170, 80)) { if (n > 1) m.bi = i; betClick = true; }
       }
-      if (m.kind === 'duel') { const MODES = ['cowboy', 'fight', 'ring']; const i = MODES.indexOf(m.mode); const want = pressed('KeyC') ? 'cowboy' : pressed('KeyF') ? 'fight' : pressed('KeyR') ? 'ring' : pressed('ArrowUp', 'KeyW') ? MODES[Math.max(0, i - 1)] : pressed('ArrowDown', 'KeyS') ? MODES[Math.min(2, i + 1)] : pressed('Tab') ? MODES[(i + 1) % 3] : null; if (want && want !== m.mode) { m.mode = want; G.Audio.play('catch'); } } // 결투 종류: 카우보이 / 공격!
-      if (m.kind !== 'target') {
+      if (m.kind === 'duel') { const MODES = ['cowboy', 'fight', 'ring', 'gun']; const i = MODES.indexOf(m.mode); const want = pressed('KeyC') ? 'cowboy' : pressed('KeyF') ? 'fight' : pressed('KeyR') ? 'ring' : pressed('KeyG') ? 'gun' : pressed('ArrowUp', 'KeyW') ? MODES[Math.max(0, i - 1)] : pressed('ArrowDown', 'KeyS') ? MODES[Math.min(3, i + 1)] : pressed('Tab') ? MODES[(i + 1) % 4] : null; if (want && want !== m.mode) { m.mode = want; G.Audio.play('catch'); } } // 결투 종류: 카우보이 / 공격!
+      if (m.kind !== 'target' && m.kind !== 'gun') {
         if (pressed('ArrowLeft', 'KeyA')) m.bi = Math.max(0, m.bi - 1);
         if (pressed('ArrowRight', 'KeyD')) m.bi = Math.min(MINI_BETS.length - 1, m.bi + 1);
         for (let n = 1; n <= 3; n++) if (pressed('Digit' + n, 'Numpad' + n)) m.bi = n - 1;
       }
       if (betClick || pressed('Enter', 'NumpadEnter', 'Space', 'KeyE')) {
-        const cost = m.kind === 'target' ? 100 : MINI_BETS[m.bi];
+        const cost = m.kind === 'target' ? 100 : m.kind === 'gun' ? 100 : MINI_BETS[m.bi];
         if (coins < cost) { m.msg = '코인이 부족해요.'; m.msgT = 1.6; G.Audio.play('deny'); return; }
         coins -= cost;
         m.cost = cost;
         m.win = 0;
         G.Audio.play('coin');
-        if (m.kind === 'shell') shellStart(m); else if (m.kind === 'target') targetStart(m); else if (m.mode === 'ring') fightStart(m); else startDuelArena(m);
+        if (m.kind === 'shell') shellStart(m); else if (m.kind === 'target') targetStart(m); else if (m.kind === 'gun') gunStart(m); else if (m.mode === 'ring') fightStart(m); else if (m.mode === 'cowboy') duelStart(m); else startDuelArena(m);
       }
       return;
     }
     if (m.kind === 'shell') shellUpdate(m, dt, pressed);
     else if (m.kind === 'target') targetUpdate(m, dt, pressed);
-    else fightUpdate(m, dt, pressed);
+    else if (m.kind === 'gun') gunUpdate(m, dt, pressed);
+    else if (m.mode === 'ring') fightUpdate(m, dt, pressed);
+    else duelUpdate(m, dt, pressed);
     if (m.st === 'result' && m.t > 0.8 && (m.clicked || pressed('Enter', 'NumpadEnter', 'Space', 'KeyE'))) { miniGo(m, 'bet'); m.msg = ''; m.rname = DUEL_RIVALS[Math.min(DUEL_RIVALS.length - 1, m.level)].name; }
   }
 
@@ -460,6 +463,180 @@
         m.msg = m.win > 0 ? `점수 ${m.score}점! +${m.win} G` : '아쉬워요… 하나도 못 맞혔다.';
         miniGo(m, 'result');
       }
+    }
+  }
+
+  // 결투: 다른 용사와 마주 선다. "지금!"이 뜨면 상대보다 먼저 Enter. 너무 일찍 누르면 반칙패, 이기면 건 돈의 2배
+  function duelStart(m) {
+    const k = Math.min(DUEL_RIVALS.length - 1, m.level);
+    m.rival = DUEL_RIVALS[k];
+    m.rlv = k + 1;
+    m.react = Math.max(0.19, 0.52 - 0.05 * k); // 상대의 반응 속도 (이길수록 빨라진다)
+    m.rt = m.react + Math.random() * 0.06;
+    m.wait = 1.3 + Math.random() * 2.3;
+    m.reaction = 0;
+    m.foul = false;
+    m.swingT = 0;
+    miniGo(m, 'ready');
+  }
+  function duelEnd(m, win, text) {
+    m.won = win;
+    if (win) { m.win = m.cost * 2; coins += m.win; m.level = Math.min(DUEL_RIVALS.length - 1, m.level + 1); G.Audio.play('treasure'); text += ` +${m.win} G`; }
+    else G.Audio.play('hurt');
+    miniLv.duel = m.level;
+    m.msg = text;
+    miniGo(m, 'result');
+  }
+  function duelUpdate(m, dt, pressed) {
+    const hit = !!m.clicked || pressed('Enter', 'NumpadEnter', 'Space');
+    if (m.st === 'ready') {
+      if (hit) { m.foul = true; duelEnd(m, false, '너무 일렀다! 반칙패…'); } else if (m.t >= 0.9) miniGo(m, 'wait');
+    } else if (m.st === 'wait') {
+      if (hit) { m.foul = true; duelEnd(m, false, '너무 일렀다! 반칙패…'); } else if (m.t >= m.wait) { miniGo(m, 'go'); G.Audio.play('spawn'); }
+    } else if (m.st === 'go') {
+      if (hit) { m.reaction = m.t; if (m.reaction < m.rt) duelEnd(m, true, '내가 먼저 베었다!'); else duelEnd(m, false, '상대가 더 빨랐다…'); }
+      else if (m.t >= m.rt) { m.reaction = m.t; duelEnd(m, false, '상대가 먼저 베었다…'); }
+    } else if (m.st === 'result') m.swingT += dt;
+  }
+
+  // ---------- 총게임: 45초 사격 서바이벌 (참가비 100 G, 쓰러뜨린 한 명당 6 G, 끝까지 버티면 +100 G) ----------
+  // ←→ 이동, Space 점프, Enter/클릭 사격(클릭은 그쪽으로), C 슬라이딩(잠깐 안 맞는다), F 막기(앞에서 오는 총알을 막는다. 막을 때마다 힘이 닳는다)
+  const GUN = { x0: 110, x1: 850, gy: 430 };
+  function gunStart(m) {
+    m.g = { x: 220, y: 0, vy: 0, vx: 0, face: 1, hp: 5, inv: 0, slideT: 0, slideCd: 0, shotCd: 0, block: false, guardE: 100, foes: [], bullets: [], shots: [], kills: 0, spawnT: 0.8, t: 0, time: 45, fx: [] };
+    miniGo(m, 'ready');
+  }
+  const this_mid = () => (GUN.x0 + GUN.x1) / 2;
+  function gunUpdate(m, dt, pressed) {
+    const g = m.g;
+    for (const f of g.fx) f.t += dt;
+    g.fx = g.fx.filter((f) => f.t < 0.8);
+    if (m.st === 'ready') { if (m.t >= 1.3) { miniGo(m, 'play'); G.Audio.play('spawn'); } return; }
+    if (m.st === 'result') return;
+    const dn = (...c) => c.some((k) => input.down.has(k));
+    g.t += dt;
+    g.time -= dt;
+    g.inv = Math.max(0, g.inv - dt);
+    g.slideT = Math.max(0, g.slideT - dt);
+    g.slideCd = Math.max(0, g.slideCd - dt);
+    g.shotCd = Math.max(0, g.shotCd - dt);
+    // ---- 내 조작 ----
+    const dirX = (dn('ArrowRight', 'KeyD') ? 1 : 0) - (dn('ArrowLeft', 'KeyA') ? 1 : 0);
+    g.block = dn('KeyF') && g.y === 0 && g.slideT === 0 && g.guardE > 0;
+    if (pressed('KeyC') && g.y === 0 && g.slideCd === 0 && g.slideT === 0) { g.slideT = 0.4; g.slideCd = 0.9; g.slideDir = dirX || g.face; G.Audio.play('dash'); }
+    if (g.slideT > 0) { g.vx = g.slideDir * 520 * (0.4 + 0.6 * g.slideT / 0.4); g.face = g.slideDir; }
+    else g.vx += (dirX * (g.block ? 80 : 240) - g.vx) * Math.min(1, 14 * dt);
+    if (g.slideT === 0 && dirX) g.face = dirX;
+    if (pressed('Space', 'ArrowUp', 'KeyW') && g.y === 0 && g.slideT === 0) g.vy = 640;
+    g.guardE = Math.min(100, g.guardE + (g.block ? 0 : 22) * dt);
+    const shoot = (ax, ay) => {
+      let ang = g.face > 0 ? 0 : Math.PI;
+      if (ax !== undefined) { ang = Math.atan2(ay - (GUN.gy - 44 - g.y), ax - g.x); g.face = ax >= g.x ? 1 : -1; }
+      g.shots.push({ x: g.x + g.face * 18, y: GUN.gy - 44 - g.y, vx: Math.cos(ang) * 1100, vy: Math.sin(ang) * 1100, life: 1.5 });
+      g.shotCd = 0.11; // 연사가 빨라졌다
+      g.flash = 0.08;
+      G.Audio.play('gun');
+    };
+    if (g.shotCd === 0 && !g.block && g.slideT === 0) {
+      if (m.clicked) shoot(m.clicked.x, m.clicked.y);
+      else if (pressed('Enter', 'NumpadEnter')) shoot();
+    }
+    g.flash = Math.max(0, (g.flash || 0) - dt);
+    // ---- 적 ----
+    g.spawnT -= dt;
+    g.volleyT = (g.volleyT === undefined ? 4 : g.volleyT) - dt;
+    if (g.volleyT <= 0 && g.foes.length >= 2) { // 일제 사격: 여럿이 한꺼번에 겨눠서 같이 쏜다
+      g.volleyT = Math.max(2.2, 4.2 - g.t * 0.04) + Math.random();
+      for (const f of g.foes) if (f.aimT <= 0) { f.aimT = 0.42; f.volley = true; }
+      g.fx.push({ x: this_mid(), y: GUN.gy - 150, t: 0, text: '일제 사격!' });
+    }
+    g.flyT = (g.flyT === undefined ? 3 : g.flyT) - dt;
+    if (g.flyT <= 0 && g.foes.length < 9) { // 위·양옆 사방에서 날아오는 몹
+      g.flyT = Math.max(1.6, 3.4 - g.t * 0.03) + Math.random();
+      const side = Math.floor(Math.random() * 3); // 0 위, 1 왼쪽, 2 오른쪽
+      const fx = side === 0 ? GUN.x0 + 60 + Math.random() * (GUN.x1 - GUN.x0 - 120) : side === 1 ? GUN.x0 - 40 : GUN.x1 + 40;
+      const fy = side === 0 ? 400 : 120 + Math.random() * 200;
+      g.foes.push({ fly: true, x: fx, y: fy, face: -1, hp: 1, tx: GUN.x0 + 80 + Math.random() * (GUN.x1 - GUN.x0 - 160), ty: 110 + Math.random() * 190, aimT: 0, cd: 0.6 + Math.random() * 0.8, hitFx: 0, ph: Math.random() * 6 });
+    }
+    if (g.spawnT <= 0 && g.foes.length < 8) {
+      g.spawnT = Math.max(0.8, 2.2 - g.t * 0.04);
+      const n = Math.min(8 - g.foes.length, 1 + Math.floor(Math.random() * 3)); // 한 번에 1~3명씩 몰려온다
+      const right = Math.random() < 0.75;
+      for (let k = 0; k < n; k++) {
+      const look = DUEL_RIVALS[Math.floor(Math.random() * 5)];
+      const tough = Math.random() < 0.2;
+      g.foes.push({ x: (right ? GUN.x1 + 40 + k * 55 : GUN.x0 - 40 - k * 55), y: 0, face: right ? -1 : 1, hp: tough ? 2 : 1, tough, tx: 260 + Math.random() * 480, aimT: 0, cd: 0.8 + Math.random(), look, hitFx: 0 });
+      }
+    }
+    for (const f of g.foes) {
+      f.hitFx = Math.max(0, f.hitFx - dt);
+      f.cd = Math.max(0, f.cd - dt);
+      f.face = Math.sign(g.x - f.x) || f.face;
+      if (f.fly) { // 날아다니며 이리저리 옮겨 다닌다
+        f.ph += dt;
+        f.x += Math.max(-230, Math.min(230, (f.tx - f.x) * 3)) * dt;
+        f.y += Math.max(-230, Math.min(230, (f.ty - f.y) * 3)) * dt + Math.sin(f.ph * 4) * 20 * dt;
+        if (Math.abs(f.tx - f.x) < 12 && Math.abs(f.ty - f.y) < 12 || Math.random() < dt * 0.2) { f.tx = GUN.x0 + 80 + Math.random() * (GUN.x1 - GUN.x0 - 160); f.ty = 110 + Math.random() * 190; }
+      }
+      if (f.aimT > 0) {
+        f.aimT -= dt;
+        if (f.aimT <= 0) {
+          const sx = f.x + f.face * 18, sy = GUN.gy - 44 - f.y;
+          const ang = Math.atan2(GUN.gy - 40 - g.y - sy, g.x - sx);
+          const sp = 540 + Math.min(200, g.t * 4);
+          g.bullets.push({ x: sx, y: sy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 4 });
+          f.cd = 0.6 + Math.random() * 0.7;
+          f.flash = 0.1;
+          G.Audio.play('gun');
+        }
+      } else {
+        const want = f.fly ? 0 : Math.abs(f.x - f.tx) > 8 ? Math.sign(f.tx - f.x) : 0;
+        if (!f.fly) f.x += want * 210 * dt; // 엄청 빠르게 뛰어다닌다
+        if (f.cd === 0) f.aimT = f.tough ? 0.3 : 0.42; // 멀리서도 걸어오면서 겨눈다
+        if (!f.fly && Math.random() < dt * 0.15) f.tx = 260 + Math.random() * 480;
+      }
+      f.flash = Math.max(0, (f.flash || 0) - dt);
+    }
+    // ---- 총알 ----
+    for (const b of g.bullets) {
+      b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+      if (b.life <= 0 || b.y > GUN.gy || b.x < GUN.x0 - 60 || b.x > GUN.x1 + 60) { b.dead = true; continue; }
+      const py = GUN.gy - 20 - g.y;
+      if (Math.abs(b.x - g.x) < 14 && Math.abs(b.y - py) < 26) {
+        if (g.slideT > 0.08 || g.inv > 0) continue; // 슬라이딩 중엔 통과
+        if (g.block && g.guardE >= 20 && Math.sign(b.x - g.x || 1) === g.face) { // 앞에서 온 총알: 막았다
+          b.dead = true; g.guardE -= 20; G.Audio.play('catch'); g.fx.push({ x: g.x + g.face * 24, y: GUN.gy - 70 - g.y, t: 0, text: '막았다!' }); continue;
+        }
+        b.dead = true; g.hp -= 1; g.inv = 1.2; G.Audio.play('hurt');
+        g.fx.push({ x: g.x, y: GUN.gy - 80 - g.y, t: 0, text: '-1' });
+      }
+    }
+    g.bullets = g.bullets.filter((b) => !b.dead);
+    for (const s of g.shots) {
+      s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
+      if (s.life <= 0 || s.y > GUN.gy || s.x < GUN.x0 - 80 || s.x > GUN.x1 + 80) { s.dead = true; continue; }
+      for (const f of g.foes) {
+        if (Math.abs(s.x - f.x) < (f.fly ? 22 : 16) && s.y > GUN.gy - 62 - f.y && s.y < GUN.gy - f.y + (f.fly ? 14 : 0)) {
+          s.dead = true; f.hp -= 1; f.hitFx = 0.2; f.aimT = Math.max(0, f.aimT - 0.2); // 맞으면 조준이 흐트러진다
+          if (f.hp <= 0) { f.dead = true; g.kills += 1; G.Audio.play('coin'); g.fx.push({ x: f.x, y: GUN.gy - 80 - f.y, t: 0, text: '+6' }); } else G.Audio.play('parry');
+          break;
+        }
+      }
+    }
+    g.shots = g.shots.filter((s) => !s.dead);
+    g.foes = g.foes.filter((f) => !f.dead);
+    // ---- 이동과 중력 ----
+    g.x = Math.max(GUN.x0, Math.min(GUN.x1, g.x + g.vx * dt));
+    if (g.y > 0 || g.vy > 0) { g.y = Math.max(0, g.y + g.vy * dt); g.vy -= 1900 * dt; if (g.y === 0) g.vy = 0; }
+    // ---- 끝 ----
+    if (g.hp <= 0 || g.time <= 0) {
+      const survived = g.hp > 0;
+      m.win = g.kills * 6 + (survived ? 100 : 0);
+      m.won = m.win > m.cost;
+      coins += m.win;
+      m.msg = `${g.kills}명 명중! ${survived ? '끝까지 버텼다! ' : ''}+${m.win} G`;
+      G.Audio.play(m.win >= m.cost ? 'treasure' : 'deny');
+      miniGo(m, 'result');
     }
   }
 
@@ -574,7 +751,8 @@
     const lv = 1 + Math.floor(Math.random() * 5);
     const hp = 4 + Math.floor(Math.random() * 7);
     const look = DUEL_RIVALS[Math.min(DUEL_RIVALS.length - 1, lv + Math.floor(Math.random() * 3))];
-    duelRun = { mode: m.mode, cost: m.cost, livesBackup: lives, end: null, endT: 0, cfg: { mode: m.mode, lv, hp, name: look.name, armor: look.armor, helmet: look.helmet, weapon: look.weapon } };
+    const dm = m.mode === 'gun' ? 'cowboy' : 'fight'; // 결투장 AI: gun = 총싸움, fight = 칼싸움
+    duelRun = { mode: dm, cost: m.cost, livesBackup: lives, end: null, endT: 0, cfg: { mode: dm, lv, hp, name: look.name, armor: look.armor, helmet: look.helmet, weapon: look.weapon } };
     mini = null;
     cutscene = null;
     loadStage('duelarena', true);
@@ -634,11 +812,52 @@
   }
   // 약점 속성 무기는 보스에게 더 아프다 (불의 용은 얼음, 눈의 털복숭이는 불)
   // 보스에게 입히기: 치명타가 터지면 치명타 대미지, 아니면 평소 대미지
+  // 약점 돋보기: 보스를 3번 때린 뒤 5초 동안 분석하면 약점이 드러나고, 이후 "약점 노출" 시간이 자주 찾아온다 (노출 중 대미지 x2)
+  const ANALYZE_HITS = 3, ANALYZE_TIME = 5, EXPOSE_TIME = 3, EXPOSE_EVERY = 5;
+  let analysis = { state: 'idle', hits: 0, t: 0, cd: 0, expose: 0, expCd: 2 }; // idle -> run -> done
+  const resetAnalysis = () => { analysis = { state: 'idle', hits: 0, t: 0, cd: 0, expose: 0, expCd: 2 }; };
+  function updateAnalysis(dt) {
+    const a = analysis;
+    a.cd = Math.max(0, a.cd - dt);
+    if (!boss || boss.done || !boss.weak || !inv.items.includes('magnifier')) return;
+    if (a.state === 'run') {
+      a.t += dt;
+      if (a.t >= ANALYZE_TIME) {
+        a.state = 'done';
+        popups.push({ x: player.x + player.w / 2, y: player.y - 50, text: `분석 완료! 약점: ${WEAK_NAMES[boss.weak]}`, t: 2.4, color: 'rgba(120,255,160,A)' });
+        G.Audio.play('treasure');
+      }
+    } else if (a.state === 'done') {
+      a.expose = Math.max(0, a.expose - dt);
+      a.expCd -= dt;
+      if (a.expCd <= 0) {
+        a.expose = EXPOSE_TIME;
+        a.expCd = EXPOSE_EVERY;
+        popups.push({ x: player.x + player.w / 2, y: player.y - 50, text: '약점 노출! 지금 공격!', t: 1.4, color: 'rgba(255,225,120,A)' });
+        G.Audio.play('spawn');
+      }
+    }
+  }
+  const analysisText = () => {
+    if (!boss || !boss.weak) return null;
+    if (!inv.items.includes('magnifier')) return '약점: ? (약점 돋보기가 있으면 분석할 수 있어요)';
+    const a = analysis;
+    if (a.state === 'idle') return `돋보기: 보스를 ${ANALYZE_HITS}번 때리면 분석 시작 (${a.hits}/${ANALYZE_HITS})`;
+    if (a.state === 'run') return `분석 중… ${Math.floor((a.t / ANALYZE_TIME) * 100)}%  (맞으면 처음부터)`;
+    return `약점: ${WEAK_NAMES[boss.weak]}${a.expose > 0 ? `   ★ 약점 노출! 대미지 x2 (${a.expose.toFixed(1)}s)` : ''}`;
+  };
   function hitBoss(rect) {
     const crit = rollCrit();
     const holy = boss.kind === 'dark' ? G.Shop.holyMult(inv) : 1; // 신성 크리스탈을 붙인 칼은 탑의 보스에게 더 강하다
     const weakMul = boss.weak && weaponElemOf() === boss.weak ? 3 : 1; // 보스의 약점 속성 무기: 대미지 x3
-    const hits = boss.hitHeads(rect, (crit ? G.Shop.critDamage(inv) : bossDamage()) * holy * weakMul);
+    const expMul = analysis.state === 'done' && analysis.expose > 0 ? 2 : 1; // 분석한 보스의 약점 노출 시간
+    const hits = boss.hitHeads(rect, (crit ? G.Shop.critDamage(inv) : bossDamage()) * holy * weakMul * expMul);
+    if (hits.length && boss.weak && analysis.state === 'idle' && analysis.cd === 0 && inv.items.includes('magnifier')) { // 돋보기: 때릴 때마다 분석 준비
+      analysis.cd = 0.3;
+      analysis.hits += 1;
+      if (analysis.hits >= ANALYZE_HITS) { analysis.state = 'run'; analysis.t = 0; popups.push({ x: player.x + player.w / 2, y: player.y - 50, text: `분석 시작! ${ANALYZE_TIME}초 동안 맞지 말고 버텨요`, t: 2, color: 'rgba(160,220,255,A)' }); G.Audio.play('pickup'); }
+    }
+    if (expMul > 1 && hits.length) popups.push({ x: hits[0].cx, y: hits[0].y - 80, text: '약점 노출! x2', t: 0.9, color: 'rgba(255,225,120,A)' });
     if (weakMul > 1 && hits.length) popups.push({ x: hits[0].cx, y: hits[0].y - 56, text: `약점! x3 (${WEAK_NAMES[boss.weak]})`, t: 1.1, color: 'rgba(120,255,160,A)' });
     if (holy > 1 && hits.length && !crit) popups.push({ x: hits[0].cx, y: hits[0].y - 34, text: `신성 x${holy}`, t: 1, color: 'rgba(255,230,140,A)' });
     if (crit && hits.length) {
@@ -816,7 +1035,7 @@
         text = S.data.enabled ? '내 스프라이트 켜짐' : '내 스프라이트 꺼짐';
       }
       popups.push({ x: player.x + player.w / 2, y: player.y - 14, text, t: 1.6, color: 'rgba(255,248,170,A)' });
-    } else if (e.code === 'KeyF') { // 전체화면 켜기/끄기
+    } else if (e.code === 'KeyM') { // 전체화면 켜기/끄기
       if (document.fullscreenElement) document.exitFullscreen();
       else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     }
@@ -832,6 +1051,17 @@
 
   // 목숨 하나를 잃는다. 그 자리에 그대로 있고 잠시 무적. 목숨이 없으면 게임오버
   function loseLife(cx, cy, dmg = 1) {
+    if (analysis.state === 'run' && !(player.blocking && stamina >= C.BLOCK_STAMINA)) { analysis.t = 0; popups.push({ x: player.x + player.w / 2, y: player.y - 50, text: '분석이 끊겼다!', t: 1.2, color: 'rgba(255,170,170,A)' }); } // 맞으면 분석이 처음부터
+    if (player.blocking && stamina >= C.BLOCK_STAMINA && (cx === undefined || cx === null || Math.sign(cx - (player.x + player.w / 2)) === player.facing || Math.abs(cx - (player.x + player.w / 2)) < 10)) { // F로 앞에서 오는 공격을 막았다
+      stamina -= C.BLOCK_STAMINA;
+      staminaWait = 1.0;
+      player.invuln = Math.max(player.invuln, 0.35);
+      player.vx = -player.facing * 120;
+      effects.shake(4, 0.15);
+      G.Audio.play('catch');
+      popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '막았다!', t: 0.8, color: 'rgba(160,220,255,A)' });
+      return;
+    }
     if (player.cancelCharge()) effects.chargeBreak(cx, cy); // 맞으면 충전 게이지가 풀린다
     effects.playerHit(cx, cy);
     effects.shake(9, 0.3);
@@ -1174,6 +1404,7 @@
       { label: '놀이마당: 야바위', hint: '마을 왼쪽', run: goto(() => goVillageShop('mgshell')) },
       { label: '놀이마당: 맞추기', hint: '숲 문 옆', run: goto(() => goVillageShop('mgtarget')) },
       { label: '놀이마당: 다른 용사와 결투', hint: '마을 오른쪽', run: goto(() => goVillageShop('mgduel')) },
+      { label: '놀이마당: 총게임', hint: '마을 맨 오른쪽', run: goto(() => goVillageShop('mggun')) },
       { label: '우리 집', run: goto(() => loadStage('home', true)) },
       { label: '숲', hint: '왕슬라임 · 샘물', run: goto(() => loadStage('forest', true)) },
       { label: '설산', hint: '털복숭이 침팬지', run: goto(() => loadStage('snow', true)) },
@@ -1815,6 +2046,10 @@
       popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '스태미나 부족!', t: 0.8, color: 'rgba(255,170,170,A)' });
       G.Audio.play('deny');
     }
+    if (input.wasPressed('KeyC') && !equipUI && player.onGround && player.slideT <= 0 && !player.swordOut) { // C: 슬라이딩
+      if (stamina < C.SLIDE_STAMINA) { popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '스태미나 부족!', t: 0.8, color: 'rgba(255,170,170,A)' }); G.Audio.play('deny'); }
+      else { player.startSlide(input.moveX || player.facing); stamina -= C.SLIDE_STAMINA; staminaWait = 0.8; G.Audio.play('dash'); effects.dashDust(player.x + player.w / 2, player.y + player.h, -player.slideDir); }
+    }
     if (input.wasPressed('KeyB')) throwIceBomb();
     if (input.wasPressed('KeyV')) eatBest();
     const wasAir = !player.onGround;
@@ -1996,6 +2231,7 @@
           hitStop = C.HIT_STOP;
         }
       }
+      updateAnalysis(dt);
       boss.update(dt, player);
       for (const h of boss.heads) {
         if (h.dmgFx) {
@@ -2122,7 +2358,7 @@
       stamina, staminaMax: stMax(), consumables: inv.consumables,
       mini: mini ? Object.assign({}, mini, { coins, me: { weaponId: inv.equipped.weapon, armorId: inv.equipped.armor, helmetId: inv.equipped.helmet, glovesId: inv.equipped.gloves, pantsId: inv.equipped.pants, bootsId: inv.equipped.boots } }) : null,
       caveInfo: stageName === 'mine' ? { level: mineRun, coins: Math.round(STAGES.mine.chest.coins * (1 + G.Shop.homeBonuses(inv).coin)) } : null,
-      weakText: boss && boss.weak ? (inv.items.includes('magnifier') ? `약점: ${WEAK_NAMES[boss.weak]}` : '약점: ? (약점 돋보기가 있으면 보여요)') : null,
+      weakText: analysisText(),
       hotbar: inv.hotbar, weaponId: inv.equipped.weapon,
       dev: devUI ? Object.assign({}, devUI, { items: devItems().map((q) => ({ head: q.head, label: q.label, hint: q.hint })) }) : null,
       home: stageName === 'home' ? Object.assign({ total: G.Home.houseDef(inv.home.type).floor + G.Home.houseDef(inv.home.type).wall }, G.Shop.homeBonuses(inv)) : null,
@@ -2167,6 +2403,8 @@
     get dev() { return devUI; },
     get mini() { return mini; },
     get duelRun() { return duelRun; },
+    get analysis() { return analysis; },
+    analysisText,
     hitBoss, weaponElemOf,
     devItems,
     get inv() { return inv; },

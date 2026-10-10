@@ -110,6 +110,8 @@ Game.Config = {
   STAMINA_REGEN_STEP: 6,   // 레벨마다 초당 회복량 +6 (16 -> 76)
   STAMINA_REGEN_PRICE: 300,
   STAMINA_REGEN_PRICE_STEP: 220,
+  SLIDE_STAMINA: 15,       // 슬라이딩(C) 한 번에 드는 스태미나
+  BLOCK_STAMINA: 20,       // 막기(F)로 한 번 막을 때 드는 스태미나
   DASH_STAMINA: 25,        // 대시 한 번에 드는 스태미나
   BOSS_STONE_HP: 1500,     // 정의의 어둠돌 (33층)
   BOSS_JUSTICE_HP: 3000,   // 정의의 어둠 (66층)
