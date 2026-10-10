@@ -19,6 +19,10 @@
   const POWER = [0, 1, 2, 3.5, 5];             // 곡괭이 단계별 한 번에 파는 양
   const hardness = (tier) => 3 + 3 * tier;     // 광석 단계별 단단함 (1단계 6, 4단계 15)
   const sizeOf = (ore) => 1.3 + 0.25 * ore.tier; // 희귀할수록 크다 (1단계 1.55배 ~ 4단계 2.3배)
+  // 어둠 결정: 광물 동굴 깊은 곳에 한두 개 숨어 있다. 캐면 어둠의 크리스탈 조각 1개 (3개를 합치면 어둠의 크리스탈)
+  const SHARD = { id: 'darkshard', name: '어둠의 크리스탈 조각', tier: 3, look: ['#b07af0', '#3a1a70'], weight: 0, mat: true };
+  const MYSTERY = 1.7;                         // 아직 안 캔 바위는 모두 같은 크기로 보인다 (뭐가 들었는지 모른다)
+  const lerp = (a, b, k) => a + (b - a) * k;
   const hexRGB = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(',');
 
   class OreNodes {
@@ -53,7 +57,18 @@
         const p = s.col / cols; // 동굴 안쪽일수록 높은 단계
         const ore = this.rollOre(p, run);
         taken.push(s);
-        this.list.push({ x: s.col * T + T / 2, y: (s.row + 1) * T, ore, hp: hardness(ore.tier), max: hardness(ore.tier), shake: 0, flash: 0, squash: 0, t: Math.random() * 6 });
+        this.list.push({ p, x: s.col * T + T / 2, y: (s.row + 1) * T, ore, hp: hardness(ore.tier), max: hardness(ore.tier), shake: 0, flash: 0, squash: 0, t: Math.random() * 6 });
+      }
+      this.placeShards();
+    }
+
+    // (setup 끝) 깊은 곳 노드 한두 개를 어둠 결정으로 바꾼다
+    placeShards() {
+      const deep = this.list.filter((q) => q.p > 0.35);
+      const k = Math.min(deep.length, 1 + (Math.random() < 0.5 ? 1 : 0));
+      for (let i = 0; i < k; i++) {
+        const nd = deep.splice(Math.floor(Math.random() * deep.length), 1)[0];
+        nd.ore = SHARD; nd.hp = nd.max = hardness(SHARD.tier);
       }
     }
 
@@ -71,6 +86,12 @@
       let q = Math.random() * sum;
       for (const o of pool) { q -= o.weight; if (q <= 0) return o; }
       return pool[0];
+    }
+
+    // 속이 얼마나 드러났나(0~1): 캘수록 균열 사이로 빛이 새어 나온다. 약점 돋보기를 끼면 처음부터 꿰뚫어 본다
+    revealOf(nd) {
+      if (this.host.hasLens()) return 1;
+      return clamp((1 - nd.hp / nd.max) * 1.25, 0, 1);
     }
 
     // 가장 가까운 노드 (플레이어 발 기준. 큰 바위일수록 조금 더 멀리서도 닿는다)
@@ -165,8 +186,10 @@
       const h = this.host;
       const o = nd.ore;
       let n = 1;
-      if (Math.random() < 0.4) n += 1;
-      if (o.tier >= 3 && Math.random() < 0.2) n += 1;
+      if (!o.mat) { // 어둠 결정은 항상 1개
+        if (Math.random() < 0.4) n += 1;
+        if (o.tier >= 3 && Math.random() < 0.2) n += 1;
+      }
       // 큰 폭발: 파편, 번쩍임, 흔들림, 잠깐 멈춤
       this.chips(nd, 5, true);
       h.fx.shake(6 + o.tier * 1.5, 0.28);
@@ -183,6 +206,11 @@
           vx: rand(-80, 80), vy: -rand(300, 460), landed: false, bounces: 0, t: Math.random() * 6, age: 0,
         });
       }
+      if (o.tier >= 3) { // 희귀한 것이 나왔다: 한참 멈췄다가 이름을 크게 알린다
+        h.hitStop(0.22);
+        h.fx.shake(10, 0.4);
+        h.popup(nd.x, nd.y - 78 * sizeOf(o), o.tier >= 4 ? `✦ 전설! ${o.name} ✦` : `✦ 희귀! ${o.name}`, `rgba(${hexRGB(o.look[0])},A)`, 2.4);
+      } else if (o.tier === 2) h.popup(nd.x, nd.y - 60 * sizeOf(o), `${o.name} 광석`, `rgba(${hexRGB(o.look[0])},A)`, 1.3);
       this.list.splice(this.list.indexOf(nd), 1);
     }
 
@@ -233,14 +261,14 @@
         const got = {};
         for (const d of near) {
           this.drops.splice(this.drops.indexOf(d), 1);
-          h.giveOre(d.id, 1);
+          if (d.ore.mat) h.giveMaterial(d.id, 1); else h.giveOre(d.id, 1);
           got[d.id] = (got[d.id] || 0) + 1;
           h.fx.sparkle(d.x, d.y - 10);
         }
         let k = 0;
         for (const id of Object.keys(got)) {
-          const o = F.ORES.find((q) => q.id === id);
-          h.popup(h.player.x + h.player.w / 2, h.player.y - 20 - k * 22, `+${got[id]} ${o.name} 광석`, 'rgba(255,235,150,A)', 1.6);
+          const o = this.drops.concat(near).find((q) => q.id === id).ore;
+          h.popup(h.player.x + h.player.w / 2, h.player.y - 20 - k * 22, `+${got[id]} ${o.name}${o.mat ? '' : ' 광석'}`, 'rgba(255,235,150,A)', 1.6);
           k += 1;
         }
         h.sound('pickup');
@@ -273,8 +301,8 @@
         } else if (near) {
           const h = this.host;
           const ok = h.pickTier() >= near.ore.tier || !h.hasLens(); // 돋보기가 없으면 단계를 알 수 없으니 빨갛게 알리지 않는다
-          const sz = sizeOf(near.ore);
-          G.TextLayer.add(`E 길게: ${near.ore.name} 광석${h.hasLens() ? ` (곡괭이 ${near.ore.tier}단계)` : ''}`, near.x, near.y - 52 * sz - 14, 'bold 13px sans-serif', ok ? '#ffffff' : '#ff9a9a');
+          const sz = lerp(MYSTERY, sizeOf(near.ore), this.revealOf(near));
+          G.TextLayer.add(`E 길게: ${this.revealOf(near) >= 0.35 ? near.ore.name + (near.ore.mat ? '' : ' 광석') : '수상한 바위'}${h.hasLens() ? ` (곡괭이 ${near.ore.tier}단계)` : ''}`, near.x, near.y - 52 * sz - 14, 'bold 13px sans-serif', ok ? '#ffffff' : '#ff9a9a');
         }
       }
     }
@@ -317,7 +345,8 @@
 
     drawNode(ctx, nd, time) {
       const o = nd.ore;
-      const sc = sizeOf(o);
+      const rv = this.revealOf(nd);
+      const sc = lerp(MYSTERY, sizeOf(o), rv);
       const sx = nd.shake > 0 ? Math.sin(time * 70) * 3 * nd.shake : 0;
       const x = nd.x + sx;
       const y = nd.y;
@@ -327,17 +356,19 @@
       // --- 빛: 희귀할수록 더 넓고 환하다 ---
       ctx.globalCompositeOperation = 'lighter';
       const R = (34 + o.tier * 20) * sc;
-      this.drawGlow(ctx, x, y - 18 * sc, R, rgb, 0.1 + 0.06 * o.tier + 0.04 * pulse * o.tier);
-      if (o.tier >= 2) this.drawGlow(ctx, x, y - 20 * sc, R * 0.5, '255,255,255', 0.02 + 0.015 * o.tier * pulse);
+      // 캐기 전에는 빛이 거의 없다. 아주 희귀한 것만 흰빛이 희미하게 샌다 (뭔가 있을지도?)
+      this.drawGlow(ctx, x, y - 18 * sc, R, rgb, (0.1 + 0.06 * o.tier + 0.04 * pulse * o.tier) * rv);
+      if (o.tier >= 2) this.drawGlow(ctx, x, y - 20 * sc, R * 0.5, '255,255,255', (0.02 + 0.015 * o.tier * pulse) * rv);
+      if (rv < 1 && o.tier >= 3) this.drawGlow(ctx, x, y - 18 * sc, 34 * sc, '255,255,255', (0.02 + 0.025 * pulse) * (1 - rv));
       // 바닥을 비추는 빛 웅덩이
-      ctx.fillStyle = `rgba(${rgb},${0.08 + 0.05 * o.tier})`;
+      ctx.fillStyle = `rgba(${rgb},${(0.08 + 0.05 * o.tier) * rv})`;
       ctx.beginPath(); ctx.ellipse(x, y, R * 0.8, 7 + o.tier * 2, 0, 0, Math.PI * 2); ctx.fill();
-      if (o.tier >= 3) { // 천천히 도는 빛줄기
+      if (o.tier >= 3 && rv > 0.4) { // 천천히 도는 빛줄기
         const rays = o.tier === 3 ? 5 : 8;
         for (let i = 0; i < rays; i++) {
           const a = time * 0.35 + (i / rays) * Math.PI * 2;
           const len = R * (0.8 + 0.12 * Math.sin(time * 2 + i));
-          ctx.fillStyle = `rgba(${rgb},${0.025 + 0.012 * o.tier})`;
+          ctx.fillStyle = `rgba(${rgb},${(0.025 + 0.012 * o.tier) * rv})`;
           ctx.beginPath();
           ctx.moveTo(x, y - 20 * sc);
           ctx.lineTo(x + Math.cos(a - 0.07) * len, y - 20 * sc + Math.sin(a - 0.07) * len);
@@ -345,7 +376,7 @@
           ctx.closePath(); ctx.fill();
         }
       }
-      if (o.tier >= 4) { // 별빛이 맴돌고, 빛 기둥이 솟는다
+      if (o.tier >= 4 && rv > 0.6) { // 별빛이 맴돌고, 빛 기둥이 솟는다
         for (let i = 0; i < 6; i++) {
           const a = time * 1.2 + i * 1.047;
           const rr = 34 * sc + 6 * Math.sin(time * 3 + i);
@@ -373,14 +404,14 @@
       ctx.beginPath(); ctx.moveTo(-14, -12); ctx.lineTo(-4, -20); ctx.lineTo(0, -8); ctx.lineTo(-10, -2); ctx.closePath(); ctx.fill();
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(-18, -3, 35, 3);
       // 박힌 결정 (단계가 높을수록 크고 많다)
-      const n = 2 + o.tier;
+      const n = 2 + Math.round(o.tier * rv);
       for (let i = 0; i < n; i++) {
         const cx = -10 + (i * 20) / Math.max(1, n - 1);
         const hh = 8 + ((i * 7 + o.tier * 3) % 5) + o.tier * 2;
         const cy = -8 - (i % 2) * 5;
-        ctx.fillStyle = nd.flash > 0 ? '#ffffff' : o.look[1];
-        ctx.beginPath(); ctx.moveTo(cx - 4, cy + 4); ctx.lineTo(cx, cy - hh); ctx.lineTo(cx + 4, cy + 4); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = o.look[0];
+        ctx.fillStyle = nd.flash > 0 ? '#ffffff' : rv < 0.25 ? '#6a6678' : o.look[1]; // 처음엔 평범한 돌조각처럼 보인다
+        ctx.beginPath(); ctx.moveTo(cx - 4, cy + 4); ctx.lineTo(cx, cy - hh * lerp(0.6, 1, rv)); ctx.lineTo(cx + 4, cy + 4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = rv < 0.25 ? '#7d788c' : o.look[0];
         ctx.beginPath(); ctx.moveTo(cx - 2.5, cy + 4); ctx.lineTo(cx - 0.5, cy - hh + 3); ctx.lineTo(cx + 1, cy + 4); ctx.closePath(); ctx.fill();
       }
       if (Math.sin(time * 5 + nd.t) > 0.8 - 0.05 * o.tier) { ctx.fillStyle = '#fff'; ctx.fillRect(4, -26, 2, 2); ctx.fillRect(-12, -18, 2, 2); ctx.fillRect(-2, -12, 2, 2); } // 반짝

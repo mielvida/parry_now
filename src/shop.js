@@ -190,7 +190,7 @@
   add({ id: 'potion2', name: '회복 물약', desc: '피 2칸 회복', price: 180, heal: 2, look: ['#c79cf0'] });
   const POTION_IDS = ['potion1', 'potion2'];
 
-  const MATERIAL_IDS = ['darkcrystal', 'cleancrystal', 'holycrystal'];
+  const MATERIAL_IDS = ['darkshard', 'darkcrystal', 'cleancrystal', 'holycrystal'];
 
   // ---- 집과 장식품 (마을에 정착하기) ----
   // 집: 종류마다 방 크기(cols)와 꾸밀 수 있는 자리 수(바닥 floor / 벽 wall)가 다르다. 하나를 사서 살고, 다른 집을 사면 이사한다
@@ -267,6 +267,7 @@
     return tabs;
   }
   // 소중한 물건 (quest): 보스가 쓰러질 때마다 하나씩 떨어뜨리고 개수가 쌓인다. 장착하거나 쓸 수 없고 인벤토리에 간직한다
+  add({ id: 'darkshard', name: '어둠의 크리스탈 조각', desc: '광물 동굴 깊은 곳의 어둠 결정에서 캔 조각. 3개를 용광로에서 합치면 어둠의 크리스탈이 된다', quest: true, look: ['#b07af0', '#3a1a70'] });
   add({ id: 'darkcrystal', name: '어둠의 크리스탈', desc: '보스가 떨어뜨린 보랏빛 수정. 깊은 어둠의 힘이 느껴진다', quest: true, look: ['#8a4fe0', '#2a1250'] });
 
   // 도구: 한 번 사면 계속 쓴다 (인벤토리 '재료' 칸에 들어간다)
@@ -549,7 +550,7 @@
       ingots: {}, // 제련한 주괴 개수
       attach: {}, // 무기마다 붙인 주괴 목록
       holy: {}, // 칼마다 붙인 신성 크리스탈 개수
-      materials: { darkcrystal: 0, cleancrystal: 0, holycrystal: 0 }, // 보스가 떨어뜨리는 소중한 물건의 개수 (쌓인다)
+      materials: { darkshard: 0, darkcrystal: 0, cleancrystal: 0, holycrystal: 0 }, // 보스가 떨어뜨리는 소중한 물건의 개수 (쌓인다)
       consumables: { st70: 0, st30: 0, icebomb: 0 }, // 다크월드 소모품 개수
       home: { type: null, owned: {}, placed: { floor: [], wall: [] } }, // 우리 집: 산 집 종류, 가진 장식품 개수, 방에 놓은 장식품
       mineLevel: 1, // 동굴 보상 업그레이드 레벨 (동굴 보물 상자 코인)

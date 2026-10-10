@@ -272,6 +272,7 @@
 
   // 크리스탈 합치기: 같은 크리스탈 3개 -> 한 단계 위 1개 (어둠 -> 정화 -> 신성). 샘물과 제단을 돌지 않고도 만들 수 있지만 비싸다
   const CRYSTAL_RECIPES = [
+    { from: 'darkshard', to: 'darkcrystal', fee: 0 },
     { from: 'darkcrystal', to: 'cleancrystal', fee: 300 },
     { from: 'cleancrystal', to: 'holycrystal', fee: 800 },
   ];
@@ -481,8 +482,8 @@
   function crystalCards(inv) {
     return CRYSTAL_RECIPES.map((r) => card({
       id: `crystal:${r.from}`, kind: 'crystal', icon: ITEMS[r.to],
-      view: (i) => { const n = (i.materials && i.materials[r.from]) || 0; return { name: `${ITEMS[r.from].name} ${Math.min(n, 99)}/3  →  ${ITEMS[r.to].name}`, desc: n >= 3 ? `3개를 합쳐 ${ITEMS[r.to].name} 1개 (수수료 ${r.fee} G)` : `${3 - n}개 더 있으면 합칠 수 있어요`, note: r.from === 'darkcrystal' ? '보스가 떨어뜨린 크리스탈 3개로 숲의 샘물 없이 정화' : '정화된 크리스탈 3개로 화산의 제단 없이 신성화' }; },
-      label: (i) => (((i.materials && i.materials[r.from]) || 0) >= 3 ? `${r.fee} G` : '재료 부족'),
+      view: (i) => { const n = (i.materials && i.materials[r.from]) || 0; return { name: `${ITEMS[r.from].name} ${Math.min(n, 99)}/3  →  ${ITEMS[r.to].name}`, desc: n >= 3 ? `3개를 합쳐 ${ITEMS[r.to].name} 1개 (수수료 ${r.fee} G)` : `${3 - n}개 더 있으면 합칠 수 있어요`, note: r.from === 'darkshard' ? '광물 동굴의 어둠 결정에서 캔 조각 3개 -> 어둠의 크리스탈' : r.from === 'darkcrystal' ? '보스가 떨어뜨린 크리스탈 3개로 숲의 샘물 없이 정화' : '정화된 크리스탈 3개로 화산의 제단 없이 신성화' }; },
+      label: (i) => (((i.materials && i.materials[r.from]) || 0) >= 3 ? (r.fee ? `${r.fee} G` : '합치기') : '재료 부족'),
       afford: (i, coins) => ((i.materials && i.materials[r.from]) || 0) >= 3 && coins >= r.fee,
       run: (wallet) => crystalMerge(wallet.inv, r.from, wallet),
     }));

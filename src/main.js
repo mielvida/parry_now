@@ -161,6 +161,8 @@
   const inv = G.Shop.newInventory(); // 가진 아이템과 낀 장비 (스테이지가 바뀌어도 유지)
   G.Forge.bind(inv); // 대장간(곡괭이)과 용광로(합치기·제련·부착)가 이 인벤토리를 본다
   let equipStats = G.Shop.stats(inv); // 낀 장비의 능력치 합계 (applyEquipment가 갱신)
+  const bossKills = {};             // 보스를 쓰러뜨린 횟수 (스테이지/층별). 다시 도전할 때마다 보상이 3분의 2로 줄어든다
+  let bossMul = 1;                  // 이번 보스전의 보상 배율 (처음 1, 그다음 2/3, 4/9 …)
   const chestTaken = {};            // 이미 연 보물 상자 (같은 상자로 코인을 또 벌 수 없다)
   let nextStage = null;             // 클리어 연출이 끝나면 갈 곳 {name, near}
   let skipBanner = false; // 마을에 처음 왔을 때의 소개/말은 한 번만
@@ -255,7 +257,12 @@
       if (duelRun) { duelWin(); return; }
       chest = makeChest();
       const drop = STAGES[stageName].boss && STAGES[stageName].boss.drop; // 보스가 떨어뜨리는 소중한 물건 (이미 있으면 다시 주지 않는다)
-      if (drop) { // 보스가 쓰러질 때마다 소중한 물건 1개 (개수가 쌓인다)
+      const key = stageName === 'dungeon' ? 'dungeon' + darkFloor : stageName;
+      const kills = bossKills[key] || 0;
+      bossKills[key] = kills + 1;
+      bossMul = Math.pow(2 / 3, kills); // 처음엔 그대로, 다시 도전할 때마다 3분의 2
+      if (kills > 0) popups.push({ x: player.x + player.w / 2, y: player.y - 100, text: `다시 도전: 보상 ${Math.round(bossMul * 100)}%`, t: 3, color: 'rgba(255,200,140,A)' });
+      if (drop && Math.random() < bossMul) { // 처음엔 꼭, 다시 도전하면 3분의 2 확률로 소중한 물건 1개 (개수가 쌓인다)
         const n = G.Shop.addMaterial(inv, drop);
         popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `${G.Shop.ITEMS[drop].name} 1개 획득! (보유 ${n}개)`, t: 3, color: 'rgba(200,150,255,A)' });
       }
@@ -266,6 +273,7 @@
   };
   function setupBoss() {
     resetAnalysis();
+    bossMul = 1;
     for (let k = monsters.length - 1; k >= 0; k--) if (monsters[k].fromBoss) monsters.splice(k, 1); // 이전 보스전에서 낳은 슬라임 정리
     const st = STAGES[stageName];
     camera.minX = 0;
@@ -1009,6 +1017,7 @@
     sound: (n) => G.Audio.play(n),
     say: (text, color) => say(text, color),
     popup: (x, y, text, color, t = 1.2) => popups.push({ x, y, text, t, color }),
+    giveMaterial(id, n) { inv.materials[id] = (inv.materials[id] || 0) + n; },
     giveOre(id, n) { inv.ores[id] = (inv.ores[id] || 0) + n; G.Forge.markDirty(); },
     pickTier: () => G.Forge.bestPick(inv),
     hasLens: () => inv.equipped.weapon === 'magnifier', // 약점 돋보기를 끼면 광석 단계가 보인다
@@ -2820,7 +2829,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   // 던전 한 층 클리어: 경험치를 얻고 한 층 위로. 100층을 클리어하면 엔딩
   function clearFloor() {
     const floor = darkFloor;
-    const gain = floor * 5 + (dungeon.bossKind ? 200 + floor * 5 : 0);
+    const gain = Math.round((floor * 5 + (dungeon.bossKind ? 200 + floor * 5 : 0)) * (dungeon.bossKind ? bossMul : 1));
     exp += gain;
     darkBest = Math.max(darkBest, floor);
     delete floorSeeds[floor]; // 클리어한 층은 다음에 새 방으로
@@ -3279,8 +3288,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       won = true;
       wonTime = 0;
       const cd = STAGES[stageName].chest;
-      const reward = Math.round(cd.coins * (1 + G.Shop.homeBonuses(inv).coin)); // 집 장식 보너스
-      ending = new G.Ending(cd.mode, reward, cd.exp || 0);
+      const reward = Math.round(cd.coins * bossMul * (1 + G.Shop.homeBonuses(inv).coin)); // 집 장식 보너스, 보스 다시 도전 배율
+      const expGain = Math.round((cd.exp || 0) * bossMul);
+      ending = new G.Ending(cd.mode, reward, expGain);
       nextStage = { name: cd.next, near: cd.near };
       if (!STAGES[stageName].repeatChest) chestTaken[stageName] = true;
       if (stageName === 'mine') { // 동굴을 15번 클리어하면 시크너의 이야기가 시작된다
@@ -3288,7 +3298,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         if (story.caves >= C.CAVE_CLEARS_FOR_STORY && !story.revealed && !story.pending) story.pending = true;
       }
       coins += reward;
-      exp += cd.exp || 0;
+      exp += expGain;
       effects.treasure(chest.x + chest.w / 2, chest.y);
       G.Audio.play('treasure');
       effects.shake(8, 0.35);
