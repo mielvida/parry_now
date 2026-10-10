@@ -70,7 +70,7 @@
 
     // 화상: 걸려 있지 않을 때만 걸린다. BURN_TICKS번 BURN_TICK_DAMAGE씩 피해 (죽으면 불꽃으로 터진다)
     applyBurn() {
-      if (!this.alive || this.burn) return;
+      if (!this.alive || this.burn || (this.immune && this.immune.fire)) return; // 용암 지역의 몬스터는 불에 타지 않는다
       this.burn = { elapsed: 0, ticks: 0 };
       this.deathStyle = 'fire';
     }
@@ -91,7 +91,7 @@
 
     // 동결: 제자리에 얼어붙어 FREEZE_TIME 동안 기절한다 (해롭지 않고, 맞으면 얼음 조각으로 부서진다)
     freeze(time = C.FREEZE_TIME) {
-      if (!this.alive || this.flying) return;
+      if (!this.alive || this.flying || (this.immune && this.immune.ice)) return; // 얼음 지역의 몬스터는 얼지 않는다
       this.frozen = true;
       this.deathStyle = 'ice';
       this.staggered = Math.max(this.staggered, time);

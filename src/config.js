@@ -95,13 +95,21 @@ Game.Config = {
   CRIT_UPGRADE_PRICE: 200, // 1레벨 업그레이드 가격
   CRIT_UPGRADE_STEP: 80,   // 레벨이 오를수록 가격이 이만큼씩 늘어난다
   CRIT_BASE_CHANCE: 0.01,  // 기본 치명타 확률 (1%). 집 장식을 놓을수록 오른다
-  DECOR_COIN_BONUS: 0.01,  // 집에 장식품을 하나 놓을 때마다 코인 획득량이 이만큼(+1%) 늘어난다
+  DECOR_COIN_BONUS: 0.1,   // 집에 장식품(가구)을 하나 놓을 때마다 코인 획득량이 이만큼(+10%) 늘어난다
   DECOR_CRIT_BONUS: 0.003, // 집에 장식품을 하나 놓을 때마다 치명타 확률이 이만큼(+0.3%) 늘어난다
   // 이야기와 다크월드: 마을 동굴을 15번 클리어하면 시크너의 이야기가 나오고 다크월드로 가는 문이 열린다
   CAVE_CLEARS_FOR_STORY: 15,
   DUNGEON_FLOORS: 100,     // 다크월드 던전 층 수 (100층에 시크너)
   STAMINA_MAX: 100,        // 스태미나 최대치: 대시와 폭탄/총/활 공격에 쓴다
   STAMINA_REGEN: 16,       // 초당 회복량
+  STAMINA_MAX_LEVELS: 20,  // 보상 상점: 스태미나 최대 강화 레벨 (20레벨: 100 -> 500)
+  STAMINA_MAX_STEP: 20,    // 레벨마다 최대 스태미나 +20
+  STAMINA_MAX_PRICE: 300,  // 1레벨 가격 (레벨마다 STEP씩 늘어난다)
+  STAMINA_MAX_PRICE_STEP: 120,
+  STAMINA_REGEN_LEVELS: 10, // 보상 상점: 스태미나 회복 속도 최대 강화 레벨
+  STAMINA_REGEN_STEP: 6,   // 레벨마다 초당 회복량 +6 (16 -> 76)
+  STAMINA_REGEN_PRICE: 300,
+  STAMINA_REGEN_PRICE_STEP: 220,
   DASH_STAMINA: 25,        // 대시 한 번에 드는 스태미나
   BOSS_STONE_HP: 1500,     // 정의의 어둠돌 (33층)
   BOSS_JUSTICE_HP: 3000,   // 정의의 어둠 (66층)

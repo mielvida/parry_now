@@ -16,8 +16,26 @@
   const WINDUP_END = C.SWING_SLASH_FRAME;   // 0~4: 치켜들기
   const SLASH_END = 12;                     // 5~11: 빠르게 베기, 12~19: 복귀
 
+  // 망치: 아주 천천히 들어 올렸다가(0~29) 점점 빨라지며 내려찍고(30~49), 땅에 닿은 채 버틴 뒤(50~61) 천천히 든다(62~83)
+  function hammerAngle(f) {
+    if (f < 0) return GUARD;
+    if (f < 30) return lerp(GUARD, -150, easeInOut(f / 30));
+    if (f < 50) { const t = (f - 30) / 20; return lerp(-150, 62, t * t * t); }
+    if (f < 62) return 62;
+    return lerp(62, GUARD, easeInOut((f - 62) / 22));
+  }
+  // 창/레이피어: 찌르기. 뒤로 당겼다가(0~4) 앞으로 쭉 내지르고(5~8) 잠깐 뻗은 채(9~11) 돌아온다 (앞으로 나간 거리 px)
+  function thrustOffset(f) {
+    if (f < 0) return 0;
+    if (f < WINDUP_END) return -12 * easeOut(f / WINDUP_END);
+    if (f < 9) return lerp(-12, 32, easeOut((f - WINDUP_END) / (9 - WINDUP_END)));
+    if (f < SLASH_END) return 32;
+    return lerp(32, 0, easeInOut((f - SLASH_END) / (C.SWING_FRAMES - SLASH_END)));
+  }
+
   // 휘두르기 프레임(0~19) -> 검 각도(도)
   function swordAngle(f) {
+    if (weaponType === 'hammer') return hammerAngle(f);
     if (f < 0) return GUARD;
     if (f < WINDUP_END) return lerp(GUARD, WINDUP, easeOut(f / WINDUP_END));
     if (f < SLASH_END) return lerp(WINDUP, FOLLOW, easeOut((f - WINDUP_END) / (SLASH_END - WINDUP_END)));
@@ -44,6 +62,8 @@
 
   // 신발(없으면 기본 가죽색): [본체, 밑창]
   let bootCol = ['#4a3b2a', '#3a2f22'];
+  // 바지(없으면 null): [본체, 그늘]
+  let pantsCol = null;
 
   function drawLegs(ctx, p) {
     const moving = p.onGround && Math.abs(p.vx) > 10;
@@ -51,10 +71,16 @@
     if (!p.onGround) { // 공중: 한 다리는 앞으로, 한 다리는 접음
       rect(ctx, bootCol[0], -5, 25, 5, 6);
       rect(ctx, bootCol[0], 1, 23, 6, 5);
+      if (pantsCol) { rect(ctx, pantsCol[1], -5, 25, 5, 3); rect(ctx, pantsCol[0], 1, 23, 6, 3); }
       return;
     }
     rect(ctx, bootCol[1], -6 - stride, 24, 5, 8);
     rect(ctx, bootCol[0], 1 + stride, 24, 5, 8);
+    if (pantsCol) { // 바지: 다리 위쪽을 덮는다
+      rect(ctx, pantsCol[1], -6 - stride, 24, 5, 5);
+      rect(ctx, pantsCol[0], 1 + stride, 24, 5, 5);
+      rect(ctx, pantsCol[0], -6, 22, 12, 3);
+    }
     if (bootCol[2]) { // 산 신발은 앞코를 조금 길게
       rect(ctx, bootCol[0], -6 - stride, 29, 7, 3);
       rect(ctx, bootCol[0], 1 + stride, 29, 7, 3);
@@ -176,6 +202,54 @@
       ctx.beginPath(); ctx.moveTo(28, -2); ctx.quadraticCurveTo(38, -20, 56, -10); ctx.quadraticCurveTo(42, -13, 33, 2); ctx.closePath(); ctx.fill();
       ctx.fillStyle = blade[1];
       ctx.beginPath(); ctx.moveTo(30, -2); ctx.quadraticCurveTo(38, -13, 52, -9); ctx.quadraticCurveTo(40, -9, 33, 1); ctx.closePath(); ctx.fill();
+    } else if (weaponType === 'spear') { // 창: 긴 자루 끝의 뾰족한 날
+      rect(ctx, '#6b4423', -8, -1.2, 46, 2.4);
+      ctx.fillStyle = blade[0];
+      ctx.beginPath(); ctx.moveTo(36, -3.5); ctx.lineTo(50, 0); ctx.lineTo(36, 3.5); ctx.closePath(); ctx.fill();
+      rect(ctx, blade[1], 36, 0, 10, 1.4);
+      rect(ctx, '#c0504d', 33, -2.2, 3, 4.4);
+    } else if (weaponType === 'axe') { // 도끼: 자루 끝의 넓은 날
+      rect(ctx, '#6b4423', -6, -1.5, 34, 3);
+      ctx.fillStyle = blade[0];
+      ctx.beginPath(); ctx.moveTo(22, -2); ctx.lineTo(28, -13); ctx.quadraticCurveTo(38, -8, 36, 0); ctx.quadraticCurveTo(38, 8, 28, 13); ctx.lineTo(22, 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = blade[1];
+      ctx.beginPath(); ctx.moveTo(30, -9); ctx.quadraticCurveTo(36, -6, 35, 0); ctx.quadraticCurveTo(36, 6, 30, 9); ctx.lineTo(32, 0); ctx.closePath(); ctx.fill();
+    } else if (weaponType === 'hammer') { // 망치: 묵직한 머리
+      rect(ctx, '#6b4423', -6, -1.5, 32, 3);
+      rect(ctx, blade[0], 22, -9, 14, 18);
+      rect(ctx, blade[1], 22, 3, 14, 6);
+      rect(ctx, '#e0b12f', 22, -9, 14, 2);
+    } else if (weaponType === 'katana') { // 도: 살짝 굽은 가는 칼날
+      rect(ctx, '#3a2a4a', -6, -1.5, 9, 3);
+      rect(ctx, '#e0b12f', 3, -4, 2.5, 8);
+      ctx.fillStyle = blade[0];
+      ctx.beginPath(); ctx.moveTo(5, -1.4); ctx.quadraticCurveTo(24, -4, 38, -9); ctx.lineTo(38, -6); ctx.quadraticCurveTo(24, 0, 5, 1.4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = blade[1];
+      ctx.beginPath(); ctx.moveTo(5, 0.4); ctx.quadraticCurveTo(24, -1, 37, -6.5); ctx.lineTo(37, -6); ctx.quadraticCurveTo(24, 0, 5, 1.4); ctx.closePath(); ctx.fill();
+    } else if (weaponType === 'rapier') { // 레이피어: 가는 칼날과 둥근 날밑
+      rect(ctx, '#6b4423', -6, -1.5, 8, 3);
+      ctx.strokeStyle = '#e0b12f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(4, 0, 5, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
+      rect(ctx, blade[0], 6, -0.9, 32, 1.8);
+      rect(ctx, blade[1], 6, 0.2, 32, 0.8);
+      ctx.fillStyle = blade[0]; ctx.beginPath(); ctx.moveTo(38, -0.9); ctx.lineTo(43, 0); ctx.lineTo(38, 0.9); ctx.closePath(); ctx.fill();
+    } else if (weaponType === 'whip') { // 채찍: 손잡이와 휘감긴 끈
+      rect(ctx, '#6b4423', -6, -1.8, 10, 3.6);
+      ctx.strokeStyle = blade[0]; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(4, 0); ctx.quadraticCurveTo(20, -14, 34, -4); ctx.quadraticCurveTo(46, 4, 40, 12); ctx.stroke();
+      ctx.strokeStyle = blade[1]; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(4, 0.6); ctx.quadraticCurveTo(20, -13, 34, -3.4); ctx.stroke();
+      ctx.lineCap = 'butt';
+    } else if (weaponType === 'crossbow') { // 석궁: 개머리판과 가로 활
+      rect(ctx, '#6b4423', -4, -2, 24, 4);
+      rect(ctx, blade[0], 14, -11, 3, 22);
+      ctx.strokeStyle = blade[1]; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(15, -11); ctx.lineTo(6, 0); ctx.lineTo(15, 11); ctx.stroke();
+      rect(ctx, '#c9d2dc', 6, -0.6, 16, 1.2);
+    } else if (weaponType === 'shotgun') { // 산탄총: 굵은 총신과 개머리판
+      rect(ctx, '#5a3a22', -8, -1, 10, 6);
+      rect(ctx, blade[1], 0, -3, 28, 5);
+      rect(ctx, blade[0], 0, -3, 28, 2);
+      rect(ctx, '#2a2f3a', 26, -4, 4, 7);
+      rect(ctx, '#6b4423', 10, 1, 8, 3);
     } else if (weaponType === 'great') { // 대검: 길고 넓은 칼날
       rect(ctx, '#6b4423', -7, -1.5, 8, 3);
       rect(ctx, '#e0b12f', 1, -7, 3, 14);
@@ -329,6 +403,7 @@
       armorCol = items[p.armorId || 'armor0'].look;
       headCol = p.helmetId ? items[p.helmetId].look : ['#c9d2dc', '#e6edf5'];
       gloveCol = p.glovesId ? items[p.glovesId].look[0] : '#e8b98a';
+      pantsCol = p.pantsId ? items[p.pantsId].look : null;
       bootCol = p.bootsId ? [items[p.bootsId].look[0], items[p.bootsId].look[1], true] : ['#4a3b2a', '#3a2f22'];
       if (G.Sprites && G.Sprites.active() && drawCustom(ctx, p)) return; // 내 스프라이트를 켰으면 그걸로 그린다
       const cx = sp(p.x + p.w / 2);
@@ -346,10 +421,22 @@
       ctx.translate(6, 16);
       const f = p.swing;
       const guard = p.guardTimer > 0; // 패링 성공 직후: 검을 앞으로 세우고 막는 자세
-      const angle = guard ? GUARD_UP : swordAngle(f);
+      const thrust = (weaponType === 'spear' || weaponType === 'rapier') && !guard; // 창은 베지 않고 찌른다
+      const angle = guard ? GUARD_UP : thrust ? -6 : swordAngle(f);
       if (!p.swordOut) { // 검을 던진 동안은 손이 빈다
-        if (!guard && !Hero.suppressTrail) drawSlashTrail(ctx, f, angle);
-        drawSword(ctx, angle);
+        if (!guard && !Hero.suppressTrail && weaponType !== 'hammer' && !thrust) drawSlashTrail(ctx, f, angle);
+        if (thrust) {
+          const off = thrustOffset(f);
+          if (f >= WINDUP_END && f < SLASH_END) { // 찌른 자리에 남는 가는 빛줄기
+            ctx.strokeStyle = `rgba(255,255,255,${0.75 * (1 - (f - WINDUP_END) / (SLASH_END - WINDUP_END))})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(off + 8, -1); ctx.lineTo(off + 60, -1); ctx.stroke();
+          }
+          ctx.save();
+          ctx.translate(off, 0);
+          drawSword(ctx, angle);
+          ctx.restore();
+        } else drawSword(ctx, angle);
       }
       if (guard) drawGuardShield(ctx, p.guardTimer / C.GUARD_TIME);
       rect(ctx, gloveCol, -2.5, -2.5, 5, 5);    // 손 (장갑)

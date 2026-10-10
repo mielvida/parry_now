@@ -15,6 +15,9 @@
     darkmerchant: { robe: '#2a4a4a', trim: '#60d0b0', hat: '#10302a', beard: null, hair: '#10302a', skin: '#c8b0a0' },
     agent: { robe: '#2f3a52', trim: '#c9d2dc', hat: '#2a2a30', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
     designer: { robe: '#d4608a', trim: '#ffc0d8', hat: '#8a2a5a', beard: null, hair: '#6b4423', skin: '#e8b98a' },
+    gambler: { robe: '#2a2a3a', trim: '#d4a017', hat: '#1a1a1a', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
+    thrower: { robe: '#c0392b', trim: '#ffd0c0', hat: '#f4f1e8', beard: null, hair: '#6b4423', skin: '#e8b98a' },
+    rival: { robe: '#2a4a8a', trim: '#9fc8ff', hat: null, beard: null, hair: '#c0392b', skin: '#e8b98a' },
     miner: { robe: '#8a6a2b', trim: '#d4a017', hat: '#e0b12f', beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070' },
     smith: { robe: '#5b5f6b', trim: '#8b90a0', hat: null, beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070', apron: '#3a2f22' },
   };

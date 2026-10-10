@@ -27,6 +27,8 @@
       this.shops = [];      // 상점 {col,row,kind:'potion'|'sword'}
       this.villagers = [];  // 마을 사람 {col,row}
       this.caveEntrances = []; // 마을의 동굴 입구 {col,row}
+      this.waters = [];     // 숲의 샘물 'w' {col,row}: 어둠의 크리스탈을 씻는다
+      this.altars = [];     // 화산의 신성의 제단 'v' {col,row}: 정화된 크리스탈을 신성 크리스탈로 바꾼다
       this.exits = [];      // 동굴의 마을 출구 {col,row}
       this.gates = [];      // 마을의 스테이지 문 {col,row,stage}: F 숲, N 설산, M 화산
 
@@ -45,6 +47,11 @@
           if (ch === 'E') this.shops.push({ col: c, row: r, kind: 'dweapon' });
           if (ch === 'I') this.shops.push({ col: c, row: r, kind: 'ditem' });
           if (ch === 'a') this.shops.push({ col: c, row: r, kind: 'darmor' });
+          if (ch === 'p') this.shops.push({ col: c, row: r, kind: 'pants' });
+          if (ch === 'g') this.shops.push({ col: c, row: r, kind: 'weapon2' });
+          if (ch === 'm') this.shops.push({ col: c, row: r, kind: 'mgshell' });
+          if (ch === 'n') this.shops.push({ col: c, row: r, kind: 'mgtarget' });
+          if (ch === 'd') this.shops.push({ col: c, row: r, kind: 'mgduel' });
           if (ch === 'O') this.shops.push({ col: c, row: r, kind: 'dupgrade' });
           if (ch === 'Z') this.gates.push({ col: c, row: r, stage: 'darkhub' });
           if (ch === 'J') this.gates.push({ col: c, row: r, stage: 'dungeon' });
@@ -61,6 +68,8 @@
           if (ch === 'V') this.villagers.push({ col: c, row: r });
           if (ch === 'D') this.caveEntrances.push({ col: c, row: r });
           if (ch === 'X') this.exits.push({ col: c, row: r });
+          if (ch === 'w') this.waters.push({ col: c, row: r });
+          if (ch === 'v') this.altars.push({ col: c, row: r });
           if (ch === 'F') this.gates.push({ col: c, row: r, stage: 'forest' });
           if (ch === 'N') this.gates.push({ col: c, row: r, stage: 'snow' });
           if (ch === 'M') this.gates.push({ col: c, row: r, stage: 'volcano' });

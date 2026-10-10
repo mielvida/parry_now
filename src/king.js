@@ -52,10 +52,10 @@
       this.sy = 1;
     }
 
-    get vulnerable() { return this.alive && (this.state === 'idle' || this.state === 'down' || this.state === 'stun'); }
+    get vulnerable() { return this.alive && (this.state === 'idle' || this.state === 'down' || this.state === 'stun' || this.state === 'recall' || this.state === 'roll' || this.state === 'bounce'); }
     get dead() { return this.state === 'dead'; }
-    get landing() { return this.state === 'air' && this.attacking && this.st / this.dur > 0.45; }
-    get touchHarm() { return this.alive && (this.state === 'idle' || this.state === 'crouch' || this.state === 'shake' || this.state === 'wind'); }
+    get landing() { return this.state === 'air' && this.attacking && (this.rush || this.st / this.dur > 0.45); } // rush: 돌진/순간이동 내려찍기는 처음부터 위험하다
+    get touchHarm() { return this.alive && (this.state === 'idle' || this.state === 'crouch' || this.state === 'shake' || this.state === 'wind' || this.state === 'roll' || this.state === 'bounce'); }
     damage(n) { this.king.damageBody(n); }
     applyPoison() { this.king.damageBody(1); }
 
@@ -71,7 +71,7 @@
       this.kind = 'king';
       this.name = '왕슬라임';
       this.defeatText = '왕슬라임을 쓰러뜨렸다!';
-      this.weak = null;
+      this.weak = 'light'; // 약점 속성: 빛 (빛 속성 무기와 번개 지팡이)
       this.hurtDmg = 1;
       this.left = left;
       this.right = left + width;
@@ -94,6 +94,8 @@
       this.done = false;
       this.time = 0;
       this.landed = false;
+      this.spawnedOnce = false; // 부하 소환은 한 판에 한 번만
+      this.lastType = null;
     }
 
     get alive() { return this.body.alive ? [this.body] : []; }
@@ -262,7 +264,10 @@
     // ---------- 패턴 ----------
     _startPattern() {
       if (!this.body.alive) return;
-      const type = ['spawn', 'slam', 'ball'][Math.floor(Math.random() * 3)];
+      const pool = ['spawn', 'slam', 'ball'].filter((t) => !(t === 'spawn' && this.spawnedOnce) && t !== this.lastType);
+      const type = pool[Math.floor(Math.random() * pool.length)];
+      this.lastType = type;
+      if (type === 'spawn') this.spawnedOnce = true;
       this.pat = { type, t: 0, n: 0, sub: 'start' };
       if (type === 'ball') {
         this.pat.shots = [];
@@ -388,6 +393,7 @@
       for (const f of this.balls) {
         f.t += dt;
         f.life -= dt;
+        if (f.ay && !f.reflected) f.vy += f.ay * dt; // 중력을 받는 구슬 (어둠 분수)
         f.x += f.vx * dt;
         f.y += f.vy * dt;
         if (f.y > this.groundY || f.x < this.left - 40 || f.x > this.right + 40 || f.life <= 0) { f.dead = true; if (f.y > this.groundY) this.ev.fx('burst', f.x, this.groundY); continue; }

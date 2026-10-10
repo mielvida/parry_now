@@ -204,6 +204,16 @@
       });
     }
 
+    // 찌르기: 앞으로 쭉 뻗는 하얀 불꽃 몇 개 (창, 레이피어)
+    thrust(x, y, dir) {
+      for (let i = 0; i < 8; i++) {
+        this.particles.push({
+          kind: 'spark', x: x + dir * rand(16, 30), y: y - rand(-5, 5), vx: dir * rand(600, 1000), vy: rand(-30, 30),
+          life: rand(0.1, 0.2), max: 0.2, size: rand(2, 3.5), gravity: 0, color: i % 2 ? '255,255,255' : '200,230,255',
+        });
+      }
+    }
+
     dashDust(x, y, dir) {
       for (let i = 0; i < 8; i++) {
         this.particles.push({

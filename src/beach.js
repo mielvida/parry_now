@@ -188,9 +188,14 @@
     const ditem = shop.kind === 'ditem';
     const dupgrade = shop.kind === 'dupgrade';
     const darmor = shop.kind === 'darmor';
+    const pantsShop = shop.kind === 'pants';
+    const weapon2 = shop.kind === 'weapon2';
+    const mgShell = shop.kind === 'mgshell';
+    const mgTarget = shop.kind === 'mgtarget';
+    const mgDuel = shop.kind === 'mgduel';
     const w = 140;
     const x = baseX - w / 2;
-    const stripeA = potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : '#4f7fd4';
+    const stripeA = potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
     ctx.fillStyle = 'rgba(0,0,0,0.14)';
     ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒤쪽 벽 + 기둥
@@ -223,6 +228,35 @@
       ctx.fillStyle = '#bfffe8'; ctx.fillRect(x + 54, baseY - 76, 10, 14); ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + 56, baseY - 81, 6, 6); // 작은 스태미나 병
       ctx.fillStyle = '#5fa8d9'; ctx.beginPath(); ctx.arc(x + 98, baseY - 70, 9, 0, Math.PI * 2); ctx.fill(); // 얼음 폭탄
       ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.arc(x + 95, baseY - 73, 3, 0, Math.PI * 2); ctx.fill();
+    } else if (mgShell) { // 선반 위의 컵 세 개와 빨간 공
+      [[24, '#c0392b'], [62, '#d4a017'], [100, '#3a6fb0']].forEach(([dx, col]) => {
+        ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x + dx, baseY - 90); ctx.lineTo(x + dx + 22, baseY - 90); ctx.lineTo(x + dx + 28, baseY - 62); ctx.lineTo(x + dx - 6, baseY - 62); ctx.closePath(); ctx.fill();
+      });
+      ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(x + 124, baseY - 68, 6, 0, Math.PI * 2); ctx.fill();
+    } else if (mgTarget) { // 벽에 걸린 표적
+      [[34, 18], [90, 18]].forEach(([dx, r]) => {
+        ctx.fillStyle = '#f4f1e8'; ctx.beginPath(); ctx.arc(x + dx, baseY - 64, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#d9473f'; ctx.beginPath(); ctx.arc(x + dx, baseY - 64, r * 0.66, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f4f1e8'; ctx.beginPath(); ctx.arc(x + dx, baseY - 64, r * 0.36, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#d9473f'; ctx.beginPath(); ctx.arc(x + dx, baseY - 64, r * 0.14, 0, Math.PI * 2); ctx.fill();
+      });
+    } else if (mgDuel) { // 벽에 걸린 두 자루의 검과 방패
+      ctx.fillStyle = '#c9d2dc'; ctx.save(); ctx.translate(x + 40, baseY - 66); ctx.rotate(0.7); ctx.fillRect(-2, -26, 4, 52); ctx.restore();
+      ctx.save(); ctx.translate(x + 40, baseY - 66); ctx.rotate(-0.7); ctx.fillRect(-2, -26, 4, 52); ctx.restore();
+      ctx.fillStyle = '#3a6fb0'; ctx.beginPath(); ctx.arc(x + 100, baseY - 64, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e0b12f'; ctx.fillRect(x + 98, baseY - 76, 4, 24);
+    } else if (weapon2) { // 벽에 걸린 창, 도끼, 망치, 도
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(x + 16, baseY - 90, 3, 54); ctx.fillStyle = '#c9d2dc'; ctx.beginPath(); ctx.moveTo(x + 17.5, baseY - 98); ctx.lineTo(x + 12, baseY - 88); ctx.lineTo(x + 23, baseY - 88); ctx.fill(); // 창
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(x + 44, baseY - 84, 3, 40); ctx.fillStyle = '#b8c0cc'; ctx.beginPath(); ctx.moveTo(x + 47, baseY - 84); ctx.lineTo(x + 62, baseY - 80); ctx.lineTo(x + 62, baseY - 64); ctx.lineTo(x + 47, baseY - 66); ctx.fill(); // 도끼
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(x + 80, baseY - 82, 3, 40); ctx.fillStyle = '#8a8f9a'; ctx.fillRect(x + 72, baseY - 88, 19, 12); // 망치
+      ctx.fillStyle = '#e8f1ff'; ctx.beginPath(); ctx.moveTo(x + 108, baseY - 92); ctx.quadraticCurveTo(x + 112, baseY - 70, x + 106, baseY - 44); ctx.lineTo(x + 109, baseY - 44); ctx.quadraticCurveTo(x + 116, baseY - 70, x + 111, baseY - 92); ctx.fill(); // 도
+    } else if (pantsShop) { // 빨랫줄에 걸린 바지들
+      ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 8, baseY - 84); ctx.lineTo(x + w - 8, baseY - 84); ctx.stroke();
+      [['#9a8a6a', 16], ['#8a5a2b', 42], ['#6a4fb0', 68], ['#d4a017', 94], ['#4fae45', 118]].forEach(([col, dx]) => {
+        ctx.fillStyle = col;
+        ctx.fillRect(x + dx, baseY - 84, 16, 10);
+        ctx.fillRect(x + dx, baseY - 74, 7, 24); ctx.fillRect(x + dx + 9, baseY - 74, 7, 24);
+      });
     } else if (darmor) { // 선반 위 검은 투구와 갑옷
       ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
       [['#3a3f4d', '#6a7388', 20], ['#2a1250', '#c07aff', 60], ['#1a0a30', '#8a60d0', 100]].forEach(([c0, c1, dx]) => {
@@ -292,7 +326,7 @@
       }
     }
     // 주인
-    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', sword: 'smith', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
+    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'smith', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', sword: 'smith', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);
@@ -309,6 +343,18 @@
     } else if (ditem) { // 계산대 위 스태미나 병
       ctx.fillStyle = '#7dffd0'; ctx.fillRect(x + w - 38, baseY - 46, 12, 14);
       ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + w - 35, baseY - 52, 6, 7);
+    } else if (mgShell) { // 계산대 위에 엎어 둔 컵
+      ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.moveTo(x + w - 52, baseY - 50); ctx.lineTo(x + w - 36, baseY - 50); ctx.lineTo(x + w - 30, baseY - 32); ctx.lineTo(x + w - 58, baseY - 32); ctx.closePath(); ctx.fill();
+    } else if (mgTarget) { // 계산대 위의 공 더미
+      ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(x + w - 54, baseY - 38, 6, 0, Math.PI * 2); ctx.arc(x + w - 42, baseY - 38, 6, 0, Math.PI * 2); ctx.arc(x + w - 48, baseY - 48, 6, 0, Math.PI * 2); ctx.fill();
+    } else if (mgDuel) { // 계산대 위의 장갑
+      ctx.fillStyle = '#e8e0d0'; ctx.fillRect(x + w - 56, baseY - 42, 20, 10); ctx.fillStyle = '#c0504d'; ctx.fillRect(x + w - 56, baseY - 42, 6, 10);
+    } else if (weapon2) { // 계산대 위 숫돌과 칼
+      ctx.fillStyle = '#7a7f8a'; ctx.fillRect(x + w - 44, baseY - 40, 26, 8);
+      ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + w - 40, baseY - 46, 20, 4);
+    } else if (pantsShop) { // 계산대 위 접힌 바지
+      ctx.fillStyle = '#8a5a2b'; ctx.fillRect(x + w - 44, baseY - 42, 26, 10);
+      ctx.fillStyle = '#6a4fb0'; ctx.fillRect(x + w - 42, baseY - 50, 22, 9);
     } else if (darmor) { // 계산대 위 어둠의 투구
       ctx.fillStyle = '#2a1250'; ctx.fillRect(x + w - 40, baseY - 46, 22, 14);
       ctx.fillStyle = '#c07aff'; ctx.fillRect(x + w - 40, baseY - 46, 22, 4);
@@ -350,7 +396,7 @@
     ctx.fillRect(baseX - 34, topY - 26, 68, 22);
     ctx.fillStyle = '#e9d8a6';
     ctx.fillRect(baseX - 31, topY - 23, 62, 16);
-    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
@@ -415,6 +461,7 @@
     darkhub: { name: '다크월드', a: '#5a1a8a', b: '#d9a0ff' },
     dungeon: { name: '던전', a: '#2a0a3a', b: '#ff6a8a' },
   };
+  // 차원문: 룬이 새겨진 돌 아치, 안쪽에서 소용돌이치는 빛, 문 주위를 도는 룬, 문 안으로 빨려 드는 빛 알갱이, 하늘로 솟는 빛기둥
   function drawGate(ctx, g, baseX, baseY, time) {
     const L = GATE_LOOK[g.stage];
     ctx.fillStyle = 'rgba(0,0,0,0.16)';

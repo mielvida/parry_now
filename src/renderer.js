@@ -90,6 +90,7 @@
       if (extras.boss) extras.boss.drawBack(ctx); // 땅 뒤: 용암에서 올라오는 목
       this._drawTerrain(ctx, terrain, camera);
       this._drawGroundDecor(ctx, terrain, camera, time);
+      this._drawCrystalSpots(ctx, terrain, time);
       if (extras.chest) (extras.chest.door ? this._drawDoor(ctx, extras.chest) : this._drawChest(ctx, extras.chest));
       if (extras.pickups) for (const p of extras.pickups) this._drawPickup(ctx, p, time);
       if (extras.enemyShots) for (const f of extras.enemyShots) this._drawEnemyShot(ctx, f);
@@ -137,18 +138,32 @@
       }
       if (extras.darken) this._drawDarkVillage(main, extras.darken, time);
       this._drawHud(main, hud);
-      if (hud && hud.stamina !== undefined) this._drawStamina(main, hud);
-      if (hud && hud.boss) this._drawBossBars(main, hud.boss);
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini));
+      if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
+      if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
+      if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
+      this._bottomBusy = !!(hud && (hud.dialog || hud.prompt)); // 자막이 겹치지 않게
       if (hud && hud.banner) this._drawStageBanner(main, hud.banner);
     }
 
     // 보스 체력: 머리마다 막대 (맞을 수 있는 머리는 노랗게)
-    _drawBossBars(ctx, boss) {
+    _drawBossBars(ctx, boss, weakText) {
+      if (boss.kind === 'rival') { // 결투 상대: 보스바 대신 나처럼 하트 체력
+        const h = boss.heads[0];
+        const step = 32;
+        const x0 = (this.viewW - step * (h.maxHp - 1)) / 2;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.font = 'bold 14px sans-serif';
+        this._text(ctx, boss.name, this.viewW / 2, 140);
+        for (let i = 0; i < h.maxHp; i++) this._drawHeart(ctx, x0 + i * step, 162, 24, i + 1 <= h.hp);
+        return;
+      }
       const n = boss.heads.length;
       const bw = n === 1 ? 420 : 250;
       const gap = 24;
       const x0 = (this.viewW - (bw * n + gap * (n - 1))) / 2;
-      const y = 84;
+      const y = 122;
       ctx.textAlign = 'center';
       ctx.font = 'bold 12px sans-serif';
       boss.heads.forEach((h, i) => {
@@ -164,6 +179,17 @@
         ctx.fillStyle = '#fff';
         ctx.fillText(h.hp > 0 ? `${boss.name}${n > 1 ? ' ' + (i + 1) : ''}   ${h.hp} / ${h.maxHp}` : `${boss.name}${n > 1 ? ' ' + (i + 1) : ''}   쓰러짐`, x + bw / 2, y + 13);
       });
+      if (weakText) { // 약점 속성 (돋보기가 있으면 이름이 보인다)
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 14px sans-serif';
+        const known = weakText.indexOf('?') < 0;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        const tw = ctx.measureText(weakText).width + 16;
+        ctx.fillRect(this.viewW / 2 - tw / 2, y + 22, tw, 20);
+        ctx.fillStyle = known ? '#9fffb8' : '#9aa4c0';
+        ctx.fillText(weakText, this.viewW / 2, y + 32);
+      }
       ctx.textAlign = 'left';
     }
 
@@ -190,7 +216,7 @@
       ctx.fillText(b.sub, this.viewW / 2, this.viewH * 0.3 + 50);
       if (b.caption) { // 하단 자막 (작은 대화칸)
         const ca = clamp01((b.t - 0.9) / 0.5) * clamp01((b.dur - b.t) / 0.6);
-        Renderer.drawCaption(ctx, this.viewW, this.viewH, b.caption, ca);
+        Renderer.drawCaption(ctx, this.viewW, this.viewH, b.caption, ca, this._bottomBusy ? 42 : 0); // 아래 자막(E: ...)이 있으면 그 위에 쌓는다
       }
       ctx.textAlign = 'start';
     }
@@ -285,7 +311,7 @@
     }
 
     // 대화/자막 칸: 글자 길이에 맞춘 작은 둥근 상자를 화면 아래 가운데에 (대화, 상호작용 안내, 연출 자막 공용)
-    static drawCaption(ctx, viewW, viewH, text, alpha = 1) {
+    static drawCaption(ctx, viewW, viewH, text, alpha = 1, lift = 0) { // lift: 다른 자막이 이미 있을 때 그 위로 올려 그린다
       ctx.save();
       ctx.font = 'bold 16px sans-serif';
       ctx.textAlign = 'center';
@@ -293,7 +319,7 @@
       const bw = Math.min(viewW - 40, ctx.measureText(text).width + 36);
       const bh = 32;
       const x = (viewW - bw) / 2;
-      const y = viewH - 20 - bh;
+      const y = viewH - 20 - bh - lift;
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(x, y, bw, bh, 8); else ctx.rect(x, y, bw, bh);
       ctx.fillStyle = `rgba(10,14,28,${0.8 * alpha})`;
@@ -350,6 +376,12 @@
         ctx.beginPath();
         for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; const rr = k % 2 ? 7 : 17; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
         ctx.closePath(); ctx.fill();
+      } else if (item.upgrade === 'stmax' || item.upgrade === 'stregen') { // 스태미나: 번개 병과 위 화살표
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-15, -4, 30, 26);
+        ctx.fillStyle = L[0]; ctx.fillRect(-13, 0, 26, 22);
+        ctx.fillStyle = '#e8f1ff'; ctx.fillRect(-6, -12, 12, 12);
+        ctx.fillStyle = '#ffe14a'; ctx.beginPath(); ctx.moveTo(2, 2); ctx.lineTo(-6, 13); ctx.lineTo(0, 13); ctx.lineTo(-3, 22); ctx.lineTo(7, 10); ctx.lineTo(1, 10); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[1]; ctx.beginPath(); ctx.moveTo(24, -26); ctx.lineTo(34, -12); ctx.lineTo(28, -12); ctx.lineTo(28, 2); ctx.lineTo(20, 2); ctx.lineTo(20, -12); ctx.lineTo(14, -12); ctx.closePath(); ctx.fill();
       } else if (item.upgrade === 'speed') { // 마을 달리기: 신발과 속도선
         for (const dx of [-14, 2]) {
           ctx.fillStyle = L[0]; ctx.fillRect(dx, -14, 12, 22); ctx.fillRect(dx, 0, 20, 9);
@@ -364,6 +396,13 @@
         }
         ctx.fillStyle = '#7dffa0';
         ctx.beginPath(); ctx.moveTo(14, -22); ctx.lineTo(26, -6); ctx.lineTo(19, -6); ctx.lineTo(19, 14); ctx.lineTo(9, 14); ctx.lineTo(9, -6); ctx.lineTo(2, -6); ctx.closePath(); ctx.fill();
+      } else if (item.tool) { // 약점 돋보기: 둥근 렌즈와 손잡이
+        ctx.strokeStyle = L[1]; ctx.lineWidth = 6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(10, 10); ctx.lineTo(26, 26); ctx.stroke();
+        ctx.fillStyle = L[1]; ctx.beginPath(); ctx.arc(-3, -3, 19, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.arc(-3, -3, 15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(-9, -9, 5, 3, -0.7, 0, Math.PI * 2); ctx.fill();
+        ctx.lineCap = 'butt';
       } else if (item.quest) { // 어둠의 크리스탈: 보랏빛 육각 수정과 빛
         const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
         g.addColorStop(0, 'rgba(190,140,255,0.7)'); g.addColorStop(1, 'rgba(120,60,200,0)');
@@ -434,6 +473,53 @@
         ctx.beginPath(); ctx.moveTo(1, -36); ctx.quadraticCurveTo(30, -50, 36, -20); ctx.quadraticCurveTo(24, -36, 1, -26); ctx.closePath(); ctx.fill();
         ctx.fillStyle = L[1];
         ctx.beginPath(); ctx.moveTo(1, -30); ctx.quadraticCurveTo(22, -38, 33, -20); ctx.quadraticCurveTo(20, -30, 1, -26); ctx.closePath(); ctx.fill();
+      } else if (item.slot === 'weapon' && item.type === 'spear') {
+        ctx.rotate(-0.8);
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(-2, -34, 4, 74);
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.moveTo(0, -54); ctx.lineTo(-7, -34); ctx.lineTo(7, -34); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[1]; ctx.fillRect(0, -50, 3, 16);
+        ctx.fillStyle = '#c0504d'; ctx.fillRect(-4, -34, 8, 4);
+      } else if (item.slot === 'weapon' && item.type === 'axe') {
+        ctx.rotate(-0.8);
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(-2, -30, 4, 68);
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.moveTo(2, -34); ctx.quadraticCurveTo(26, -42, 26, -18); ctx.quadraticCurveTo(26, -8, 2, -14); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[1]; ctx.beginPath(); ctx.moveTo(12, -36); ctx.quadraticCurveTo(24, -30, 22, -20); ctx.quadraticCurveTo(18, -26, 12, -24); ctx.closePath(); ctx.fill();
+      } else if (item.slot === 'weapon' && item.type === 'hammer') {
+        ctx.rotate(-0.8);
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(-2, -22, 4, 62);
+        ctx.fillStyle = L[0]; ctx.fillRect(-17, -38, 34, 18);
+        ctx.fillStyle = L[1]; ctx.fillRect(-17, -26, 34, 6);
+        ctx.fillStyle = '#e0b12f'; ctx.fillRect(-17, -38, 34, 3);
+      } else if (item.slot === 'weapon' && item.type === 'katana') {
+        ctx.rotate(-0.8);
+        ctx.fillStyle = '#3a2a4a'; ctx.fillRect(-3, 12, 6, 18);
+        ctx.fillStyle = '#e0b12f'; ctx.fillRect(-9, 8, 18, 4);
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.moveTo(-3, 8); ctx.quadraticCurveTo(-8, -20, 8, -44); ctx.lineTo(8, -38); ctx.quadraticCurveTo(2, -16, 3, 8); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[1]; ctx.fillRect(1, -20, 2, 26);
+      } else if (item.slot === 'weapon' && item.type === 'rapier') {
+        ctx.rotate(-0.8);
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(-2.5, 14, 5, 16);
+        ctx.strokeStyle = '#e0b12f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 12, 11, Math.PI, 0); ctx.stroke();
+        ctx.fillStyle = L[0]; ctx.fillRect(-2, -42, 4, 54);
+        ctx.fillStyle = L[1]; ctx.fillRect(0, -42, 2, 54);
+        ctx.beginPath(); ctx.moveTo(-2, -42); ctx.lineTo(0, -50); ctx.lineTo(2, -42); ctx.closePath(); ctx.fillStyle = L[0]; ctx.fill();
+      } else if (item.slot === 'weapon' && item.type === 'whip') {
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(-20, 10, 14, 6);
+        ctx.strokeStyle = L[0]; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-6, 13); ctx.quadraticCurveTo(14, -34, 24, -8); ctx.quadraticCurveTo(30, 6, 14, 16); ctx.stroke();
+        ctx.strokeStyle = L[1]; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(-6, 12); ctx.quadraticCurveTo(14, -32, 24, -7); ctx.stroke();
+        ctx.lineCap = 'butt';
+      } else if (item.slot === 'weapon' && item.type === 'crossbow') {
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(-26, -4, 52, 8);
+        ctx.fillStyle = L[0]; ctx.fillRect(10, -24, 6, 48);
+        ctx.strokeStyle = L[1]; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(12, -24); ctx.lineTo(-10, 0); ctx.lineTo(12, 24); ctx.stroke();
+        ctx.fillStyle = '#c9d2dc'; ctx.fillRect(-10, -1.5, 34, 3);
+      } else if (item.slot === 'weapon' && item.type === 'shotgun') {
+        ctx.fillStyle = '#5a3a22'; ctx.beginPath(); ctx.moveTo(-28, -2); ctx.lineTo(-6, -4); ctx.lineTo(-6, 8); ctx.lineTo(-24, 14); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[1]; ctx.fillRect(-8, -7, 38, 9);
+        ctx.fillStyle = L[0]; ctx.fillRect(-8, -7, 38, 3);
+        ctx.fillStyle = '#6b4423'; ctx.fillRect(2, 2, 14, 5);
       } else if (item.slot === 'weapon' && item.type === 'great') {
         ctx.rotate(-0.8);
         ctx.fillStyle = '#6b4423'; ctx.fillRect(-4, 18, 8, 16);
@@ -465,6 +551,15 @@
         ctx.fillStyle = L[0]; ctx.fillRect(-14, -18, 28, 22); ctx.fillRect(-20, -6, 8, 14);
         ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(-6, -18, 2, 12); ctx.fillRect(2, -18, 2, 12);
         ctx.fillStyle = L[1]; ctx.fillRect(-15, 4, 30, 10);
+      } else if (item.slot === 'pants') { // 바지: 허리띠와 두 가닥 다리
+        ctx.fillStyle = L[0];
+        ctx.fillRect(-18, -24, 36, 13);
+        ctx.fillRect(-18, -12, 16, 38); ctx.fillRect(2, -12, 16, 38);
+        ctx.fillStyle = L[1];
+        ctx.fillRect(-18, -24, 36, 4);
+        ctx.fillRect(-2, -12, 4, 18);
+        ctx.fillRect(-18, 20, 16, 6); ctx.fillRect(2, 20, 16, 6);
+        ctx.fillStyle = '#e0b12f'; ctx.fillRect(-3, -24, 6, 5);
       } else if (item.slot === 'boots') {
         for (const dx of [-17, 4]) {
           ctx.fillStyle = L[0]; ctx.fillRect(dx, -20, 13, 28); ctx.fillRect(dx, 2, 24, 10);
@@ -501,7 +596,7 @@
         ctx.fillStyle = on ? '#e0b12f' : 'rgba(255,255,255,0.1)';
         ctx.fillRect(t.x, t.y, t.w, t.h);
         ctx.textAlign = 'center';
-        ctx.font = 'bold 18px sans-serif';
+        ctx.font = `bold ${s.def.tabs.length > 6 ? 15 : 18}px sans-serif`;
         ctx.fillStyle = on ? '#1d2233' : '#b8c2dc';
         ctx.fillText(s.def.tabs[i].name, t.x + t.w / 2, t.y + t.h / 2 + 1);
       });
@@ -512,8 +607,8 @@
         const maxed = G.Shop.upMaxed(it, s.inv);
         const placing = s.mode === 'place'; // 꾸미기 창: 가격 대신 놓기/치우기
         const lives_here = !!it.house && s.inv.home.type === it.id;
-        const owned = maxed || lives_here || (!!it.slot && s.inv.items.includes(it.id));
-        const afford = (it.expCost ? s.exp : s.coins) >= price;
+        const owned = maxed || lives_here || (!!(it.slot || it.tool) && s.inv.items.includes(it.id));
+        const afford = it.upgrade === 'holy' ? (s.inv.materials.holycrystal || 0) >= 1 : (it.expCost ? s.exp : s.coins) >= price;
         const hover = s.hover === i;
         ctx.fillStyle = hover ? 'rgba(255,213,74,0.16)' : 'rgba(255,255,255,0.07)';
         ctx.fillRect(row.x, row.y, row.w, row.h);
@@ -537,7 +632,7 @@
         ctx.textAlign = 'right';
         ctx.font = 'bold 23px sans-serif';
         ctx.fillStyle = placing ? (it.id === s.slotItem ? '#8a93a8' : '#7dffa0') : owned ? '#8a93a8' : afford ? '#ffd54a' : '#ff6b7a';
-        const label = placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : it.expCost ? `${price} EXP` : `${price} G`;
+        const label = placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : it.upgrade === 'holy' ? '크리스탈 1개' : it.expCost ? `${price} EXP` : `${price} G`;
         const twoLine = it.heal !== undefined || it.consumable || (it.decor && !it.clear);
         ctx.fillText(label, row.x + row.w - 16, row.y + row.h / 2 - (twoLine ? 8 : 0));
         if (twoLine) { // 물약/장식품은 가진 개수를 보여준다
@@ -557,33 +652,40 @@
       ctx.restore();
     }
 
-    // 인벤토리 창의 칸 배치 (그리기와 마우스 판정이 같이 쓴다). 격자 6x4 + 왼쪽 장착 슬롯 4개
+    // 인벤토리 창의 칸 배치 (그리기와 마우스 판정이 같이 쓴다).
+    // 오른쪽: 분류 탭 5개 + 8x5 칸 격자(스크롤) + 설명 / 왼쪽: 장착 슬롯 5개와 용사
     static equipGeometry(vw, vh) {
-      const w = 780;
-      const h = 490;
+      const w = 920;
+      const h = 540;
       const x = (vw - w) / 2;
       const y = (vh - h) / 2;
-      const cell = 64;
+      const cell = 56;
       const gap = 8;
-      const cols = 6;
-      const rows = 4;
-      const gx = x + w - 28 - (cols * cell + (cols - 1) * gap);
-      const gy = y + 84;
+      const cols = 8;
+      const rows = 5;
+      const gridW = cols * cell + (cols - 1) * gap;
+      const gx = x + w - 40 - gridW;
+      const gy = y + 124;
       const cells = [];
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) cells.push({ x: gx + c * (cell + gap), y: gy + r * (cell + gap), w: cell, h: cell });
       }
-      const slot = (i) => ({ x: x + 24, y: y + 84 + i * 80, w: 64, h: 64 });
+      const tabs = [0, 1, 2, 3, 4].map((i) => ({ x: gx + i * (gridW / 5), y: y + 56, w: gridW / 5 - 6, h: 30 }));
+      const chip = (i, n) => { const cw = Math.min(76, 776 / Math.max(1, n)); return { x: x + 104 + i * cw, y: y + 92, w: cw - 3, h: 24 }; }; // 종류 버튼 i번째 (모두 n개)
+      const sort = { x: x + w - 300, y: y + 10, w: 150, h: 34 }; // 정렬 버튼
+      const quick = [0, 1, 2, 3, 4].map((i) => ({ x: gx + i * 46, y: y + 10, w: 40, h: 40 })); // 빠른 무기 칸 1~5
+      const slot = (i) => ({ x: x + 24, y: y + 82 + i * 72, w: 58, h: 58 });
       return {
-        panel: { x, y, w, h }, cols, rows, cells,
-        slots: { weapon: slot(0), helmet: slot(1), armor: slot(2), gloves: slot(3), boots: slot(4) },
+        panel: { x, y, w, h }, cols, rows, cells, tabs, quick, sort, chip,
+        slots: { weapon: slot(0), helmet: slot(1), armor: slot(2), gloves: slot(3), pants: slot(4), boots: slot(5) },
         hero: { x: x + 206, y: y + 232 },
-        info: { x: gx, y: gy + rows * (cell + gap) + 4, w: cols * cell + (cols - 1) * gap, h: 62 },
+        bar: { x: gx + gridW + 10, y: gy, w: 10, h: rows * (cell + gap) - gap },
+        info: { x: gx, y: gy + rows * (cell + gap) + 2, w: gridW, h: 64 },
       };
     }
 
-    // 인벤토리 창: 네모 칸 격자에 가진 장비가 들어 있고, 왼쪽 슬롯 4개(무기/갑옷/장갑/신발)에 낀 장비와 용사 모습이 보인다.
-    // 방향키/마우스로 고르고 E/Enter/클릭으로 장착, 1/Esc로 닫는다
+    // 인벤토리 창: 분류 탭(전체/무기/방어구/소모품/재료)과 스크롤되는 큰 칸 격자, 왼쪽에 장착 슬롯과 용사.
+    // 방향키/마우스로 고르고 E/Enter/클릭으로 장착, 1~5 키로 무기 칸에 넣고, 휠로 스크롤, Tab으로 분류 바꾸기, I/Esc로 닫는다
     _drawEquip(ctx, e) {
       ctx.save();
       const geo = Renderer.equipGeometry(this.viewW, this.viewH);
@@ -591,7 +693,11 @@
       const eq = e.inv.equipped;
       const defs = G.Shop.ITEMS;
       const isEquipped = (id) => !!id && eq[defs[id].slot] === id;
-      const entries = G.Shop.gridEntries(e.inv); // 장비 + 물약(개수)
+      const cats = G.Shop.CATEGORIES;
+      const entries = G.Shop.gridEntries(e.inv, e.cat);
+      const cols = geo.cols;
+      const total = Math.max(e.cap, Math.ceil(entries.length / cols) * cols);
+      const totalRows = Math.ceil(total / cols);
       ctx.fillStyle = 'rgba(0,0,0,0.62)';
       ctx.fillRect(0, 0, this.viewW, this.viewH);
       ctx.fillStyle = '#1d2233';
@@ -603,12 +709,76 @@
       ctx.textAlign = 'left';
       ctx.font = 'bold 28px sans-serif';
       ctx.fillStyle = '#ffd54a';
-      ctx.fillText('인벤토리', x + 28, y + 36);
+      ctx.fillText('인벤토리', x + 28, y + 34);
+      ctx.font = '15px sans-serif';
+      ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(`${G.Shop.gridEntries(e.inv, 'all').length} / ${e.cap} 칸`, x + 150, y + 36);
       ctx.textAlign = 'right';
       ctx.font = 'bold 18px sans-serif';
-      ctx.fillText(`${e.coins} G`, x + w - 28, y + 36);
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText(`${e.coins} G`, x + w - 28, y + 34);
 
-      // 왼쪽: 장착 슬롯 4개 + 용사
+      // 빠른 무기 칸 1~5: 고른 무기를 숫자 키(또는 이 칸 클릭)로 넣는다. 게임 중엔 숫자 키로 바로 바꿔 든다
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText('빠른 무기', geo.quick[0].x - 10, y + 30);
+      geo.quick.forEach((q, i) => {
+        const id = e.inv.hotbar[i];
+        const on = id && id === eq.weapon;
+        ctx.fillStyle = on ? 'rgba(255,213,74,0.25)' : 'rgba(255,255,255,0.08)';
+        ctx.fillRect(q.x, q.y, q.w, q.h);
+        ctx.lineWidth = on ? 2.5 : 1.5;
+        ctx.strokeStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.28)';
+        ctx.strokeRect(q.x, q.y, q.w, q.h);
+        if (id && defs[id]) this._drawItemIcon(ctx, defs[id], q.x + q.w / 2, q.y + q.h / 2 + 1, 0.42);
+        ctx.fillStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.75)';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(String(i + 1), q.x + 3, q.y + 8);
+      });
+      // 정렬 버튼 (클릭 또는 Q): 기본 / 많이 쓴 순 / 레벨순 / 좋은 순 / 이름순
+      {
+        const sb = geo.sort;
+        const sm = G.Shop.SORTS.find((q) => q.id === (e.inv.invSort || 'default')) || G.Shop.SORTS[0];
+        ctx.fillStyle = 'rgba(111,208,255,0.16)';
+        ctx.fillRect(sb.x, sb.y, sb.w, sb.h);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#6fd0ff';
+        ctx.strokeRect(sb.x, sb.y, sb.w, sb.h);
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillStyle = '#c8ecff';
+        ctx.fillText(`정렬: ${sm.name}  ▼`, sb.x + sb.w / 2, sb.y + sb.h / 2 + 1);
+      }
+      // 분류 탭
+      geo.tabs.forEach((t, i) => {
+        const on = cats[i].id === e.cat;
+        ctx.fillStyle = on ? '#e0b12f' : 'rgba(255,255,255,0.1)';
+        ctx.fillRect(t.x, t.y, t.w, t.h);
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillStyle = on ? '#1d2233' : '#b8c2dc';
+        const n = G.Shop.gridEntries(e.inv, cats[i].id).length;
+        ctx.fillText(`${cats[i].name} ${n}`, t.x + t.w / 2, t.y + t.h / 2 + 1);
+      });
+
+      // 종류 버튼: 무기 탭(검/대검/단검/낫/지팡이/폭탄/총/활/방패), 방어구 탭(갑옷/투구/장갑/신발)
+      const subs = G.Shop.subList(e.inv, e.cat);
+      if (subs.length) {
+        const curSub = e.inv.invSub || 'all';
+        subs.forEach((sb, i) => {
+          const cr = geo.chip(i, subs.length);
+          const on = sb.id === curSub;
+          ctx.fillStyle = on ? '#6fd0ff' : 'rgba(255,255,255,0.08)';
+          ctx.fillRect(cr.x, cr.y, cr.w, cr.h);
+          ctx.textAlign = 'center';
+          ctx.font = cr.w < 60 ? 'bold 12px sans-serif' : 'bold 13px sans-serif';
+          ctx.fillStyle = on ? '#0f2230' : '#b8c2dc';
+          ctx.fillText(cr.w < 60 ? sb.name : `${sb.name} ${sb.n}`, cr.x + cr.w / 2, cr.y + cr.h / 2 + 1);
+        });
+      }
+      // 왼쪽: 장착 슬롯 + 용사
       for (const slot of Object.keys(geo.slots)) {
         const sl = geo.slots[slot];
         ctx.textAlign = 'left';
@@ -632,38 +802,42 @@
       ctx.translate(geo.hero.x, geo.hero.y);
       ctx.scale(3, 3);
       const t = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
-      G.Hero.draw(ctx, { x: -12, y: -32, w: 24, h: 32, facing: 1, vx: 0, onGround: true, animTime: t, runPhase: 0, swing: -1, swordOut: false, guardTimer: 0, weaponId: eq.weapon, armorId: eq.armor, helmetId: eq.helmet, glovesId: eq.gloves, bootsId: eq.boots });
+      G.Hero.draw(ctx, { x: -12, y: -32, w: 24, h: 32, facing: 1, vx: 0, onGround: true, animTime: t, runPhase: 0, swing: -1, swordOut: false, guardTimer: 0, weaponId: eq.weapon, armorId: eq.armor, helmetId: eq.helmet, glovesId: eq.gloves, pantsId: eq.pants, bootsId: eq.boots });
       ctx.restore();
       const st = G.Shop.stats(e.inv);
       const C = G.Config;
       const lines = [
         `피 ${e.lives} / ${e.maxLives}`,
-        `패링 범위 ${st.reachTiles}칸`,
+        `대미지 ${defs[eq.weapon].shot ? defs[eq.weapon].dmg + st.dmgBonus : st.baseDmg + st.bossBonus}`,
+        `패링 범위 ${Math.round(st.reachTiles * 10) / 10}칸`,
         `피격 후 무적 ${(C.PLAYER_INVULN + st.invulnAdd).toFixed(1)}초`,
         `패링 지속 ${(C.PARRY_WINDOW + st.windowAdd).toFixed(2)}초`,
         `패링 쿨다운 ${Math.max(0.25, C.PARRY_COOLDOWN + st.cooldownAdd).toFixed(1)}초`,
-        st.canThrow ? `던지기 +${st.throwTiles}칸` : '던지기 불가 (대검)',
+        st.canThrow ? (st.throwTiles ? `던지기 +${st.throwTiles}칸` : '던지기 가능') : '던지기 불가',
         `이동 속도 ${Math.round((1 + st.speedAdd) * 100)}%`,
         `코인 획득 +${Math.round(e.bonus.coin * 100)}%  (집 장식 ${e.bonus.n}개)`,
-        `치명타 확률 ${Math.round(e.bonus.crit * 1000) / 10}%`,
-        `치명타 대미지 ${e.bonus.critDamage}`,
+        `치명타 확률 ${Math.round(e.bonus.crit * 1000) / 10}%  대미지 ${e.bonus.critDamage}`,
+        `탑 보스 대미지 x${G.Shop.holyMult(e.inv)} (신성)`,
       ];
       ctx.textAlign = 'left';
       ctx.font = '14px sans-serif';
       ctx.fillStyle = '#d8e0f5';
-      lines.forEach((l, i) => ctx.fillText(l, x + 112, y + 268 + i * 21));
+      lines.forEach((l, i) => ctx.fillText(l, x + 112, y + 262 + i * 20));
 
-      // 오른쪽: 아이템 칸 격자
+      // 오른쪽: 스크롤되는 칸 격자
+      const first = e.scroll * cols;
       geo.cells.forEach((c, i) => {
-        const entry = entries[i];
+        const gi = first + i;
+        const entry = entries[gi];
         const id = entry && entry.id;
         ctx.fillStyle = id ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.04)';
         ctx.fillRect(c.x, c.y, c.w, c.h);
         ctx.lineWidth = 1.5;
         ctx.strokeStyle = isEquipped(id) ? '#7dffa0' : 'rgba(255,255,255,0.16)';
         ctx.strokeRect(c.x, c.y, c.w, c.h);
+        if (gi >= total) return;
         if (id) {
-          this._drawItemIcon(ctx, defs[id], c.x + c.w / 2, c.y + c.h / 2 + 2, 0.62);
+          this._drawItemIcon(ctx, defs[id], c.x + c.w / 2, c.y + c.h / 2 + 2, 0.55);
           if (entry.count) { // 물약 개수
             ctx.fillStyle = 'rgba(0,0,0,0.7)';
             ctx.fillRect(c.x + c.w - 24, c.y + c.h - 18, 22, 15);
@@ -680,13 +854,41 @@
             ctx.textAlign = 'center';
             ctx.fillText('E', c.x + c.w - 10, c.y + 10.5);
           }
+          if (defs[id].slot === 'weapon' && e.inv.wlevel && e.inv.wlevel[id] > 0) { // 강화한 무기: +레벨
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(c.x + 2, c.y + c.h - 17, 28, 15);
+            ctx.fillStyle = '#7dd0ff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`+${e.inv.wlevel[id]}`, c.x + 5, c.y + c.h - 9.5);
+          }
+          const hb = e.inv.hotbar ? e.inv.hotbar.indexOf(id) : -1;
+          if (hb >= 0) { // 무기 칸 번호
+            ctx.fillStyle = '#ffd54a';
+            ctx.fillRect(c.x + 3, c.y + 3, 15, 15);
+            ctx.fillStyle = '#2a1d00';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(String(hb + 1), c.x + 10.5, c.y + 10.5);
+          }
         }
       });
-      const cur = geo.cells[e.cur];
+      const curLocal = e.cur - first;
+      const cur = curLocal >= 0 && curLocal < geo.cells.length ? geo.cells[curLocal] : null;
       if (cur) { // 선택 칸
         ctx.lineWidth = 3.5;
         ctx.strokeStyle = '#ffd54a';
         ctx.strokeRect(cur.x - 1, cur.y - 1, cur.w + 2, cur.h + 2);
+      }
+      // 스크롤바
+      const bar = geo.bar;
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(bar.x, bar.y, bar.w, bar.h);
+      if (totalRows > geo.rows) {
+        const th = Math.max(26, (bar.h * geo.rows) / totalRows);
+        const ty = bar.y + ((bar.h - th) * e.scroll) / (totalRows - geo.rows);
+        ctx.fillStyle = '#e0b12f';
+        ctx.fillRect(bar.x, ty, bar.w, th);
       }
 
       // 선택한 아이템 설명 + 메시지
@@ -700,27 +902,156 @@
         ctx.fillStyle = e.ok ? '#7dffa0' : '#ff8a8a';
         ctx.fillText(e.msg, info.x + 14, info.y + info.h / 2);
       } else if (selId) {
-        const d = G.Shop.describe(defs[selId]);
+        const d = G.Shop.describe(defs[selId], e.inv);
         ctx.font = 'bold 18px sans-serif';
         ctx.fillStyle = '#fff';
-        ctx.fillText(`${d.name}  (${d.slotName}${isEquipped(selId) ? ', 장착중' : ''})`, info.x + 14, info.y + 14);
+        ctx.fillText(`${d.name}  (${d.slotName}${isEquipped(selId) ? ', 장착중' : ''})`, info.x + 14, info.y + 15);
         ctx.font = '14px sans-serif';
         ctx.fillStyle = '#b8c2dc';
-        ctx.fillText(d.desc, info.x + 14, info.y + 33);
+        ctx.fillText(d.desc, info.x + 14, info.y + 35);
         if (d.note) {
           ctx.fillStyle = '#9fe8a8';
-          ctx.fillText(d.note, info.x + 14, info.y + 51);
+          ctx.fillText(d.note, info.x + 14, info.y + 53);
+        }
+        const sv = G.Shop.sortValue(e.inv, selId); // 정렬 기준 값
+        if (sv) {
+          ctx.textAlign = 'right';
+          ctx.font = 'bold 15px sans-serif';
+          ctx.fillStyle = '#6fd0ff';
+          ctx.fillText(sv, info.x + info.w - 14, info.y + 15);
+          ctx.textAlign = 'left';
         }
       } else {
         ctx.font = '15px sans-serif';
         ctx.fillStyle = '#6c7490';
         ctx.fillText('빈 칸', info.x + 14, info.y + info.h / 2);
       }
+      if (e.drag && e.drag.active) { // 끌고 있는 무기: 놓을 수 있는 빠른 칸이 빛난다
+        geo.quick.forEach((q) => {
+          if (e.drag.x >= q.x && e.drag.x < q.x + q.w && e.drag.y >= q.y && e.drag.y < q.y + q.h) {
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#7dffa0';
+            ctx.strokeRect(q.x - 2, q.y - 2, q.w + 4, q.h + 4);
+          }
+        });
+        const g = ctx.createRadialGradient(e.drag.x, e.drag.y, 2, e.drag.x, e.drag.y, 40);
+        g.addColorStop(0, 'rgba(255,230,140,0.45)'); g.addColorStop(1, 'rgba(255,230,140,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(e.drag.x - 40, e.drag.y - 40, 80, 80);
+        this._drawItemIcon(ctx, defs[e.drag.id], e.drag.x, e.drag.y, 0.8);
+      }
       ctx.textAlign = 'center';
-      ctx.font = '15px sans-serif';
+      ctx.font = '14px sans-serif';
       ctx.fillStyle = '#9aa4c0';
-      ctx.fillText('방향키/마우스: 선택     E / Enter / 클릭: 장착·물약 마시기     1 또는 Esc: 닫기', x + w / 2, y + h - 18);
+      ctx.fillText('방향키/마우스: 선택   휠: 스크롤   Tab: 분류   C: 종류   Q: 정렬   E·Enter·클릭: 장착/사용   무기를 끌어다 빠른 칸에 놓기 (1~5 키도 가능)   I·]·Esc: 닫기', x + w / 2, y + h - 14);
       ctx.restore();
+    }
+
+    // 개발 메뉴(F1): 스크롤되는 버튼 목록. 순간이동과 지급 버튼이 모여 있다
+    static devGeometry(vw, vh, count, scroll) {
+      const w = 620;
+      const h = 520;
+      const x = (vw - w) / 2;
+      const y = (vh - h) / 2;
+      const rowH = 44;
+      const top = y + 74;
+      const visible = Math.floor((h - 74 - 56) / rowH);
+      const rows = [];
+      for (let i = 0; i < visible; i++) {
+        const idx = scroll + i;
+        if (idx >= count) break;
+        rows.push({ idx, x: x + 20, y: top + i * rowH, w: w - 56, h: rowH - 6 });
+      }
+      return { panel: { x, y, w, h }, rows, visible, bar: { x: x + w - 26, y: top, w: 10, h: visible * rowH - 6 } };
+    }
+
+    _drawDev(ctx, d) {
+      ctx.save();
+      const geo = Renderer.devGeometry(this.viewW, this.viewH, d.items.length, d.scroll);
+      const { x, y, w, h } = geo.panel;
+      ctx.fillStyle = 'rgba(0,0,0,0.66)';
+      ctx.fillRect(0, 0, this.viewW, this.viewH);
+      ctx.fillStyle = '#171c2b';
+      ctx.fillRect(x, y, w, h);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#6fd0ff';
+      ctx.strokeRect(x, y, w, h);
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.fillStyle = '#9fe0ff';
+      ctx.fillText('개발 메뉴  (F1)', x + 24, y + 34);
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = '#7f8aa8';
+      ctx.fillText('순간이동 · 아이템 지급 — 앞으로 모든 테스트 기능은 여기에 모인다', x + 24, y + 58);
+      for (const r of geo.rows) {
+        const it = d.items[r.idx];
+        if (it.head) {
+          ctx.fillStyle = 'rgba(111,208,255,0.16)';
+          ctx.fillRect(r.x, r.y, r.w, r.h);
+          ctx.fillStyle = '#9fe0ff';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillText(`▼ ${it.head}`, r.x + 12, r.y + r.h / 2);
+          continue;
+        }
+        const on = r.idx === d.cur;
+        ctx.fillStyle = on ? 'rgba(255,213,74,0.2)' : 'rgba(255,255,255,0.07)';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.lineWidth = on ? 2.5 : 1;
+        ctx.strokeStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.15)';
+        ctx.strokeRect(r.x, r.y, r.w, r.h);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 17px sans-serif';
+        ctx.fillText(it.label, r.x + 16, r.y + r.h / 2);
+        if (it.hint) {
+          ctx.textAlign = 'right';
+          ctx.font = '13px sans-serif';
+          ctx.fillStyle = '#8c97b8';
+          ctx.fillText(it.hint, r.x + r.w - 14, r.y + r.h / 2);
+          ctx.textAlign = 'left';
+        }
+      }
+      const bar = geo.bar;
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(bar.x, bar.y, bar.w, bar.h);
+      if (d.items.length > geo.visible) {
+        const th = Math.max(28, (bar.h * geo.visible) / d.items.length);
+        const ty = bar.y + ((bar.h - th) * d.scroll) / (d.items.length - geo.visible);
+        ctx.fillStyle = '#6fd0ff';
+        ctx.fillRect(bar.x, ty, bar.w, th);
+      }
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = d.msgT > 0 ? '#7dffa0' : 'rgba(0,0,0,0)';
+      ctx.fillText(d.msg || '', x + w / 2, y + h - 40);
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = '#8c97b8';
+      ctx.fillText('↑↓ / 휠: 스크롤   Enter·클릭: 실행   F1·Esc: 닫기', x + w / 2, y + h - 18);
+      ctx.restore();
+    }
+
+    // 왼쪽 맨 위 무기 칸 1~5: 숫자 키를 누르면 그 칸의 무기로 바꾼다
+    _drawHotbar(ctx, hud) {
+      const size = 44;
+      const gap = 6;
+      const defs = G.Shop.ITEMS;
+      for (let i = 0; i < 5; i++) {
+        const x = 12 + i * (size + gap);
+        const y = 8;
+        const id = hud.hotbar[i];
+        const on = id && id === hud.weaponId;
+        ctx.fillStyle = on ? 'rgba(255,213,74,0.28)' : 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x, y, size, size);
+        ctx.lineWidth = on ? 3 : 1.5;
+        ctx.strokeStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.3)';
+        ctx.strokeRect(x, y, size, size);
+        if (id && defs[id]) this._drawItemIcon(ctx, defs[id], x + size / 2, y + size / 2 + 1, 0.46);
+        ctx.fillStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.75)';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(String(i + 1), x + 4, y + 3);
+      }
     }
 
     _drawTerrain(ctx, terrain, camera) {
@@ -863,6 +1194,278 @@
         }
       }
       ctx.restore();
+    }
+
+    // 숲의 샘물과 화산의 신성의 제단 (크리스탈 만들기)
+    _drawCrystalSpots(ctx, terrain, time) {
+      for (const w of terrain.waters || []) {
+        const cx = w.col * TILE + TILE / 2;
+        const gy = (w.row + 1) * TILE;
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(cx, gy, 44, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#7d8798'; ctx.beginPath(); ctx.ellipse(cx, gy - 5, 38, 11, 0, 0, Math.PI * 2); ctx.fill(); // 돌 테두리
+        ctx.fillStyle = '#a4aebf'; ctx.beginPath(); ctx.ellipse(cx, gy - 8, 38, 9, 0, Math.PI, 0); ctx.fill();
+        const g = ctx.createLinearGradient(0, gy - 14, 0, gy);
+        g.addColorStop(0, '#9fe8ff'); g.addColorStop(1, '#3a9fd0');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, gy - 6, 31, 7, 0, 0, Math.PI * 2); ctx.fill(); // 샘물
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
+        for (let k = 0; k < 2; k++) { const r = 6 + ((time * 14 + k * 11) % 22); ctx.globalAlpha = 1 - r / 28; ctx.beginPath(); ctx.ellipse(cx + (k ? 8 : -6), gy - 6, r, r * 0.25, 0, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.globalAlpha = 1;
+        for (let k = 0; k < 4; k++) { const ph = (time * 0.8 + k * 0.25) % 1; ctx.fillStyle = `rgba(200,240,255,${1 - ph})`; ctx.fillRect(cx - 14 + k * 9, gy - 12 - ph * 26, 2, 2); } // 튀는 물방울
+        G.TextLayer.add('숲의 샘물', cx, gy - 54, 'bold 13px sans-serif', '#d6f4ff');
+      }
+      for (const a of terrain.altars || []) {
+        const cx = a.col * TILE + TILE / 2;
+        const gy = (a.row + 1) * TILE;
+        const pulse = 0.6 + 0.4 * Math.sin(time * 3);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(cx, gy, 40, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2e2424'; ctx.fillRect(cx - 30, gy - 14, 60, 14); // 제단 받침
+        ctx.fillStyle = '#4a3838'; ctx.fillRect(cx - 22, gy - 34, 44, 20);
+        ctx.fillStyle = '#6a5252'; ctx.fillRect(cx - 26, gy - 38, 52, 6);
+        ctx.strokeStyle = `rgba(255,170,60,${0.5 + 0.5 * pulse})`; ctx.lineWidth = 2; // 빛나는 룬
+        ctx.beginPath(); ctx.moveTo(cx - 12, gy - 28); ctx.lineTo(cx, gy - 20); ctx.lineTo(cx + 12, gy - 28); ctx.moveTo(cx, gy - 20); ctx.lineTo(cx, gy - 10); ctx.stroke();
+        const gg = ctx.createRadialGradient(cx, gy - 58, 2, cx, gy - 58, 46); // 떠 있는 신성한 빛
+        gg.addColorStop(0, `rgba(255,236,150,${0.55 * pulse})`); gg.addColorStop(1, 'rgba(255,170,60,0)');
+        ctx.fillStyle = gg; ctx.fillRect(cx - 46, gy - 104, 92, 92);
+        const bob = Math.sin(time * 2) * 4;
+        ctx.fillStyle = '#e0a82a'; ctx.beginPath(); ctx.moveTo(cx, gy - 74 + bob); ctx.lineTo(cx + 10, gy - 60 + bob); ctx.lineTo(cx + 6, gy - 44 + bob); ctx.lineTo(cx, gy - 40 + bob); ctx.lineTo(cx - 6, gy - 44 + bob); ctx.lineTo(cx - 10, gy - 60 + bob); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#fff2a8'; ctx.beginPath(); ctx.moveTo(cx, gy - 70 + bob); ctx.lineTo(cx + 6, gy - 60 + bob); ctx.lineTo(cx, gy - 46 + bob); ctx.lineTo(cx - 6, gy - 60 + bob); ctx.closePath(); ctx.fill();
+        G.TextLayer.add('신성의 제단', cx, gy - 92, 'bold 13px sans-serif', '#ffe9a8');
+      }
+    }
+
+    // 동굴에 들어가면 가운데 위에 동굴 레벨과 상자가 주는 돈을 보여준다
+    _drawCaveInfo(ctx, info) {
+      ctx.save();
+      const w = 250;
+      const h = 44;
+      const x = (this.viewW - w) / 2;
+      const y = 8;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, h, 10); else ctx.rect(x, y, w, h);
+      ctx.fillStyle = 'rgba(10,14,28,0.78)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,213,74,0.7)';
+      ctx.stroke();
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = '#9fe0ff';
+      ctx.fillText(`동굴 Lv ${info.level}`, x + 14, y + h / 2 + 1);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText(`상자 +${info.coins} G`, x + w - 14, y + h / 2 + 1);
+      ctx.restore();
+    }
+
+    // 놀이마당: 야바위 / 공 던지기 표적 맞추기 / 다른 용사와 결투
+    _drawMini(ctx, m) {
+      ctx.save();
+      const W = this.viewW;
+      const H = this.viewH;
+      const px = 40;
+      const py = 24;
+      const pw = W - 80;
+      const ph = H - 48;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#1a1e2d';
+      ctx.fillRect(px, py, pw, ph);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#e0b12f';
+      ctx.strokeRect(px, py, pw, ph);
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText({ shell: '야바위', target: '맞추기 (공 던지기)', duel: '다른 용사와 결투' }[m.kind], px + 24, py + 34);
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`보유 ${m.coins} G`, px + pw - 24, py + 34);
+      if (m.st === 'bet') this._miniBet(ctx, m, px, py, pw, ph);
+      else if (m.kind === 'shell') this._miniShell(ctx, m, px, py, pw, ph);
+      else if (m.kind === 'target') this._miniTarget(ctx, m, px, py, pw, ph);
+      else this._miniFight(ctx, m, px, py, pw, ph);
+      ctx.textAlign = 'center';
+      ctx.font = '15px sans-serif';
+      ctx.fillStyle = '#9aa4c0';
+      const hint = m.st === 'bet' ? (m.kind === 'target' ? 'Enter: 시작   Esc: 나가기' : `${m.kind === 'duel' ? '↑↓: 결투 종류   ' : ''}←→ 또는 1~3: 거는 돈   Enter: 시작   Esc: 나가기`)
+        : m.st === 'result' ? 'Enter: 한 번 더   Esc: 나가기'
+        : m.kind === 'target' ? '방향키: 조준   Enter: 공 던지기' : m.kind === 'shell' ? '←→: 컵 고르기   Enter: 열기' : '←→ 이동   Space 점프   ↓ 막기   Enter 공격';
+      ctx.fillText(hint, W / 2, py + ph - 20);
+      ctx.restore();
+    }
+
+    // 링 격투: 링 위에서 AI 용사와 싸운다
+    _miniFight(ctx, m, px, py, pw, ph) {
+      const gy = 430;
+      const x0 = 170;
+      const x1 = 790;
+      const sky = ctx.createLinearGradient(0, py + 60, 0, gy);
+      sky.addColorStop(0, '#1d2340'); sky.addColorStop(1, '#4a3a5a');
+      ctx.fillStyle = sky; ctx.fillRect(px + 8, py + 60, pw - 16, gy - py - 60);
+      for (let i = 0; i < 12; i++) { // 구경하는 마을 주민들 (모두 똑같은 모습)
+        ctx.save(); ctx.translate(px + 60 + i * 56, gy - 14 - Math.max(0, Math.sin(m.t * 5 + i * 1.7)) * 4); ctx.scale(2.6, 2.6);
+        G.Npc.draw(ctx, 'villager', 0, 0, i % 2 ? -1 : 1, m.t + i);
+        ctx.restore();
+      }
+      ctx.fillStyle = '#6a4a2a'; ctx.fillRect(px + 8, gy, pw - 16, py + ph - gy - 8); // 링 바닥
+      ctx.fillStyle = '#8a6a3a'; ctx.fillRect(px + 8, gy, pw - 16, 8);
+      for (const [x, c1] of [[x0 - 24, '#c0392b'], [x1 + 24, '#3a6fb0']]) { // 모서리 기둥과 로프
+        ctx.fillStyle = c1; ctx.fillRect(x - 7, gy - 170, 14, 176);
+        ctx.fillStyle = '#e0b12f'; ctx.fillRect(x - 9, gy - 176, 18, 10);
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; // 링 중앙의 표시
+      ctx.fillRect((x0 + x1) / 2 - 2, gy + 2, 4, 14);
+      const rv = m.rival;
+      const draw = (f, facing, p, who) => {
+        const hit = f.hitFx > 0;
+        const swingF = f.atkT > 0 ? Math.min(19, Math.floor((1 - f.atkT / 0.32) * 19)) : (who === 'ai' && m.ai.state === 'wind' ? 3 : -1);
+        ctx.save();
+        ctx.translate(f.x, gy - f.y);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, f.y, 34, 6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.scale(facing * 3.6, 3.6);
+        if (hit && Math.floor(m.t * 30) % 2) ctx.globalAlpha = 0.45;
+        if (m.st === 'result' && ((who === 'pl') !== !!m.won)) ctx.globalAlpha = 0.55;
+        G.Hero.draw(ctx, Object.assign({ x: -12, y: -32, w: 24, h: 32, facing: 1, vx: Math.abs(f.vx) > 40 ? 120 : 0, onGround: f.y === 0, animTime: m.t, runPhase: m.t * 12, swing: swingF, swordOut: false, guardTimer: (who === 'pl' ? f.guard : f.guard > 0) ? 0.2 : 0 }, p));
+        ctx.restore();
+      };
+      draw(m.pl, m.pl.face, m.me || {}, 'pl');
+      draw(m.ai, m.ai.face, { weaponId: rv.weapon, armorId: rv.armor, helmetId: rv.helmet, glovesId: null, bootsId: null }, 'ai');
+      // 체력 막대
+      const bar = (x, w, hp, max, color, label, right) => {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - 3, py + 66, w + 6, 24);
+        ctx.fillStyle = '#2a1018'; ctx.fillRect(x, py + 69, w, 18);
+        ctx.fillStyle = color; ctx.fillRect(x, py + 69, (w * hp) / max, 18);
+        ctx.font = 'bold 14px sans-serif'; ctx.textAlign = right ? 'right' : 'left'; ctx.fillStyle = '#ffffff';
+        ctx.fillText(`${label}  ${hp} / ${max}`, right ? x + w - 6 : x + 6, py + 79);
+      };
+      bar(px + 30, 300, m.pl.hp, m.pl.maxHp, '#e8334a', '나', false);
+      bar(px + pw - 330, 300, m.ai.hp, m.ai.maxHp, '#3a8fd4', `${rv.name} (등급 ${m.lv})`, true);
+      ctx.textAlign = 'center'; ctx.font = 'bold 22px sans-serif'; ctx.fillStyle = m.time < 10 ? '#ff8a8a' : '#ffffff';
+      ctx.fillText(`${Math.max(0, Math.ceil(m.time))}`, this.viewW / 2, py + 79);
+      for (const f of m.fx) { ctx.font = 'bold 24px sans-serif'; ctx.fillStyle = `rgba(255,230,120,${1 - f.t / 0.8})`; ctx.fillText(f.text, f.x, f.y - f.t * 50); }
+      let big = ''; let col = '#ffffff';
+      if (m.st === 'ready') { big = m.t < 1.0 ? '준비…' : '공격!'; col = m.t < 1.0 ? '#ffffff' : '#ff4a4a'; }
+      else if (m.st === 'fight' && m.t < 0.6) { big = '공격!'; col = '#ff4a4a'; }
+      else if (m.st === 'result') { big = m.msg; col = m.won ? '#7dffa0' : '#ff8a8a'; }
+      if (big) { ctx.font = `bold ${m.st === 'result' ? 38 : 70}px sans-serif`; ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(big, this.viewW / 2 + 3, 233); ctx.fillStyle = col; ctx.fillText(big, this.viewW / 2, 230); }
+    }
+
+    _miniBet(ctx, m, px, py, pw, ph) {
+      const cx = this.viewW / 2;
+      const rules = {
+        shell: ['공이 든 컵을 맞혀 보세요!', '컵을 보여 준 뒤 빠르게 섞어요. 맞히면 건 돈의 2배를 받아요.', `이길수록 컵이 점점 빨라져요  (지금 난이도 ${m.level + 1})`],
+        target: ['공 5개를 던져 빠르게 움직이는 작은 표적을 맞히세요!', '한가운데일수록 점수가 높아요 (50 · 30 · 20 · 10점). 던질수록 더 빨라져요.', '점수 x2 만큼 코인을 받아요. 참가비 100 G'],
+        duel: m.mode === 'ring'
+          ? ['링 격투 — 링 위에서 한 판', '화면 속 링에서 무작위 AI 용사(등급 1~5, 체력 4~10)와 싸워요. 나는 체력 10.', '←→ 이동, Space 점프, ↓ 막기, Enter 공격. 이기면 등급에 따라 건 돈의 1.8~2.6배']
+          : m.mode === 'fight'
+          ? ['공격! — 보스전처럼 칼싸움', '결투장에서 무작위 AI 용사(등급 1~5, 체력 4~10)가 칼로 달려들어요. 치켜들 때 피하거나 패링!', '평소 조작 그대로예요: 던지는 무기는 던지고, 쏘는 무기는 쏴요. 이기면 건 돈의 1.8~2.6배']
+          : ['카우보이 — 보스전처럼 총싸움', '결투장에서 무작위 AI 용사(등급 1~5, 체력 4~10)가 총을 쏴요. 조준선이 보이면 피하거나 패링!', '평소 조작 그대로예요: 던지는 무기는 던지고, 쏘는 무기는 쏴요. 이기면 건 돈의 1.8~2.6배'],
+      }[m.kind];
+      if (m.kind === 'duel') { // 결투 종류 고르기
+        [['cowboy', '카우보이'], ['fight', '공격!'], ['ring', '링 격투']].forEach(([id, name], i) => {
+          const x = cx - 290 + i * 200;
+          const on = m.mode === id;
+          ctx.fillStyle = on ? 'rgba(111,208,255,0.28)' : 'rgba(255,255,255,0.07)';
+          ctx.fillRect(x, py + 62, 180, 40);
+          ctx.lineWidth = on ? 3 : 1.5;
+          ctx.strokeStyle = on ? '#6fd0ff' : 'rgba(255,255,255,0.2)';
+          ctx.strokeRect(x, py + 62, 180, 40);
+          ctx.textAlign = 'center';
+          ctx.font = 'bold 20px sans-serif';
+          ctx.fillStyle = on ? '#c8ecff' : '#9aa4c0';
+          ctx.fillText(name, x + 90, py + 83);
+        });
+      }
+      ctx.textAlign = 'center';
+      rules.forEach((t, i) => { ctx.font = i === 0 ? 'bold 26px sans-serif' : '18px sans-serif'; ctx.fillStyle = i === 0 ? '#ffffff' : '#c8d0e8'; ctx.fillText(t, cx, py + (m.kind === 'duel' ? 150 : 130) + i * 44); });
+      const bets = m.kind === 'target' ? [100] : [100, 300, 1000];
+      bets.forEach((b, i) => {
+        const x = cx - (bets.length * 190 - 20) / 2 + i * 190;
+        const y = py + 300;
+        const on = m.kind === 'target' || i === m.bi;
+        const ok = m.coins >= b;
+        ctx.fillStyle = on ? 'rgba(255,213,74,0.22)' : 'rgba(255,255,255,0.07)';
+        ctx.fillRect(x, y, 170, 80);
+        ctx.lineWidth = on ? 3.5 : 1.5;
+        ctx.strokeStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.2)';
+        ctx.strokeRect(x, y, 170, 80);
+        ctx.font = 'bold 28px sans-serif';
+        ctx.fillStyle = ok ? '#ffd54a' : '#ff6b7a';
+        ctx.fillText(`${b} G`, x + 85, y + 34);
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#9aa4c0';
+        ctx.fillText(m.kind === 'target' ? '참가비' : `이기면 +${b} G`, x + 85, y + 62);
+      });
+      if (m.msgT > 0) { ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#ff8a8a'; ctx.fillText(m.msg, cx, py + 430); }
+    }
+
+    _miniShell(ctx, m, px, py, pw, ph) {
+      const slotX = (v) => 300 + v * 180;
+      ctx.fillStyle = '#2f6b4a'; ctx.fillRect(px + 30, 340, pw - 60, 150); // 초록 천을 깐 탁자
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(px + 30, 330, pw - 60, 14);
+      for (const c of m.cups) { // 공: 컵이 올라갔을 때만 보인다
+        if (c.lift > 0.1 && m.cups.indexOf(c) === m.ball) {
+          const x = slotX(c.px);
+          ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x, 352 + c.py, 22, 6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(x, 334 + c.py, 17, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(x - 6, 328 + c.py, 5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      for (const c of [...m.cups].sort((a, b) => a.py - b.py)) { // 컵 (앞으로 나온 컵이 위에 그려진다)
+        const x = slotX(c.px);
+        const base = 350 + c.py - c.lift * 80;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x, 352 + c.py, 54, 9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#c0392b';
+        ctx.beginPath(); ctx.moveTo(x - 32, base - 112); ctx.lineTo(x + 32, base - 112); ctx.lineTo(x + 50, base); ctx.lineTo(x - 50, base); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#e8604a'; ctx.beginPath(); ctx.moveTo(x - 32, base - 112); ctx.lineTo(x - 14, base - 112); ctx.lineTo(x - 24, base); ctx.lineTo(x - 50, base); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#e0b12f'; ctx.fillRect(x - 36, base - 118, 72, 8); ctx.fillRect(x - 52, base - 8, 104, 8); // 금빛 테두리
+        ctx.fillStyle = '#7a1f16'; ctx.fillRect(x - 44, base - 62, 88, 6);
+      }
+      if (m.st === 'pick') { // 고른 컵 위의 화살표
+        const x = slotX(m.cur);
+        const bob = Math.sin(m.t * 6) * 5;
+        ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.moveTo(x, 205 + bob); ctx.lineTo(x - 18, 175 + bob); ctx.lineTo(x + 18, 175 + bob); ctx.closePath(); ctx.fill();
+      }
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.fillStyle = m.st === 'result' ? (m.won ? '#7dffa0' : '#ff8a8a') : '#ffffff';
+      ctx.fillText(m.st === 'show' ? '공이 어디 있는지 잘 봐요!' : m.st === 'shuffle' ? '섞는 중…' : m.st === 'pick' ? '공이 든 컵은 어디일까요?' : m.msg, this.viewW / 2, py + 100);
+      ctx.font = '16px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(`건 돈 ${m.cost} G  ·  난이도 ${m.level + 1}`, this.viewW / 2, py + 140);
+    }
+
+    _miniTarget(ctx, m, px, py, pw, ph) {
+      ctx.fillStyle = '#5a3d22'; ctx.fillRect(px + 80, py + 70, pw - 160, 400); // 나무 판자 뒷벽
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2;
+      for (let i = 1; i < 8; i++) { ctx.beginPath(); ctx.moveTo(px + 80 + i * ((pw - 160) / 8), py + 70); ctx.lineTo(px + 80 + i * ((pw - 160) / 8), py + 470); ctx.stroke(); }
+      const rings = [[52, '#f4f1e8'], [36, '#d9473f'], [22, '#f4f1e8'], [10, '#d9473f']]; // 작은 표적
+      ctx.strokeStyle = '#2a1a0a'; ctx.lineWidth = 2.5;
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(m.tx - 4, m.ty + 52, 8, 168); // 표적을 매단 막대
+      for (const [r, col] of rings) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(m.tx, m.ty, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      for (const mk of m.marks) { // 맞은 자리 표시와 점수
+        ctx.fillStyle = mk.pts ? '#2a7a3a' : '#555'; ctx.beginPath(); ctx.arc(mk.x, mk.y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = `rgba(${mk.pts ? '255,230,120' : '200,200,200'},${Math.max(0, 1 - mk.t / 1.2)})`;
+        ctx.fillText(mk.pts ? `+${mk.pts}` : '빗나감', mk.x, mk.y - 14 - mk.t * 30);
+      }
+      if (m.ball) { // 날아가는 공
+        const u = m.ball.t / 0.28;
+        const bx = 480 + (m.ball.ax - 480) * u;
+        const by = 520 + (m.ball.ay - 520) * u - Math.sin(u * Math.PI) * 50;
+        ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(bx, by, 16 - 8 * u, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(bx - 3, by - 3, 4 - 2 * u, 0, Math.PI * 2); ctx.fill();
+      }
+      if (m.st === 'play') { // 조준선
+        ctx.strokeStyle = '#7dffa0'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(m.cx, m.cy, 18, 0, Math.PI * 2); ctx.moveTo(m.cx - 30, m.cy); ctx.lineTo(m.cx - 8, m.cy); ctx.moveTo(m.cx + 8, m.cy); ctx.lineTo(m.cx + 30, m.cy); ctx.moveTo(m.cx, m.cy - 30); ctx.lineTo(m.cx, m.cy - 8); ctx.moveTo(m.cx, m.cy + 8); ctx.lineTo(m.cx, m.cy + 30); ctx.stroke();
+      }
+      ctx.textAlign = 'left'; ctx.font = 'bold 22px sans-serif'; ctx.fillStyle = '#ffffff';
+      ctx.fillText(`점수 ${m.score}`, px + 30, py + 90);
+      ctx.fillText(`남은 공 ${m.shots}`, px + 30, py + 124);
+      if (m.st === 'result') { ctx.textAlign = 'center'; ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = m.win > 0 ? '#7dffa0' : '#ff8a8a'; ctx.fillText(m.msg, this.viewW / 2, py + 270); }
     }
 
     // 발밑 그림자: 아래 땅까지의 거리가 멀수록 작고 옅어진다
@@ -1372,7 +1975,7 @@
 
     // 스태미나: 왼쪽 아래 초록 막대 (모자라면 붉게)
     _drawStamina(ctx, hud) {
-      const w = 170;
+      const w = 170 + Math.min(220, Math.max(0, (hud.staminaMax - 100) * 0.55)); // 최대치가 늘면 막대도 길어진다
       const x = 14;
       const y = this.viewH - 30;
       const k = Math.max(0, Math.min(1, hud.stamina / hud.staminaMax));
@@ -1389,7 +1992,7 @@
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
       ctx.fillStyle = '#fff';
-      ctx.fillText(`스태미나 ${Math.round(hud.stamina)}`, x + 6, y + 7);
+      ctx.fillText(`스태미나 ${Math.round(hud.stamina)} / ${hud.staminaMax}`, x + 6, y + 7);
       const c = hud.consumables || {};
       const bits = [];
       if (c.icebomb > 0) bits.push(`얼음폭탄 ${c.icebomb} (B)`);
@@ -1648,21 +2251,24 @@
       ctx.font = '16px sans-serif';
       ctx.textBaseline = 'top';
       ctx.font = '14px sans-serif';
-      this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Shift(또는 X): 3칸 대시   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   R: 처음 위치로', 12, 10);
+      this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Shift(또는 X): 3칸 대시   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   R: 처음 위치로', 12, 62);
       ctx.font = '16px sans-serif';
       if (!hud) return;
-      const test = '   [테스트] 0: 해변  9: 마을  7: 마을 동굴  4: 다크월드  5: 위층  8: 코인+1000   1: 장비';
-      if (hud.summon) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리${test}`, 12, 32);
-      else if (hud.monsterless) this._text(ctx, `몬스터가 없는 평화로운 마을${test}`, 12, 32);
-      else if (hud.crabCount !== undefined) this._text(ctx, `꽃게 ${hud.crabCount}마리${test}`, 12, 32);
+      const test = '   F1: 개발 메뉴 (순간이동·아이템)   I 또는 ]: 인벤토리   1~5: 무기 바꾸기';
+      if (hud.summon) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리${test}`, 12, 84);
+      else if (hud.monsterless) this._text(ctx, `몬스터가 없는 평화로운 마을${test}`, 12, 84);
+      else if (hud.crabCount !== undefined) this._text(ctx, `꽃게 ${hud.crabCount}마리${test}`, 12, 84);
 
+      if (hud.hotbar) this._drawHotbar(ctx, hud); // 왼쪽 위: 무기 칸 1~5
+      ctx.textBaseline = 'top';
       // 목숨: 우측 상단 하트
       for (let i = 0; i < hud.maxLives; i++) {
         const hx = this.viewW - 28 - (hud.maxLives - 1 - i) * 34;
         this._drawHeart(ctx, hx, 10, 26, i + 1 <= hud.lives);
-        if (hud.lives - i === 0.5) { // 반 칸: 왼쪽 절반만 채운다
+        const frac = hud.lives - i;
+        if (frac > 0 && frac < 1) { // 일부만 찬 칸(¼, ½, ¾): 왼쪽부터 그만큼만 채운다
           ctx.save();
-          ctx.beginPath(); ctx.rect(hx - 20, 0, 20, 60); ctx.clip();
+          ctx.beginPath(); ctx.rect(hx - 15, 0, 30 * frac, 60); ctx.clip();
           this._drawHeart(ctx, hx, 10, 26, true);
           ctx.restore();
         }
@@ -1674,8 +2280,10 @@
       else if (hud.prompt) this._drawBottomText(ctx, hud.prompt);
       if (hud.shop) this._drawShop(ctx, hud.shop);
       if (hud.equip) this._drawEquip(ctx, hud.equip);
+      if (hud.dev) this._drawDev(ctx, hud.dev);
+      if (hud.mini) this._drawMini(ctx, hud.mini);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 54);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

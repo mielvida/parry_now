@@ -29,7 +29,7 @@
       banner: { title: 'STAGE 2', sub: '지상 - 낯선 해변', dur: 5, caption: '…여기는 어디지? 처음 보는 해변이다. 아무래도 엉뚱한 곳으로 올라온 모양이다.' },
     },
     village: {
-      music: 'village', level: G.Levels.village, theme: G.Beach, monsterless: true, goal: '마을을 둘러보자: 가게 앞에서 E 키, 오른쪽 끝에는 동굴 입구가 있다 (장비: 1 키)',
+      music: 'village', level: G.Levels.village, theme: G.Beach, monsterless: true, goal: '마을을 둘러보자: 가게 앞에서 E 키, 오른쪽 끝에는 동굴 입구가 있다 (장비: I 키)',
       banner: { title: 'STAGE 3', sub: '해변 마을', dur: 5, caption: '…마을이다! 몬스터는 보이지 않고, 가게들이 늘어서 있다.' },
     },
     darkhub: { // 다크월드 입구: 무기 상점, 아이템 상점, 던전으로 오르는 문
@@ -44,6 +44,12 @@
       get label() { return `어둠의 탑 ${darkFloor}층`; },
       get goal() { return `어둠의 탑 ${darkFloor}층 / ${C.DUNGEON_FLOORS}층: ${dungeon.boss ? '보스를 쓰러뜨려라!' : '발판을 타고 꼭대기 계단으로! (암흑은 맞으면 -3)'}  [B 얼음폭탄 · V 먹기]`; },
       get banner() { return { title: `${darkFloor}층`, sub: dungeon.bossKind ? '보스가 기다린다…' : '어둠의 탑', dur: 2.5, caption: dungeon.bossKind ? '…강한 기운이 느껴진다. 이 층의 끝에 보스가 있다.' : '…위로, 위로. 시크너가 기다린다.' }; },
+    },
+    duelarena: { // 결투장: 보스전처럼 AI 용사와 싸운다
+      music: 'cave', label: '결투장', level: G.Levels.duelarena, theme: G.Beach, monsterless: true, returnNear: 'village', exitTo: 'village',
+      boss: { col: 2, kind: 'duel' },
+      get goal() { return duelRun ? `결투! ${duelRun.mode === 'cowboy' ? '카우보이 (총싸움)' : '공격! (칼싸움)'} — 상대 체력을 0으로! 던지는 무기는 던지고, 쏘는 무기는 쏴요. 건 돈 ${duelRun.cost} G` : '결투장'; },
+      banner: { title: '결투!', sub: '링 위의 승부', dur: 2.5, caption: '…관중이 환호한다. 상대의 체력을 먼저 0으로 만들어라!' },
     },
     home: { // 우리 집 안 (마을의 내 집 터에서 E). 장식품을 놓고 치우는 곳
       music: 'village', label: '우리 집', monsterless: true, returnNear: 'Y', theme: G.HomeTheme,
@@ -70,14 +76,14 @@
       banner: { title: '속삭이는 숲', sub: '슬라임 왕이 사는 초록 숲', dur: 3.5, caption: '…숲은 고요하다. 저 끝에 슬라임들의 왕이 있다고 한다.' },
     },
     snow: {
-      music: 'cave', label: '얼음 산', level: G.Levels.snow, theme: G.Snow, summon: true, repeatChest: true, returnNear: 'snow', slimeVariant: 'ice', slippery: true,
+      music: 'cave', label: '얼음 산', level: G.Levels.snow, theme: G.Snow, summon: true, repeatChest: true, returnNear: 'snow', slimeVariant: 'ice', slippery: true, iceZone: true,
       monsterSpeed: C.SNOW_MOB_SPEED, monsterDamage: C.SNOW_MOB_DAMAGE, boss: { col: 164, kind: 'ape' }, // 몬스터는 느리지만 한 방에 목숨 2개. 맨 끝 경기장(164칸~)에서 털복숭이 침팬지와 대결
       goal: '목표: 설산 끝의 털복숭이 침팬지를 쓰러뜨리고 보물 상자 (+1500 G, 경험치 50). 몬스터에게 맞으면 -2! 바닥이 미끄럽다',
       chest: { mode: 'mine', coins: 1500, exp: 50, next: 'village', near: 'snow' },
       banner: { title: '얼음 산', sub: '바닥이 미끄러운 설산', dur: 3.5, caption: '…발밑이 꽁꽁 얼어 있다. 몬스터는 굼뜨지만, 한 번 맞으면 크게 다친다!' },
     },
     volcano: {
-      music: 'cave', label: '불꽃 화산', level: G.Levels.volcano, theme: G.Volcano, summon: true, repeatChest: true, returnNear: 'volcano', slimeVariant: 'lava',
+      music: 'cave', label: '불꽃 화산', level: G.Levels.volcano, theme: G.Volcano, summon: true, repeatChest: true, returnNear: 'volcano', slimeVariant: 'lava', fireZone: true,
       monsterSpeed: C.VOLCANO_MOB_SPEED, boss: { col: 145, drop: 'darkcrystal' }, // 쓰러뜨리면 어둠의 크리스탈을 떨어뜨린다. 용암 때문에 모든 몬스터가 빠르다. 맨 끝 경기장(145칸~)에서 용머리 3개와 대결
       goal: '목표: 화산 끝의 용머리 3개를 쓰러뜨리고 보물 상자 (+1000 G, 경험치 50). 돌아가려면 처음의 출구에서 E',
       chest: { mode: 'mine', coins: 1000, exp: 50, next: 'village', near: 'volcano' },
@@ -93,7 +99,7 @@
     '마을 사람: "해변의 꽃게를 잡으면 코인을 떨어뜨린다더군."',
     '마을 사람: "마을 오른쪽 끝 동굴엔 보물이 있지만, 슬라임과 박쥐가 득시글하다네."',
     '마을 사람: "마을 곳곳의 문으로 숲, 설산, 화산에 갈 수 있다네. 갈수록 위험하지만 상자 보상도 크지."',
-    '마을 사람: "갑옷 가게엔 투구와 장갑, 신발도 있지. 1 키로 장비를 바꿀 수 있다네."',
+    '마을 사람: "갑옷 가게엔 투구와 장갑, 신발도 있지. I 키로 장비를, 1~5 키로 무기를 바꿀 수 있다네."',
     '마을 사람: "가끔 하늘이 어둡게 일렁이는 건, 기분 탓이겠지…"',
     '마을 사람: "왼쪽 끝 부동산에서 집을 사고, 인테리어 가게에서 가구를 사 방을 꾸며 보게나."',
     '마을 사람: "동굴 옆 상점에서 동굴 보물 상자의 코인을 업그레이드할 수 있다네. 최대 15레벨이지."',
@@ -137,6 +143,8 @@
   let equipStats = G.Shop.stats(inv); // 낀 장비의 능력치 합계 (applyEquipment가 갱신)
   const chestTaken = {};            // 이미 연 보물 상자 (같은 상자로 코인을 또 벌 수 없다)
   let nextStage = null;             // 클리어 연출이 끝나면 갈 곳 {name, near}
+  let skipBanner = false; // 마을에 처음 왔을 때의 소개/말은 한 번만
+  const seenStages = {};
   let equipUI = null;   // 인벤토리 창 {cur(선택한 칸 번호), msg, msgT, ok}
   const maxLives = () => G.Shop.maxLivesFor(inv, C.PLAYER_LIVES); // 갑옷에 따라 늘어나는 최대 피
   let shop = null;      // 열려 있는 상점 {kind, def, msg, msgT, ok}
@@ -148,6 +156,8 @@
   let ending = null;     // 클리어 연출 ('cave': 코인 -> 해변, 'house': 노인과 대화 -> 마을)
   let footT = 0;                 // 달리기 먼지 간격
   let reapKills = 0;             // 낫으로 잡은 몬스터 수: 20마리마다 피 반 칸
+  const dashCost = () => Math.max(5, C.DASH_STAMINA + equipStats.dashCostAdd); // 신발에 따라 대시 스태미나가 줄어든다
+  const stMax = () => G.Shop.staminaMax(inv); // 최대 스태미나 (보상 상점 업그레이드)
   let stamina = C.STAMINA_MAX;   // 스태미나: 대시와 폭탄/총/활 공격에 쓴다
   let staminaWait = 0;           // 스태미나를 쓴 직후 회복이 잠깐 멈추는 시간
   const story = { caves: 0, pending: false, revealed: false, cleared: false }; // 이야기: 동굴 15번 클리어 -> 시크너 이야기 -> 다크월드 문
@@ -213,6 +223,7 @@
     slamImpact(x, y) { effects.quakeDust(x, y, 96); effects.shake(10, 0.3); G.Audio.play('vanish'); },
     stunned() { popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: `${boss.name} 기절! 지금이다!`, t: 2, color: 'rgba(255,230,120,A)' }); G.Audio.play('pickup'); },
     defeated() { // 용머리를 모두 쓰러뜨림: 보물 상자가 나타난다
+      if (duelRun) { duelWin(); return; }
       chest = makeChest();
       const drop = STAGES[stageName].boss && STAGES[stageName].boss.drop; // 보스가 떨어뜨리는 소중한 물건 (이미 있으면 다시 주지 않는다)
       if (drop) { // 보스가 쓰러질 때마다 소중한 물건 1개 (개수가 쌓인다)
@@ -230,7 +241,12 @@
     camera.minX = 0;
     const bk = st.boss && st.boss.kind;
     if (bk && bk.startsWith('dark_')) { // 다크월드 보스 (정의의 어둠돌 / 정의의 어둠 / 시크너)
-      boss = new G.DarkBoss(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv, bk.slice(5));
+      const DB = bk === 'dark_sikner' ? G.Sikner : G.DarkBoss; // 100층 시크너는 전용 패턴
+      boss = new DB(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv, bk.slice(5));
+      return;
+    }
+    if (bk === 'duel' && duelRun) { // 결투장의 AI 용사
+      boss = new G.DuelRival(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE * 2, (terrain.treasure.row + 1) * C.TILE, bossEv, duelRun.cfg);
       return;
     }
     const Cls = st.boss && ({ ape: G.ApeBoss, king: G.KingSlime }[bk] || G.Boss);
@@ -238,18 +254,403 @@
   }
   const bossOn = () => !!(boss && boss.started);
   const magicTargets = () => (bossOn() ? monsters.concat(boss.targets()) : monsters);
+  // 속성 갑옷의 능력 (equipStats.perk): thorn 가시, fire 화염, ice 얼음, volt 번개, toxic 독가시, regen 재생 (gold 탐욕은 코인 계산, 그림자는 무적 시간에서)
+  let perkT = 0;
+  let regenT = 0;
+  let usedT = 0; // 방어구를 입은 시간(초) 세기
+  function updateArmorPerks(dt) {
+    const perk = equipStats.perk;
+    if (!perk) return;
+    if (perk === 'regen') {
+      regenT += dt;
+      if (regenT >= 10) {
+        regenT = 0;
+        if (lives < maxLives()) {
+          lives = Math.min(maxLives(), lives + 0.5);
+          popups.push({ x: player.x + player.w / 2, y: player.y - 30, text: '재생 +½', t: 1.2, color: 'rgba(255,140,170,A)' });
+        }
+      }
+      return;
+    }
+    if (perk !== 'fire' && perk !== 'toxic') return;
+    perkT += dt;
+    if (perkT < 0.5) return;
+    perkT = 0;
+    const r = (perk === 'fire' ? 2 : 2.5) * C.TILE;
+    const px = player.x + player.w / 2;
+    const py = player.y + player.h / 2;
+    for (const mo of monsters) {
+      if (!mo.alive || mo.flying || mo.appear > 0) continue;
+      if (Math.hypot(mo.x + mo.w / 2 - px, mo.y + mo.h / 2 - py) > r) continue;
+      if (perk === 'fire') mo.applyBurn(); else mo.applyPoison();
+    }
+  }
+  // 몬스터에게 맞았을 때 일어나는 갑옷 능력 (s = 나를 친 몬스터)
+  function armorHurtPerk(s) {
+    const perk = equipStats.perk;
+    if (!perk) return;
+    const T = C.TILE;
+    const px = player.x + player.w / 2;
+    const py = player.y + player.h / 2;
+    const near = (rad) => monsters.filter((mo) => mo.alive && !mo.flying && mo.appear <= 0 && Math.hypot(mo.x + mo.w / 2 - px, mo.y + mo.h / 2 - py) <= rad);
+    if (perk === 'thorn' || perk === 'toxic') {
+      s.knockback(Math.sign(s.x + s.w / 2 - px) || 1);
+      effects.crystalShards(s.x + s.w / 2, s.y + s.h / 2);
+    } else if (perk === 'ice') {
+      for (const mo of near(T * 3)) mo.freeze();
+      effects.crystalShards(px, py);
+    } else if (perk === 'volt') {
+      for (const mo of near(T * 4)) mo.stagger(Math.sign(mo.x + mo.w / 2 - px) || 1);
+      effects.lightBurst(px, py, T * 4);
+    }
+  }
+
+  // ---------- 돈 버는 놀이: 야바위 / 공 던지기 표적 맞추기 / 다른 용사와 결투 (마을의 놀이마당) ----------
+  const MINI_BETS = [100, 300, 1000];
+  const miniLv = { shell: 0, duel: 0 }; // 이길수록 어려워진다 (야바위는 빨라지고, 결투 상대는 강해진다)
+  const DUEL_RIVALS = [
+    { name: '풋내기 용사 미르', armor: 'armor1', helmet: null, weapon: 'sword0' },
+    { name: '떠돌이 검사 하늘', armor: 'armor2', helmet: 'helmet1', weapon: 'sword1' },
+    { name: '결투가 라온', armor: 'armor3', helmet: 'helmet2', weapon: 'katana1' },
+    { name: '검객 아린', armor: 'armor4', helmet: 'helmet3', weapon: 'rapier2' },
+    { name: '기사 도윤', armor: 'darmor1', helmet: 'helmet4', weapon: 'sword6' },
+    { name: '그림자 용사 세라', armor: 'darmor2', helmet: 'dhelmet2', weapon: 'katana3' },
+    { name: '어둠의 검사 로건', armor: 'darmor4', helmet: 'dhelmet3', weapon: 'sword7' },
+    { name: '전설의 용사 하랑', armor: 'darmor3', helmet: 'dhelmet4', weapon: 'great4' },
+  ];
+  let mini = null;
+  const rand3 = () => Math.floor(Math.random() * 3);
+  const miniGo = (m, st) => { m.st = st; m.t = 0; };
+  function openMini(kind) {
+    mini = { kind, st: 'bet', bi: 0, msg: '', msgT: 0, t: 0, level: miniLv[kind] || 0, cost: 0, win: 0, mode: 'cowboy' };
+    mini.rname = DUEL_RIVALS[Math.min(DUEL_RIVALS.length - 1, mini.level)].name;
+    G.Audio.play('pickup');
+  }
+
+  function updateMini(dt) {
+    const m = mini;
+    const pressed = (...c) => c.some((k) => input.wasPressed(k));
+    m.t += dt;
+    m.msgT = Math.max(0, m.msgT - dt);
+    m.clicked = m.click || null; // 이번 프레임의 마우스 클릭 (화면 좌표)
+    m.click = null;
+    const hitBox = (p, x, y, w, h) => p && p.x >= x && p.x < x + w && p.y >= y && p.y < y + h;
+    if (pressed('Escape')) { mini = null; return; }
+    if (m.st === 'bet') {
+      let betClick = false;
+      if (m.clicked) {
+        if (m.kind === 'duel') ['cowboy', 'fight', 'ring'].forEach((id, i) => { if (hitBox(m.clicked, 480 - 290 + i * 200, 86, 180, 40) && m.mode !== id) { m.mode = id; G.Audio.play('catch'); } });
+        const n = m.kind === 'target' ? 1 : 3;
+        for (let i = 0; i < n; i++) if (hitBox(m.clicked, 480 - (n * 190 - 20) / 2 + i * 190, 324, 170, 80)) { if (m.kind !== 'target') m.bi = i; betClick = true; }
+      }
+      if (m.kind === 'duel') { const MODES = ['cowboy', 'fight', 'ring']; const i = MODES.indexOf(m.mode); const want = pressed('KeyC') ? 'cowboy' : pressed('KeyF') ? 'fight' : pressed('KeyR') ? 'ring' : pressed('ArrowUp', 'KeyW') ? MODES[Math.max(0, i - 1)] : pressed('ArrowDown', 'KeyS') ? MODES[Math.min(2, i + 1)] : pressed('Tab') ? MODES[(i + 1) % 3] : null; if (want && want !== m.mode) { m.mode = want; G.Audio.play('catch'); } } // 결투 종류: 카우보이 / 공격!
+      if (m.kind !== 'target') {
+        if (pressed('ArrowLeft', 'KeyA')) m.bi = Math.max(0, m.bi - 1);
+        if (pressed('ArrowRight', 'KeyD')) m.bi = Math.min(MINI_BETS.length - 1, m.bi + 1);
+        for (let n = 1; n <= 3; n++) if (pressed('Digit' + n, 'Numpad' + n)) m.bi = n - 1;
+      }
+      if (betClick || pressed('Enter', 'NumpadEnter', 'Space', 'KeyE')) {
+        const cost = m.kind === 'target' ? 100 : MINI_BETS[m.bi];
+        if (coins < cost) { m.msg = '코인이 부족해요.'; m.msgT = 1.6; G.Audio.play('deny'); return; }
+        coins -= cost;
+        m.cost = cost;
+        m.win = 0;
+        G.Audio.play('coin');
+        if (m.kind === 'shell') shellStart(m); else if (m.kind === 'target') targetStart(m); else if (m.mode === 'ring') fightStart(m); else startDuelArena(m);
+      }
+      return;
+    }
+    if (m.kind === 'shell') shellUpdate(m, dt, pressed);
+    else if (m.kind === 'target') targetUpdate(m, dt, pressed);
+    else fightUpdate(m, dt, pressed);
+    if (m.st === 'result' && m.t > 0.8 && (m.clicked || pressed('Enter', 'NumpadEnter', 'Space', 'KeyE'))) { miniGo(m, 'bet'); m.msg = ''; m.rname = DUEL_RIVALS[Math.min(DUEL_RIVALS.length - 1, m.level)].name; }
+  }
+
+  // 야바위: 공이 든 컵을 보여 준 뒤 컵을 여러 번 섞는다. 공이 든 컵을 맞히면 건 돈의 2배
+  function shellStart(m) {
+    m.cups = [0, 1, 2].map((i) => ({ slot: i, px: i, py: 0, lift: 0 }));
+    m.ball = rand3();
+    m.swaps = [];
+    const n = 14 + m.level * 3;
+    for (let i = 0; i < n; i++) { const a = rand3(); let b = rand3(); while (b === a) b = rand3(); m.swaps.push([a, b]); }
+    m.si = 0;
+    m.sT = 0;
+    m.sdur = Math.max(0.03, 0.075 - 0.011 * m.level); // 거의 찍는 것처럼 눈 깜짝할 새에 섞는다
+    m.cur = 1;
+    miniGo(m, 'show');
+  }
+  function shellUpdate(m, dt, pressed) {
+    for (const c of m.cups) { c.px = c.slot; c.py = 0; }
+    if (m.st === 'show') { // 공이 든 컵을 들어 올려 보여 준다
+      m.cups.forEach((c, i) => { const want = i === m.ball && m.t < 1.1 ? 1 : 0; c.lift += (want - c.lift) * Math.min(1, 10 * dt); });
+      if (m.t >= 1.5) { miniGo(m, 'shuffle'); m.sT = 0; }
+    } else if (m.st === 'shuffle') {
+      m.sT += dt;
+      const sw = m.swaps[m.si];
+      const u = Math.min(1, m.sT / m.sdur);
+      const e = u * u * (3 - 2 * u);
+      const ca = m.cups.find((c) => c.slot === sw[0]);
+      const cb = m.cups.find((c) => c.slot === sw[1]);
+      ca.px = sw[0] + (sw[1] - sw[0]) * e; ca.py = -Math.sin(u * Math.PI) * 30; // 한 컵은 앞으로 크게 돌아 나온다
+      cb.px = sw[1] + (sw[0] - sw[1]) * e; cb.py = Math.sin(u * Math.PI) * 14;
+      if (u >= 1) {
+        ca.slot = sw[1]; cb.slot = sw[0]; ca.px = ca.slot; cb.px = cb.slot; ca.py = 0; cb.py = 0;
+        m.si += 1; m.sT = 0;
+        G.Audio.play('catch');
+        if (m.si >= m.swaps.length) miniGo(m, 'pick');
+      }
+    } else if (m.st === 'pick') {
+      if (pressed('ArrowLeft', 'KeyA')) { m.cur = Math.max(0, m.cur - 1); m.useMouse = false; }
+      if (pressed('ArrowRight', 'KeyD')) { m.cur = Math.min(2, m.cur + 1); m.useMouse = false; }
+      const cupAt = (p) => (p && p.y >= 235 && p.y < 360 ? [0, 1, 2].find((s) => Math.abs(p.x - (300 + s * 180)) < 54) : undefined);
+      if (m.useMouse && cupAt(m.mouse) !== undefined) m.cur = cupAt(m.mouse); // 마우스를 올린 컵
+      const cupClick = cupAt(m.clicked);
+      if (cupClick !== undefined) m.cur = cupClick;
+      if (cupClick !== undefined || pressed('Enter', 'NumpadEnter', 'Space', 'KeyE')) {
+        const chosen = m.cups.findIndex((c) => c.slot === m.cur);
+        m.pick = chosen;
+        const win = chosen === m.ball;
+        m.won = win;
+        if (win) { m.win = m.cost * 2; coins += m.win; m.level = Math.min(5, m.level + 1); m.msg = `정답! +${m.win} G (다음엔 더 빨라진다)`; G.Audio.play('treasure'); }
+        else { m.msg = '틀렸어요… 공은 다른 컵에 있었다.'; G.Audio.play('deny'); }
+        miniLv.shell = m.level;
+        miniGo(m, 'result');
+      }
+    } else if (m.st === 'result') { // 컵을 모두 열어 공이 어디 있었는지 보여 준다
+      m.cups.forEach((c, i) => { const want = i === m.pick || m.t > 0.6 ? 1 : 0; c.lift += (want - c.lift) * Math.min(1, 10 * dt); });
+    }
+  }
+
+  // 표적 맞추기: 방향키로 조준하고 Enter로 공을 던진다. 움직이는 표적의 한가운데일수록 점수가 높다 (참가비 100 G, 점수 x2 코인)
+  function targetStart(m) {
+    m.shots = 5; m.score = 0; m.cx = 480; m.cy = 330; m.ball = null; m.marks = []; m.tt = 0; m.endT = 0;
+    m.tx = 480; m.ty = 235;
+    miniGo(m, 'play');
+  }
+  function targetUpdate(m, dt, pressed) {
+    m.tt += dt;
+    const spd = 1.7 + 0.28 * (5 - m.shots); // 던질수록 더 빨라진다
+    m.tx = 480 + Math.sin(m.tt * spd) * 240;
+    m.ty = 235 + Math.sin(m.tt * spd * 0.8 + 1) * 60;
+    for (const mk of m.marks) mk.t += dt;
+    if (m.st !== 'play') return;
+    const dn = (...c) => c.some((k) => input.down.has(k));
+    const v = 420;
+    m.cx = Math.max(130, Math.min(830, m.cx + ((dn('ArrowRight', 'KeyD') ? 1 : 0) - (dn('ArrowLeft', 'KeyA') ? 1 : 0)) * v * dt));
+    m.cy = Math.max(100, Math.min(460, m.cy + ((dn('ArrowDown', 'KeyS') ? 1 : 0) - (dn('ArrowUp', 'KeyW') ? 1 : 0)) * v * dt));
+    if (dn('ArrowRight', 'KeyD', 'ArrowLeft', 'KeyA', 'ArrowDown', 'KeyS', 'ArrowUp', 'KeyW')) m.useMouse = false;
+    if (m.useMouse && m.mouse) { m.cx = Math.max(130, Math.min(830, m.mouse.x)); m.cy = Math.max(100, Math.min(460, m.mouse.y)); } // 마우스로 조준
+    if (!m.ball && m.shots > 0 && (m.clicked || pressed('Enter', 'NumpadEnter', 'Space'))) { m.ball = { t: 0, ax: m.cx, ay: m.cy }; G.Audio.play('throw'); }
+    if (m.ball) {
+      m.ball.t += dt;
+      if (m.ball.t >= 0.28) { // 공이 표적에 닿는 순간의 표적 위치로 판정
+        const d = Math.hypot(m.ball.ax - m.tx, m.ball.ay - m.ty);
+        const pts = d <= 10 ? 50 : d <= 22 ? 30 : d <= 36 ? 20 : d <= 52 ? 10 : 0; // 표적이 작아서 더 어렵다
+        m.score += pts;
+        m.marks.push({ x: m.ball.ax, y: m.ball.ay, pts, t: 0 });
+        m.shots -= 1;
+        m.ball = null;
+        G.Audio.play(pts >= 30 ? 'treasure' : pts > 0 ? 'coin' : 'deny');
+      }
+    } else if (m.shots <= 0) {
+      m.endT += dt;
+      if (m.endT > 1.0) {
+        m.win = m.score * 2;
+        coins += m.win;
+        m.msg = m.win > 0 ? `점수 ${m.score}점! +${m.win} G` : '아쉬워요… 하나도 못 맞혔다.';
+        miniGo(m, 'result');
+      }
+    }
+  }
+
+  // 링 격투 (오버레이): 경기장 안에서 무작위 AI 용사와 진짜로 싸운다. AI의 등급(1~5)은 무작위, 체력은 4~10.
+  // ←→ 이동, Space/↑ 점프, ↓ 막기(막으면 상대가 휘청한다), Enter 공격. 상대 체력을 0으로 만들면 이긴다 (60초가 지나면 남은 체력 비율이 높은 쪽)
+  const ARENA = { x0: 170, x1: 790, gy: 430 };
+  function fightStart(m) {
+    const lv = 2 + Math.floor(Math.random() * 4); // 링 격투는 더 어렵다: 등급 2~5 + 보너스
+    const hp = 6 + Math.floor(Math.random() * 7);
+    const look = DUEL_RIVALS[Math.min(DUEL_RIVALS.length - 1, lv + 1 + Math.floor(Math.random() * 3))];
+    m.lv = lv;
+    m.rival = look;
+    m.rlv = lv;
+    m.ai = { x: ARENA.x1 - 130, y: 0, vy: 0, vx: 0, face: -1, hp, maxHp: hp, state: 'approach', st: 0, cd: 1.0, inv: 0, guard: 0, atkT: 0, stagger: 0, hitFx: 0 };
+    m.pl = { x: ARENA.x0 + 130, y: 0, vy: 0, vx: 0, face: 1, hp: 10, maxHp: 10, inv: 0, atkT: 0, cd: 0, guard: false, hitFx: 0 };
+    m.time = 60;
+    m.fx = [];
+    m.swingT = 0;
+    miniGo(m, 'ready');
+  }
+  function fightHit(m, who, dmg, dir) { // who = 맞는 쪽 ('pl' | 'ai')
+    const t = m[who];
+    t.hp = Math.max(0, t.hp - dmg);
+    t.inv = 0.55;
+    t.vx = dir * 340;
+    t.hitFx = 0.3;
+    m.fx.push({ x: t.x, y: ARENA.gy - 70 - t.y, t: 0, text: `-${dmg}` });
+    G.Audio.play(who === 'ai' ? 'parry' : 'hurt');
+  }
+  function fightUpdate(m, dt, pressed) {
+    for (const f of m.fx) f.t += dt;
+    m.fx = m.fx.filter((f) => f.t < 0.8);
+    if (m.st === 'ready') {
+      if (m.t >= 1.5) { miniGo(m, 'fight'); G.Audio.play('spawn'); }
+      return;
+    }
+    if (m.st === 'result') { m.swingT += dt; return; }
+    const dn = (...c) => c.some((k) => input.down.has(k));
+    const P = m.pl;
+    const A = m.ai;
+    m.time -= dt;
+    // ---- 내 조작 ----
+    P.inv = Math.max(0, P.inv - dt); P.hitFx = Math.max(0, P.hitFx - dt); P.atkT = Math.max(0, P.atkT - dt); P.cd = Math.max(0, P.cd - dt);
+    P.guard = dn('ArrowDown', 'KeyS') && P.y === 0 && P.atkT === 0;
+    const dirX = (dn('ArrowRight', 'KeyD') ? 1 : 0) - (dn('ArrowLeft', 'KeyA') ? 1 : 0);
+    if (!P.guard && P.hitFx < 0.15) { P.vx += (dirX * 240 - P.vx) * Math.min(1, 12 * dt); if (dirX) P.face = dirX; } else P.vx *= Math.max(0, 1 - 6 * dt);
+    if (pressed('Space', 'ArrowUp', 'KeyW') && P.y === 0 && !P.guard) P.vy = 640;
+    if (pressed('Enter', 'NumpadEnter') && P.cd === 0 && !P.guard) {
+      P.atkT = 0.32;
+      P.cd = Math.max(0.3, 0.5 + equipStats.cooldownAdd * 0.6);
+      P.struck = false;
+      G.Audio.play('swing');
+    }
+    if (P.atkT > 0 && !P.struck && P.atkT < 0.2) { // 휘두른 지 조금 뒤에 맞는다
+      P.struck = true;
+      const reach = 78 + equipStats.reachTiles * 70;
+      if (Math.abs(A.x - P.x) <= reach && Math.abs(A.y - P.y) < 70 && Math.sign(A.x - P.x || P.face) === P.face) {
+        if (A.inv > 0) { /* 무적 중 */ } else if (A.guard > 0) { A.guard = 0; P.vx = -P.face * 200; m.fx.push({ x: A.x, y: ARENA.gy - 90 - A.y, t: 0, text: '막았다!' }); G.Audio.play('catch'); }
+        else fightHit(m, 'ai', Math.max(1, Math.min(4, Math.round(Math.sqrt(equipStats.baseDmg + equipStats.bossBonus)))), P.face);
+      }
+    }
+    // ---- AI ----
+    A.inv = Math.max(0, A.inv - dt); A.hitFx = Math.max(0, A.hitFx - dt); A.atkT = Math.max(0, A.atkT - dt); A.cd = Math.max(0, A.cd - dt); A.stagger = Math.max(0, A.stagger - dt); A.guard = Math.max(0, A.guard - dt);
+    const dx = P.x - A.x;
+    const dist = Math.abs(dx);
+    const lv = m.lv;
+    if (A.stagger === 0 && A.hitFx < 0.15) {
+      A.face = Math.sign(dx) || A.face;
+      if (A.state === 'approach') {
+        const want = dist > 92 ? A.face : dist < 58 ? -A.face : 0;
+        A.vx += (want * (170 + 32 * lv) - A.vx) * Math.min(1, 10 * dt);
+        if (A.cd === 0 && dist < 110 && Math.abs(P.y - A.y) < 60) { A.state = 'wind'; A.st = 0; A.vx = 0; }
+        if (P.atkT > 0.1 && dist < 150 && Math.random() < dt * (2.4 * lv)) { A.guard = 0.55; A.state = 'approach'; A.cd = Math.min(A.cd, 0.1); } // 내가 휘두르면 자주 막고 바로 반격
+        else if (P.atkT > 0.1 && dist < 130 && A.y === 0 && Math.random() < dt * 1.2 * lv) { A.vx = -A.face * 520; A.inv = 0.25; } // 뒤로 빠지며 피한다
+        if (A.y === 0 && dist < 150 && Math.random() < dt * 0.4 * lv) A.vy = 560; // 가끔 뛴다
+      } else if (A.state === 'wind') { // 칼을 치켜든다 (이때가 막을 기회)
+        A.st += dt;
+        if (A.st >= Math.max(0.12, 0.42 - 0.06 * lv)) { A.state = 'strike'; A.st = 0; A.atkT = 0.3; }
+      } else if (A.state === 'strike') {
+        A.st += dt;
+        if (!A.hitDone && A.st >= 0.08) {
+          A.hitDone = true;
+          if (dist <= 132 && Math.abs(P.y - A.y) < 70 && Math.sign(dx) === A.face && P.inv === 0) {
+            if (P.guard) { A.stagger = 0.7; A.vx = -A.face * 220; m.fx.push({ x: P.x, y: ARENA.gy - 90, t: 0, text: '막았다!' }); G.Audio.play('catch'); } // 막으면 상대가 휘청한다
+            else fightHit(m, 'pl', lv >= 4 ? 2 : 1, A.face);
+          }
+        }
+        if (A.st >= 0.3) { A.state = 'approach'; A.hitDone = false; A.cd = Math.max(0.12, 0.9 - 0.15 * lv) + Math.random() * 0.25; if (Math.random() < 0.3 + 0.08 * lv) A.cd = 0.08; }
+      }
+    } else A.vx *= Math.max(0, 1 - 6 * dt);
+    // ---- 이동과 경기장 벽 ----
+    for (const f of [P, A]) {
+      f.x = Math.max(ARENA.x0, Math.min(ARENA.x1, f.x + f.vx * dt));
+      if (f.y > 0 || f.vy > 0) { f.y = Math.max(0, f.y + f.vy * dt); f.vy -= 1900 * dt; if (f.y === 0) f.vy = 0; }
+    }
+    // ---- 결판 ----
+    if (A.hp <= 0 || P.hp <= 0 || m.time <= 0) {
+      const win = A.hp <= 0 ? true : P.hp <= 0 ? false : (P.hp / P.maxHp) > (A.hp / A.maxHp);
+      m.won = win;
+      if (win) { m.win = Math.round(m.cost * (1.6 + 0.2 * lv)); coins += m.win; G.Audio.play('treasure'); }
+      else G.Audio.play('hurt');
+      m.msg = A.hp <= 0 ? `이겼다! +${m.win} G` : P.hp <= 0 ? '쓰러졌다…' : win ? `시간 종료, 체력이 더 많아 승리! +${m.win} G` : '시간 종료, 체력이 더 적어 패배…';
+      m.swingT = 0;
+      miniGo(m, 'result');
+    }
+  }
+
+  // ---------- 결투장: 보스전처럼 AI 용사와 싸운다 (카우보이 = 총싸움 / 공격! = 칼싸움) ----------
+  // 평소 게임 조작 그대로: 이동, 점프, 패링(Enter), 대시, 검 던지기, 총·활·폭탄 쏘기. 상대의 체력은 4~10, 등급은 1~5 무작위.
+  let duelRun = null; // {mode, cost, cfg, livesBackup, end, endT}
+  function startDuelArena(m) {
+    const lv = 1 + Math.floor(Math.random() * 5);
+    const hp = 4 + Math.floor(Math.random() * 7);
+    const look = DUEL_RIVALS[Math.min(DUEL_RIVALS.length - 1, lv + Math.floor(Math.random() * 3))];
+    duelRun = { mode: m.mode, cost: m.cost, livesBackup: lives, end: null, endT: 0, cfg: { mode: m.mode, lv, hp, name: look.name, armor: look.armor, helmet: look.helmet, weapon: look.weapon } };
+    mini = null;
+    cutscene = null;
+    loadStage('duelarena', true);
+    lives = maxLives(); // 결투 동안은 체력이 가득 차 있다 (결투가 끝나면 원래대로)
+  }
+  function duelWin() {
+    const r = duelRun;
+    if (!r || r.end) return;
+    r.end = 'win';
+    const lv = r.cfg.lv;
+    const pay = Math.round(r.cost * (1.6 + 0.2 * lv));
+    coins += pay;
+    popups.push({ x: player.x + player.w / 2, y: player.y - 56, text: `결투 승리! +${pay} G`, t: 3, color: 'rgba(125,255,160,A)' });
+    G.Audio.play('treasure');
+    effects.treasure(player.x + player.w / 2, player.y);
+  }
+  function duelLose() {
+    const r = duelRun;
+    if (!r || r.end) return;
+    r.end = 'lose';
+    lives = 1;
+    player.invuln = 99;
+    if (boss) boss.stop = true;
+    popups.push({ x: player.x + player.w / 2, y: player.y - 56, text: `결투 패배… -${r.cost} G`, t: 3, color: 'rgba(255,140,140,A)' });
+    G.Audio.play('gameover');
+  }
+  function updateDuelRun(dt) {
+    const r = duelRun;
+    if (!r || !r.end) return;
+    r.endT += dt;
+    if (r.endT >= 2.6) { // 마을의 결투장 앞으로 돌아간다
+      lives = r.livesBackup;
+      duelRun = null;
+      goVillageShop('mgduel');
+    }
+  }
+
+  // 크리스탈 만들기: 어둠의 크리스탈 -> (숲의 샘물) 정화된 크리스탈 -> (화산의 제단) 신성 크리스탈
+  function say(text, color) { popups.push({ x: player.x + player.w / 2, y: player.y - 44, text, t: 2.6, color: color || 'rgba(255,240,170,A)' }); }
+  function washCrystals() {
+    const n = inv.materials.darkcrystal || 0;
+    if (!n) { say('씻을 어둠의 크리스탈이 없어요 (탑의 보스가 떨어뜨려요)', 'rgba(255,170,170,A)'); G.Audio.play('deny'); return; }
+    inv.materials.darkcrystal = 0;
+    inv.materials.cleancrystal = (inv.materials.cleancrystal || 0) + n;
+    say(`어둠의 크리스탈 ${n}개를 씻었다! 정화된 크리스탈 ${n}개 (다음: 화산의 제단)`, 'rgba(170,235,255,A)');
+    G.Audio.play('pickup');
+    effects.sparkle(player.x + player.w / 2, player.y);
+  }
+  function blessCrystals() {
+    const n = inv.materials.cleancrystal || 0;
+    if (!n) { say('정화된 크리스탈이 없어요 (어둠의 크리스탈을 숲의 샘물로 씻어 오세요)', 'rgba(255,170,170,A)'); G.Audio.play('deny'); return; }
+    inv.materials.cleancrystal = 0;
+    inv.materials.holycrystal = (inv.materials.holycrystal || 0) + n;
+    say(`신성 크리스탈 ${n}개를 얻었다! (대장간에서 칼에 붙일 수 있어요)`, 'rgba(255,225,120,A)');
+    G.Audio.play('treasure');
+    effects.treasure(player.x + player.w / 2, player.y);
+  }
   // 약점 속성 무기는 보스에게 더 아프다 (불의 용은 얼음, 눈의 털복숭이는 불)
   // 보스에게 입히기: 치명타가 터지면 치명타 대미지, 아니면 평소 대미지
   function hitBoss(rect) {
     const crit = rollCrit();
-    const hits = boss.hitHeads(rect, crit ? G.Shop.critDamage(inv) : bossDamage());
+    const holy = boss.kind === 'dark' ? G.Shop.holyMult(inv) : 1; // 신성 크리스탈을 붙인 칼은 탑의 보스에게 더 강하다
+    const weakMul = boss.weak && weaponElemOf() === boss.weak ? 3 : 1; // 보스의 약점 속성 무기: 대미지 x3
+    const hits = boss.hitHeads(rect, (crit ? G.Shop.critDamage(inv) : bossDamage()) * holy * weakMul);
+    if (weakMul > 1 && hits.length) popups.push({ x: hits[0].cx, y: hits[0].y - 56, text: `약점! x3 (${WEAK_NAMES[boss.weak]})`, t: 1.1, color: 'rgba(120,255,160,A)' });
+    if (holy > 1 && hits.length && !crit) popups.push({ x: hits[0].cx, y: hits[0].y - 34, text: `신성 x${holy}`, t: 1, color: 'rgba(255,230,140,A)' });
     if (crit && hits.length) {
       popups.push({ x: hits[0].cx, y: hits[0].y - 34, text: `치명타! ${G.Shop.critDamage(inv)}`, t: 1.4, color: 'rgba(255,225,80,A)' });
       critFx(hits[0].cx, hits[0].cy);
     }
     return hits;
   }
-  const bossDamage = () => (killsInOne() ? 2 : 1) + equipStats.bossBonus + (boss && G.Shop.ITEMS[inv.equipped.weapon].elem === boss.weak ? (boss.weak === 'ice' ? C.BOSS_ICE_BONUS : C.BOSS_FIRE_BONUS) : 0);
+  const bossDamage = () => equipStats.baseDmg + equipStats.bossBonus; // 약점은 hitBoss에서 x3
+  const WEAK_NAMES = { fire: '불꽃', ice: '얼음', light: '빛', quake: '대지', crystal: '수정', shadow: '그림자', poison: '독' };
+  // 무기의 속성: 근접 무기는 elem, 지팡이는 element (번개 = 빛)
+  const weaponElemOf = () => { const w = G.Shop.ITEMS[inv.equipped.weapon]; const e = w.elem || w.element || null; return e === 'lightning' ? 'light' : e === 'random' ? null : e; };
 
   // 던전: 층마다 0~3개의 아이템이 바닥에 떨어져 있다 (스태미나, 얼음 폭탄, 음식)
   const PICKUP_TABLE = ['st70', 'st30', 'st30', 'icebomb', 'st30'];
@@ -264,6 +665,8 @@
 
   function loadStage(name, keepLives = false, near = null) {
     stageName = name;
+    skipBanner = name === 'village' && !!seenStages.village;
+    seenStages[name] = true;
     if (name === 'mine' && !mineLevel) { // ?stage=mine 처럼 입구를 거치지 않고 바로 온 경우
       mineRun = 1;
       mineLevel = G.MineGen.generate(1);
@@ -320,6 +723,7 @@
     for (const mo of monsters) {
       mo.stageSpeed = (st.monsterSpeed || 1) * (st.dark ? 1 + Math.min(0.6, darkFloor * 0.006) : 1); // 다크월드는 올라갈수록 빨라진다
       mo.contactDmg = st.monsterDamage || (st.dark ? 3 : 1); // 설산 몬스터는 목숨 2개, 다크월드(암흑)는 3개
+      mo.immune = { ice: !!st.iceZone, fire: !!st.fireZone }; // 설산 몬스터는 얼지 않고, 화산 몬스터는 불에 타지 않는다
       if (st.dark) { // 다크월드 몬스터: 층이 오를수록 단단하다 (체력, 더 때려야 하는 횟수)
         mo.dark = true;
         mo.maxHp = Math.round(mo.maxHp * (1 + darkFloor * 0.06));
@@ -345,7 +749,7 @@
     stageTime = 0;
     if (name === 'village' && story.pending) dialog = null; // 이야기는 잠시 뒤에 시작한다 (step)
     player.respawn(spawn.x, spawn.y);
-    player.slippery = !!st.slippery; // 설산은 바닥이 미끄럽다
+    player.slippery = !!st.slippery && equipStats.perk !== 'ice'; // 설산은 바닥이 미끄럽다 (얼음 갑옷은 안 미끄러진다)
     applySpeed(); // 마을에서만 달리기 업그레이드가 적용된다
     setupBoss();
     camera.follow(player, terrain, C.DT, true);
@@ -364,12 +768,15 @@
     player.armorId = inv.equipped.armor;
     player.helmetId = inv.equipped.helmet;
     player.glovesId = inv.equipped.gloves;
+    { const wd = G.Shop.ITEMS[inv.equipped.weapon]; player.swingFrames = wd.swingFrames || C.SWING_FRAMES; player.slashFrame = wd.slashFrame || C.SWING_SLASH_FRAME; } // 망치는 천천히 내려찍는다
+    player.pantsId = inv.equipped.pants;
     player.bootsId = inv.equipped.boots;
     player.throwBonus = equipStats.throwTiles;
     player.canThrow = equipStats.canThrow;
     player.parryWindow = C.PARRY_WINDOW + equipStats.windowAdd;
     player.parryCooldownTime = Math.max(0.25, C.PARRY_COOLDOWN + equipStats.cooldownAdd);
     applySpeed();
+    player.slippery = !!(STAGES[stageName] && STAGES[stageName].slippery) && equipStats.perk !== 'ice';
     lives = Math.min(lives, maxLives()); // 갑옷을 벗어 최대 피가 줄면 넘치는 피는 사라진다
   }
 
@@ -397,30 +804,10 @@
   window.addEventListener('resize', fitCanvas);
   fitCanvas();
 
-  // 테스트용 키: 0 = 해변, 9 = 마을, 7 = 마을 동굴(새로 생성)로 바로 이동 (컷신/클리어 연출 중이어도 끊는다), 8 = 코인 +1000
-  const STAGE_KEYS = { Digit0: 'beach', Numpad0: 'beach', Digit9: 'village', Numpad9: 'village' };
+  // 테스트 기능(순간이동, 아이템 지급 등)은 F1 개발 메뉴로 옮겼다. 여기에는 스프라이트(K)와 전체화면(F)만 남는다
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
-    if (STAGE_KEYS[e.code]) {
-      cutscene = null;
-      loadStage(STAGE_KEYS[e.code], true);
-    } else if (e.code === 'Digit7' || e.code === 'Numpad7') {
-      cutscene = null;
-      enterMine();
-    } else if (e.code === 'Digit4' || e.code === 'Numpad4') { // 테스트: 4 = 이야기를 건너뛰고 바로 다크월드로
-      cutscene = null;
-      story.revealed = true;
-      story.pending = false;
-      loadStage('darkhub', true);
-    } else if (e.code === 'Digit5' || e.code === 'Numpad5') { // 테스트: 5 = 던전에서 한 층씩 위로 (던전 밖이면 1층부터)
-      cutscene = null;
-      story.revealed = true;
-      story.pending = false;
-      if (stageName === 'dungeon') darkFloor = Math.min(C.DUNGEON_FLOORS, darkFloor + 1);
-      else darkFloor = 1;
-      darkBest = Math.max(darkBest, darkFloor);
-      loadStage('dungeon', true);
-    } else if (e.code === 'KeyK') { // 내 스프라이트(editor.html에서 그린 모션) 켜기/끄기
+    if (e.code === 'KeyK') { // 내 스프라이트(editor.html에서 그린 모션) 켜기/끄기
       const S = G.Sprites;
       let text;
       if (!S.hasFrames()) text = 'editor.html 에서 먼저 그려 주세요';
@@ -432,8 +819,6 @@
     } else if (e.code === 'KeyF') { // 전체화면 켜기/끄기
       if (document.fullscreenElement) document.exitFullscreen();
       else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-    } else if (e.code === 'Digit8' || e.code === 'Numpad8') {
-      coins += 1000;
     }
   });
 
@@ -452,6 +837,7 @@
     effects.shake(9, 0.3);
     lives -= dmg;
     G.Audio.play('hurt');
+    if (lives <= 0 && duelRun) { duelLose(); return; }
     if (lives <= 0) {
       G.Audio.play('gameover');
       gameOver = true;
@@ -478,6 +864,12 @@
     for (let i = 0; i < terrain.villagers.length; i++) {
       const v = terrain.villagers[i];
       if (Math.abs(px - (v.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (v.row + 1) * T) < T * 2) return { type: 'talk', index: i };
+    }
+    for (const w of terrain.waters) {
+      if (Math.abs(px - (w.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (w.row + 1) * T) < T * 2) return { type: 'water' };
+    }
+    for (const a of terrain.altars) {
+      if (Math.abs(px - (a.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (a.row + 1) * T) < T * 2) return { type: 'altar' };
     }
     for (const d of terrain.caveEntrances) {
       if (Math.abs(px - (d.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (d.row + 1) * T) < T * 2) return { type: 'enter' };
@@ -530,6 +922,7 @@
     if (shop.mode === 'place') { placeItem(item); return; }
     const w = wallet();
     const res = G.Shop.buy(item, w);
+    if (res.ok && item.upgrade === 'stmax') stamina += C.STAMINA_MAX_STEP; // 늘어난 만큼 바로 채워 준다
     coins = w.coins;
     exp = w.exp;
     lives = w.lives;
@@ -557,9 +950,9 @@
     shop.msgT = Math.max(0, shop.msgT - dt);
   }
 
-  // 인벤토리 창(1 키): 방향키로 칸 선택(←→ 1칸, ↑↓ 한 줄), E/Enter/Space 또는 클릭으로 장착, 1/Esc로 닫기
-  const INV_COLS = 6;
-  const INV_SLOTS = 24;
+  const INV_COLS = 8; // 인벤토리 격자: 8칸 x 보이는 5줄, 모두 120칸 (더 가지면 늘어난다), 스크롤
+  const INV_ROWS = 5;
+  const INV_CAP = 120;
 
   // 물약을 마시고 피를 채운다 (인벤토리 E와 Q 키가 같이 쓴다). 결과 메시지를 돌려준다
   function drinkPotion(id) {
@@ -572,7 +965,7 @@
   // 선택한 칸의 아이템을 쓴다: 장비는 장착(이미 낀 장갑/신발은 해제, 무기·갑옷은 벗을 수 없음), 물약은 마신다
   function equipSelected() {
     const e = equipUI;
-    const entry = G.Shop.gridEntries(inv)[e.cur];
+    const entry = G.Shop.gridEntries(inv, e.cat)[e.cur];
     const item = entry && G.Shop.ITEMS[entry.id];
     e.msgT = 1.5;
     if (!item) {
@@ -584,7 +977,7 @@
       e.msg = r.msg;
       e.ok = r.ok;
       if (!r.ok) G.Audio.play('deny');
-    } else if (item.quest) {
+    } else if (item.quest || item.tool) {
       e.msg = `${item.name}: 소중히 간직하고 있다`;
       e.ok = true;
       G.Audio.play('pickup');
@@ -593,7 +986,7 @@
       e.msg = r.msg;
       e.ok = r.ok;
     } else if (inv.equipped[item.slot] === item.id) {
-      if (item.slot === 'helmet' || item.slot === 'gloves' || item.slot === 'boots') {
+      if (item.slot === 'helmet' || item.slot === 'gloves' || item.slot === 'boots' || item.slot === 'pants') {
         inv.equipped[item.slot] = null;
         applyEquipment();
         e.msg = `${item.name} 해제`;
@@ -613,19 +1006,238 @@
     }
   }
 
+  // 인벤토리 창(I 키): 분류 탭(Tab) + 스크롤되는 큰 격자. 방향키/마우스로 칸 선택, E/Enter/클릭으로 장착, 1~5 키로 무기 칸에 넣기, I/Esc로 닫기
   function updateEquip(dt) {
     const e = equipUI;
     const pressed = (...codes) => codes.some((c) => input.wasPressed(c));
-    if (pressed('Escape', 'Digit1', 'Numpad1')) {
+    if (pressed('Escape', 'KeyI', 'BracketRight')) {
       equipUI = null;
       return;
     }
+    const cats = G.Shop.CATEGORIES;
+    if (pressed('KeyQ')) cycleSort();
+    if (pressed('KeyC')) cycleSub();
+    if (pressed('Tab')) {
+      const k = (cats.findIndex((c) => c.id === e.cat) + 1) % cats.length;
+      setEquipCat(cats[k].id);
+    }
+    const entries = G.Shop.gridEntries(inv, e.cat);
+    const total = Math.max(INV_CAP, Math.ceil(entries.length / INV_COLS) * INV_COLS);
+    if (pressed('ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS', 'Tab')) e.followCur = true;
     if (pressed('ArrowLeft', 'KeyA')) e.cur = e.cur % INV_COLS === 0 ? e.cur : e.cur - 1;
-    if (pressed('ArrowRight', 'KeyD')) e.cur = e.cur % INV_COLS === INV_COLS - 1 ? e.cur : e.cur + 1;
+    if (pressed('ArrowRight', 'KeyD')) e.cur = e.cur % INV_COLS === INV_COLS - 1 || e.cur + 1 >= total ? e.cur : e.cur + 1;
     if (pressed('ArrowUp', 'KeyW')) e.cur = e.cur - INV_COLS >= 0 ? e.cur - INV_COLS : e.cur;
-    if (pressed('ArrowDown', 'KeyS')) e.cur = e.cur + INV_COLS < INV_SLOTS ? e.cur + INV_COLS : e.cur;
+    if (pressed('ArrowDown', 'KeyS')) e.cur = e.cur + INV_COLS < total ? e.cur + INV_COLS : e.cur;
     if (pressed('KeyE', 'Enter', 'NumpadEnter', 'Space')) equipSelected();
+    for (let n = 1; n <= 5; n++) if (pressed('Digit' + n, 'Numpad' + n)) assignHotbar(n - 1);
+    clampEquipScroll(total);
     e.msgT = Math.max(0, (e.msgT || 0) - dt);
+  }
+
+  // 무기/방어구 탭에서 종류(검, 대검 ... / 갑옷, 투구 ...)를 고른다 (C 키 또는 종류 버튼)
+  function setSub(id) {
+    inv.invSub = id;
+    equipUI.cur = 0;
+    equipUI.scroll = 0;
+    equipUI.followCur = true;
+  }
+  function cycleSub() {
+    const subs = G.Shop.subList(inv, equipUI.cat);
+    if (!subs.length) return;
+    const k = (subs.findIndex((q) => q.id === (inv.invSub || 'all')) + 1) % subs.length;
+    setSub(subs[k].id);
+    equipUI.msg = `종류: ${subs[k].name}`;
+    equipUI.msgT = 1.2;
+    equipUI.ok = true;
+  }
+
+  // 정렬 방식을 바꾼다 (Q 또는 정렬 버튼). 고른 아이템은 그대로 가리킨다
+  function cycleSort() {
+    const e = equipUI;
+    const cur = (G.Shop.gridEntries(inv, e.cat)[e.cur] || {}).id;
+    const modes = G.Shop.SORTS;
+    const k = (modes.findIndex((q) => q.id === (inv.invSort || 'default')) + 1) % modes.length;
+    inv.invSort = modes[k].id;
+    const idx = G.Shop.gridEntries(inv, e.cat).findIndex((en) => en.id === cur);
+    e.cur = idx >= 0 ? idx : 0;
+    e.followCur = true;
+    e.msg = `정렬: ${modes[k].name}`;
+    e.msgT = 1.4;
+    e.ok = true;
+    G.Audio.play('catch');
+  }
+
+  function setEquipCat(cat) {
+    inv.invSub = 'all';
+    equipUI.cat = cat;
+    equipUI.cur = 0;
+    equipUI.scroll = 0;
+  }
+
+  // 선택한 칸이 보이도록 스크롤을 맞춘다 (total = 전체 칸 수)
+  function clampEquipScroll(total) {
+    const e = equipUI;
+    const rows = Math.ceil(total / INV_COLS);
+    const curRow = Math.floor(e.cur / INV_COLS);
+    if (e.followCur) {
+      if (curRow < e.scroll) e.scroll = curRow;
+      if (curRow >= e.scroll + INV_ROWS) e.scroll = curRow - INV_ROWS + 1;
+    }
+    e.scroll = Math.max(0, Math.min(Math.max(0, rows - INV_ROWS), e.scroll));
+  }
+
+  // 인벤토리에서 고른 무기를 1~5번 칸에 넣는다 (그 칸의 숫자 키로 바로 바꿔 든다)
+  function assignHotbar(i) {
+    const e = equipUI;
+    const entry = G.Shop.gridEntries(inv, e.cat)[e.cur];
+    const item = entry && G.Shop.ITEMS[entry.id];
+    e.msgT = 1.6;
+    if (!item || item.slot !== 'weapon') {
+      e.msg = '무기를 고른 뒤 숫자 키를 누르세요.';
+      e.ok = false;
+      G.Audio.play('deny');
+      return;
+    }
+    for (let k = 0; k < inv.hotbar.length; k++) if (inv.hotbar[k] === item.id) inv.hotbar[k] = null;
+    inv.hotbar[i] = item.id;
+    e.msg = `${item.name} -> ${i + 1}번 칸`;
+    e.ok = true;
+    G.Audio.play('catch');
+  }
+
+  // 인벤토리 창의 빠른 칸 클릭: 고른 무기가 있으면 그 칸에 넣고(이미 그 칸이면 비운다), 아니면 그 칸의 무기를 가리킨다
+  function quickClick(i) {
+    const e = equipUI;
+    const entry = G.Shop.gridEntries(inv, e.cat)[e.cur];
+    const item = entry && G.Shop.ITEMS[entry.id];
+    if (item && item.slot === 'weapon') {
+      if (inv.hotbar[i] === item.id) {
+        inv.hotbar[i] = null;
+        e.msg = `${i + 1}번 칸을 비웠다`;
+        e.msgT = 1.4;
+        e.ok = true;
+        G.Audio.play('catch');
+      } else assignHotbar(i);
+    } else if (inv.hotbar[i]) {
+      e.cat = 'all';
+      e.cur = Math.max(0, G.Shop.gridEntries(inv, 'all').findIndex((en) => en.id === inv.hotbar[i]));
+      e.followCur = true;
+    } else {
+      e.msg = '무기를 고른 뒤 이 칸을 누르세요.';
+      e.msgT = 1.4;
+      e.ok = false;
+      G.Audio.play('deny');
+    }
+  }
+
+  // 숫자 키 1~5: 그 칸의 무기로 바꿔 든다
+  function switchWeapon(i) {
+    const id = inv.hotbar[i];
+    if (!id || !inv.items.includes(id)) return;
+    if (inv.equipped.weapon === id) return;
+    inv.equipped.weapon = id;
+    applyEquipment();
+    G.Audio.play('catch');
+    popups.push({ x: player.x + player.w / 2, y: player.y - 18, text: `${G.Shop.ITEMS[id].name}`, t: 1, color: 'rgba(255,248,170,A)' });
+  }
+
+  // ---------- 개발 메뉴 (F1): 앞으로 모든 테스트 기능은 여기에 모은다 ----------
+  let devUI = null; // {cur, scroll, msg, msgT, fresh}
+  let god = false;  // 무적
+  // 마을의 가게 앞으로 간다 (개발 메뉴의 순간이동)
+  function goVillageShop(kind) {
+    loadStage('village', true);
+    const sh = terrain.shops.find((q) => q.kind === kind);
+    if (sh) {
+      player.placeAt(sh.col * C.TILE + C.TILE / 2 - player.w / 2 - 70, (sh.row + 1) * C.TILE - player.h);
+      camera.follow(player, terrain, C.DT, true);
+    }
+  }
+  function devItems() {
+    const goto = (fn) => () => { cutscene = null; devUI = null; fn(); };
+    const goFloor = (n) => { story.revealed = true; story.pending = false; darkFloor = Math.max(1, Math.min(C.DUNGEON_FLOORS, n)); loadStage('dungeon', true); };
+    const give = (msg, fn) => () => { fn(); devUI.msg = msg; devUI.msgT = 2; G.Audio.play('pickup'); };
+    const addC = (id, n) => { inv.consumables[id] = (inv.consumables[id] || 0) + n; };
+    const addM = (id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; };
+    const giveItems = (filter) => {
+      let n = 0;
+      for (const it of Object.values(G.Shop.ITEMS)) {
+        if (it.slot && filter(it) && !inv.items.includes(it.id)) { inv.items.push(it.id); n += 1; }
+      }
+      return n;
+    };
+    return [
+      { head: '순간이동 · 지상' },
+      { label: '해변', run: goto(() => loadStage('beach', true)) },
+      { label: '마을', run: goto(() => loadStage('village', true)) },
+      { label: '마을 동굴 (새로 생성)', run: goto(() => enterMine()) },
+      { label: '놀이마당: 야바위', hint: '마을 왼쪽', run: goto(() => goVillageShop('mgshell')) },
+      { label: '놀이마당: 맞추기', hint: '숲 문 옆', run: goto(() => goVillageShop('mgtarget')) },
+      { label: '놀이마당: 다른 용사와 결투', hint: '마을 오른쪽', run: goto(() => goVillageShop('mgduel')) },
+      { label: '우리 집', run: goto(() => loadStage('home', true)) },
+      { label: '숲', hint: '왕슬라임 · 샘물', run: goto(() => loadStage('forest', true)) },
+      { label: '설산', hint: '털복숭이 침팬지', run: goto(() => loadStage('snow', true)) },
+      { label: '화산', hint: '용 · 신성의 제단', run: goto(() => loadStage('volcano', true)) },
+      { head: '순간이동 · 다크월드' },
+      { label: '다크월드 입구', hint: '상점들', run: goto(() => { story.revealed = true; story.pending = false; loadStage('darkhub', true); }) },
+      { label: '던전 1층', run: goto(() => goFloor(1)) },
+      { label: '던전 위층 (+1)', hint: `지금 ${darkFloor}층`, run: goto(() => goFloor(darkFloor + 1)) },
+      { label: '던전 아래층 (-1)', hint: `지금 ${darkFloor}층`, run: goto(() => goFloor(darkFloor - 1)) },
+      { label: '10층', run: goto(() => goFloor(10)) },
+      { label: '33층 보스', hint: '정의의 어둠돌', run: goto(() => goFloor(33)) },
+      { label: '50층', run: goto(() => goFloor(50)) },
+      { label: '66층 보스', hint: '정의의 어둠', run: goto(() => goFloor(66)) },
+      { label: '90층', run: goto(() => goFloor(90)) },
+      { label: '100층 보스', hint: '어둠의 기사 시크너', run: goto(() => goFloor(100)) },
+      { head: '플레이어에게 주기' },
+      { label: '코인 +1,000', run: give('코인 +1,000', () => { coins += 1000; }) },
+      { label: '코인 +10,000', run: give('코인 +10,000', () => { coins += 10000; }) },
+      { label: '코인 +100,000', run: give('코인 +100,000', () => { coins += 100000; }) },
+      { label: '경험치 +1,000', run: give('경험치 +1,000', () => { exp += 1000; }) },
+      { label: '경험치 +10,000', run: give('경험치 +10,000', () => { exp += 10000; }) },
+      { label: '피 가득 채우기', run: give('피를 가득 채웠다', () => { lives = maxLives(); }) },
+      { label: '스태미나 가득 채우기', run: give('스태미나를 가득 채웠다', () => { stamina = stMax(); }) },
+      { label: '회복 물약 5개씩', hint: '작은 + 큰', run: give('물약 5개씩', () => { inv.potions.potion1 += 5; inv.potions.potion2 += 5; }) },
+      { label: '스태미나 물약 5개씩', hint: '30% + 70%', run: give('스태미나 물약 5개씩', () => { addC('st30', 5); addC('st70', 5); }) },
+      { label: '얼음 폭탄 5개', run: give('얼음 폭탄 5개', () => addC('icebomb', 5)) },
+      { label: '어둠의 크리스탈 +1', run: give('어둠의 크리스탈 +1', () => addM('darkcrystal')) },
+      { label: '정화된 크리스탈 +1', run: give('정화된 크리스탈 +1', () => addM('cleancrystal')) },
+      { label: '신성 크리스탈 +1', run: give('신성 크리스탈 +1', () => addM('holycrystal')) },
+      { label: '모든 무기 받기', run: give('모든 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon'); devUI.msg = `무기 ${n}개를 받았다`; }) },
+      { label: '모든 방어구 받기', hint: '갑옷 · 투구 · 장갑 · 신발', run: give('모든 방어구를 받았다', () => { const n = giveItems((it) => it.slot !== 'weapon'); devUI.msg = `방어구 ${n}개를 받았다`; }) },
+      { label: `무적 ${god ? '끄기' : '켜기'}`, hint: god ? '지금 켜짐' : '지금 꺼짐', run: () => { god = !god; devUI.msg = god ? '무적 켜짐' : '무적 꺼짐'; devUI.msgT = 2; G.Audio.play('pickup'); } },
+      { label: '시크너 이야기 건너뛰기', hint: '다크월드 열기', run: give('다크월드가 열렸다', () => { story.revealed = true; story.pending = false; }) },
+    ];
+  }
+
+  function updateDev(dt) {
+    const d = devUI;
+    const items = devItems();
+    const pressed = (...codes) => codes.some((c) => input.wasPressed(c));
+    const fresh = d.fresh;
+    d.fresh = false;
+    if (pressed('Escape') || (!fresh && pressed('F1'))) {
+      devUI = null;
+      return;
+    }
+    const move = (dir) => {
+      let i = d.cur;
+      do { i += dir; } while (i >= 0 && i < items.length && items[i].head);
+      if (i >= 0 && i < items.length) d.cur = i;
+    };
+    if (pressed('ArrowDown', 'KeyS')) move(1);
+    if (pressed('ArrowUp', 'KeyW')) move(-1);
+    if (pressed('Enter', 'NumpadEnter', 'KeyE', 'Space')) {
+      const it = items[d.cur];
+      if (it && it.run) it.run();
+      if (!devUI) return;
+    }
+    const vis = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, items.length, 0).visible;
+    if (d.cur < d.scroll) d.scroll = d.cur;
+    if (d.cur >= d.scroll + vis) d.scroll = d.cur - vis + 1;
+    if (d.cur <= 1) d.scroll = 0;
+    d.scroll = Math.max(0, Math.min(Math.max(0, items.length - vis), d.scroll));
+    d.msgT = Math.max(0, d.msgT - dt);
   }
 
   // 마우스 좌표를 게임 화면 좌표로 (캔버스가 화면 크기에 맞춰 늘어나 있어도 맞게)
@@ -635,27 +1247,121 @@
   }
   const inRect = (p, r) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
 
+  // 인벤토리: 무기를 끌어다 빠른 칸(1~5)에 놓는다. 빠른 칸끼리 끌면 자리가 바뀌고, 칸 밖으로 끌어내면 비워진다
+  let suppressClick = false; // 끌기가 끝난 직후의 클릭은 무시
+  canvas.addEventListener('mousedown', (ev) => {
+    suppressClick = false; // 새로 누르면 남아 있던 '클릭 무시'를 푼다
+    if (!equipUI || ev.button !== 0) return;
+    const p = canvasPoint(ev);
+    const geo = G.Renderer.equipGeometry(C.VIEW_W, C.VIEW_H);
+    let d = null;
+    const ci = geo.cells.findIndex((c) => inRect(p, c));
+    if (ci >= 0) {
+      const en = G.Shop.gridEntries(inv, equipUI.cat)[ci + equipUI.scroll * INV_COLS];
+      if (en && G.Shop.ITEMS[en.id].slot === 'weapon') d = { src: 'grid', id: en.id };
+    }
+    const qi = geo.quick.findIndex((r) => inRect(p, r));
+    if (qi >= 0 && inv.hotbar[qi]) d = { src: 'quick', idx: qi, id: inv.hotbar[qi] };
+    equipUI.drag = d ? Object.assign(d, { sx: p.x, sy: p.y, x: p.x, y: p.y, active: false }) : null;
+  });
+  window.addEventListener('mouseup', (ev) => {
+    if (!equipUI || !equipUI.drag) return;
+    const d = equipUI.drag;
+    equipUI.drag = null;
+    if (!d.active) return; // 그냥 클릭이었다
+    suppressClick = true;
+    const p = canvasPoint(ev);
+    const geo = G.Renderer.equipGeometry(C.VIEW_W, C.VIEW_H);
+    const qi = geo.quick.findIndex((r) => inRect(p, r));
+    const name = G.Shop.ITEMS[d.id].name;
+    equipUI.msgT = 1.6;
+    equipUI.ok = true;
+    if (qi >= 0) {
+      if (d.src === 'grid') {
+        for (let k = 0; k < inv.hotbar.length; k++) if (inv.hotbar[k] === d.id) inv.hotbar[k] = null;
+        inv.hotbar[qi] = d.id;
+        equipUI.msg = `${name} -> ${qi + 1}번 칸`;
+      } else {
+        const other = inv.hotbar[qi];
+        inv.hotbar[qi] = d.id;
+        inv.hotbar[d.idx] = other;
+        equipUI.msg = qi === d.idx ? `${name}: ${qi + 1}번 칸` : `${d.idx + 1}번 ↔ ${qi + 1}번 칸을 바꿨다`;
+      }
+      G.Audio.play('catch');
+    } else if (d.src === 'quick') {
+      inv.hotbar[d.idx] = null;
+      equipUI.msg = `${d.idx + 1}번 칸을 비웠다`;
+      G.Audio.play('catch');
+    } else {
+      equipUI.msgT = 0;
+    }
+  });
   canvas.addEventListener('mousemove', (ev) => {
     const p = canvasPoint(ev);
-    if (equipUI) { // 칸 위에 올리면 선택
+    if (mini) { mini.mouse = p; mini.useMouse = true; } // 놀이마당: 마우스로 조준/선택
+    if (equipUI && equipUI.drag) {
+      const d = equipUI.drag;
+      d.x = p.x;
+      d.y = p.y;
+      if (!d.active && Math.hypot(p.x - d.sx, p.y - d.sy) > 8) d.active = true;
+    }
+    if (devUI) { // 버튼 위에 올리면 선택
+      const items = devItems();
+      const geo = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, items.length, devUI.scroll);
+      const r = geo.rows.find((q) => inRect(p, q));
+      if (r && !items[r.idx].head) devUI.cur = r.idx;
+    } else if (equipUI) { // 칸 위에 올리면 선택
       const i = G.Renderer.equipGeometry(C.VIEW_W, C.VIEW_H).cells.findIndex((c) => inRect(p, c));
-      if (i >= 0) equipUI.cur = i;
+      if (i >= 0) { equipUI.cur = i + equipUI.scroll * INV_COLS; equipUI.followCur = false; }
     } else if (shop) { // 물품 줄 위에 올리면 강조
       shop.hover = G.Renderer.shopGeometry(C.VIEW_W, C.VIEW_H, shop.def, shop.tab).rows.findIndex((r) => inRect(p, r));
     }
   });
+  canvas.addEventListener('wheel', (ev) => { // 휠: 인벤토리/개발 메뉴 스크롤
+    if (devUI) {
+      ev.preventDefault();
+      const n = devItems().length;
+      const vis = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, n, 0).visible;
+      devUI.scroll = Math.max(0, Math.min(Math.max(0, n - vis), devUI.scroll + (ev.deltaY > 0 ? 1 : -1)));
+    } else if (equipUI) {
+      ev.preventDefault();
+      const entries = G.Shop.gridEntries(inv, equipUI.cat);
+      const total = Math.max(INV_CAP, Math.ceil(entries.length / INV_COLS) * INV_COLS);
+      equipUI.followCur = false;
+      equipUI.scroll += ev.deltaY > 0 ? 1 : -1;
+      clampEquipScroll(total);
+    }
+  }, { passive: false });
   canvas.addEventListener('click', (ev) => {
+    if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
-    if (equipUI) { // 칸 클릭 = 장착. 왼쪽 장착 슬롯 클릭 = 그 아이템이 있는 칸을 가리킴
+    if (mini) { mini.click = p; mini.mouse = p; mini.useMouse = true; return; }
+    if (devUI) { // 버튼 클릭 = 실행
+      const items = devItems();
+      const geo = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, items.length, devUI.scroll);
+      const r = geo.rows.find((q) => inRect(p, q));
+      if (r && !items[r.idx].head && items[r.idx].run) { devUI.cur = r.idx; items[r.idx].run(); }
+    } else if (equipUI) { // 탭 클릭 = 분류, 칸 클릭 = 장착. 왼쪽 장착 슬롯 클릭 = 그 아이템이 있는 칸을 가리킴
       const geo = G.Renderer.equipGeometry(C.VIEW_W, C.VIEW_H);
+      if (inRect(p, geo.sort)) { cycleSort(); return; }
+      const subs = G.Shop.subList(inv, equipUI.cat);
+      const si = subs.findIndex((sb, i) => inRect(p, geo.chip(i, subs.length)));
+      if (si >= 0) { setSub(subs[si].id); return; }
+      const q = geo.quick.findIndex((r) => inRect(p, r));
+      if (q >= 0) { quickClick(q); return; }
+      const t = geo.tabs.findIndex((r) => inRect(p, r));
+      if (t >= 0) { setEquipCat(G.Shop.CATEGORIES[t].id); return; }
       const i = geo.cells.findIndex((c) => inRect(p, c));
       if (i >= 0) {
-        equipUI.cur = i;
+        equipUI.cur = i + equipUI.scroll * INV_COLS;
         equipSelected();
         return;
       }
       for (const slot of Object.keys(geo.slots)) {
-        if (inRect(p, geo.slots[slot]) && inv.equipped[slot]) equipUI.cur = Math.max(0, inv.items.indexOf(inv.equipped[slot]));
+        if (inRect(p, geo.slots[slot]) && inv.equipped[slot]) {
+          const idx = G.Shop.gridEntries(inv, equipUI.cat).findIndex((en) => en.id === inv.equipped[slot]);
+          if (idx >= 0) { equipUI.cur = idx; equipUI.followCur = true; }
+        }
       }
     } else if (shop) { // 탭 클릭 = 전환, 물품 줄 클릭 = 구매
       const geo = G.Renderer.shopGeometry(C.VIEW_W, C.VIEW_H, shop.def, shop.tab);
@@ -689,10 +1395,17 @@
   }
   const critChance = () => G.Shop.homeBonuses(inv).crit;
   const rollCrit = () => Math.random() < critChance();
+  // 낫: 몬스터를 맞힐 때마다 그 몬스터의 체력 ¼칸(반의 반)을 빼앗아 온다
+  function reapSteal(s) {
+    if (G.Shop.ITEMS[inv.equipped.weapon].elem !== 'reap' || s.noExp || lives >= maxLives()) return;
+    lives = Math.min(maxLives(), lives + 0.25);
+    popups.push({ x: s.x + s.w / 2, y: s.y - 8, text: '+¼', t: 0.9, color: 'rgba(255,140,170,A)' });
+  }
   function hitMonster(s, fromX, fallbackDir) {
+    reapSteal(s);
     const away = Math.sign(s.x + s.w / 2 - fromX) || fallbackDir;
     if (s.extraHits > 0 && !s.flying && !rollCrit()) { // 다크월드의 단단한 몬스터: 여러 번 때려야 쓰러진다
-      s.extraHits -= 1;
+      s.extraHits = Math.max(0, s.extraHits - equipStats.hitPower); // 무기를 강화할수록 단단한 몬스터를 더 많이 깎는다
       s.hitGrace = C.HIT_GRACE;
       if (s.hurt) s.hurt(away);
       effects.parryHit(s.x + s.w / 2, s.y + s.h / 2);
@@ -725,14 +1438,18 @@
     const cy = s.y + s.h / 2;
     const near = (r) => monsters.filter((m) => m !== s && m.alive && !m.flying && m.appear <= 0 && Math.hypot(m.x + m.w / 2 - cx, m.y + m.h / 2 - cy) <= r);
     const dirFrom = (m) => Math.sign(m.x + m.w / 2 - cx) || away;
-    if (w.elem === 'fire') { // 불타며 죽는다. 불이 주변으로 옮겨붙는다
+    if (s.immune && ((w.elem === 'fire' && s.immune.fire) || (w.elem === 'ice' && s.immune.ice))) popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: w.elem === 'fire' ? '불에 타지 않는다!' : '얼지 않는다!', t: 0.9, color: 'rgba(200,200,220,A)' });
+    if (w.elem === 'poison') { // 독: 맞은 몬스터와 주변이 중독된다
+      s.applyPoison();
+      for (const m of near(T * 1.3)) m.applyPoison();
+      effects.sparkle(cx, cy);
+    } else if (w.elem === 'fire') { // 불타며 죽는다. 불이 주변으로 옮겨붙는다
       s.applyBurn();
       for (const m of near(T * 1.5)) m.applyBurn();
       effects.fireBurst(cx, cy);
     } else if (w.elem === 'ice') { // 얼어붙은 채 날아가 부서진다. 주변도 얼어붙는다
       if (s.flying) {
-        s.frozen = true;
-        s.deathStyle = 'ice';
+        if (!(s.immune && s.immune.ice)) { s.frozen = true; s.deathStyle = 'ice'; }
       } else {
         s.freeze();
       }
@@ -772,19 +1489,21 @@
   const magicHooks = {
     hit(m, el, dir, x, y, shot) {
       if (el === 'bomb' || el === 'icebomb') return; // 폭탄은 터질 때 피해를 준다 (explode)
+      const isBossHit = bossOn() && boss.targets().includes(m);
+      const weakX = (e) => (isBossHit && boss.weak && e === boss.weak ? 3 : 1); // 보스의 약점 속성이면 x3
       if (el === 'arrow' || el === 'bullet') {
-        m.damage(shot && shot.dmg ? shot.dmg : 3);
+        m.damage((shot && shot.dmg ? shot.dmg : 3) * weakX(weaponElemOf()));
         if (m.alive && m.twoHit && !m.staggered && m.stagger) m.stagger(dir);
         effects.parryHit(x, y);
         effects.shake(3, 0.1);
         return;
       }
       if (el === 'fire') {
-        m.damage(C.FIRE_DAMAGE);
+        m.damage(C.FIRE_DAMAGE * weakX('fire'));
       } else if (el === 'poison') {
         m.applyPoison();
       } else { // 번개: 피해 + 기절(두 번 맞는 몬스터는 밀려나고 멍해진다)
-        m.damage(C.LIGHTNING_DAMAGE);
+        m.damage(C.LIGHTNING_DAMAGE * weakX('light'));
         if (m.alive && m.twoHit && !m.staggered) m.stagger(dir);
       }
       effects.parryHit(x, y);
@@ -829,12 +1548,12 @@
     if (!(inv.consumables[id] > 0)) return { ok: false, msg: '없어요.' };
     if (it.bomb) return { ok: false, msg: 'B 키로 던져서 쓰는 폭탄이에요.' };
     const needLife = it.food && lives < maxLives();
-    const needSt = it.stamina && stamina < C.STAMINA_MAX;
+    const needSt = it.stamina && stamina < stMax();
     if (!needLife && !needSt) return { ok: false, msg: it.food && it.stamina ? '피도 스태미나도 가득이에요.' : it.food ? '피가 가득 차 있어요.' : '스태미나가 가득 차 있어요.' };
     inv.consumables[id] -= 1;
     const parts = [];
     if (needLife) { const before = lives; lives = Math.min(maxLives(), lives + it.food); parts.push(`피 +${lives - before}`); }
-    if (needSt) { const before = stamina; stamina = Math.min(C.STAMINA_MAX, stamina + it.stamina); parts.push(`스태미나 +${Math.round(stamina - before)}`); }
+    if (needSt) { const before = stamina; stamina = Math.min(stMax(), stamina + it.stamina); parts.push(`스태미나 +${Math.round(stamina - before)}`); }
     G.Audio.play('pickup');
     return { ok: true, msg: `${it.name}: ${parts.join(', ')}` };
   }
@@ -842,7 +1561,7 @@
   // V 키: 지금 가장 필요한 것을 먹는다 (스태미나가 모자라면 스태미나 물약, 피가 모자라면 음식)
   function eatBest() {
     const has = (id) => inv.consumables[id] > 0;
-    const lowSt = stamina < C.STAMINA_MAX - 25;
+    const lowSt = stamina < stMax() - 25;
     const order = lowSt ? ['st30', 'st70'] : ['st30', 'st70']; // 스태미나 물약 (작은 것부터)
     for (const id of order) {
       if (!has(id)) continue;
@@ -955,6 +1674,21 @@
   }
 
   function step(dt) {
+    if (!devUI && input.wasPressed('F1')) { // F1: 개발 메뉴 (모든 테스트 기능)
+      devUI = { cur: 1, scroll: 0, msg: '', msgT: 0, fresh: true };
+      G.Audio.play('pickup');
+    }
+    if (devUI) { // 메뉴가 열려 있는 동안 게임이 멈춘다
+      updateDev(dt);
+      input.endFrame();
+      return;
+    }
+    if (mini) { // 놀이(야바위/표적/결투) 중에는 게임이 멈춘다
+      updateMini(dt);
+      input.endFrame();
+      return;
+    }
+    if (god) player.invuln = Math.max(player.invuln, 1);
     effects.update(dt);
     stageTime += dt;
     if (hitStop > 0) {
@@ -995,12 +1729,14 @@
       input.endFrame();
       return;
     }
-    if (input.wasPressed('Digit1') || input.wasPressed('Numpad1')) {
-      equipUI = { cur: Math.max(0, inv.items.indexOf(inv.equipped.weapon)), msg: '', msgT: 0, ok: true };
+    if (input.wasPressed('KeyI') || input.wasPressed('BracketRight')) { // 인벤토리 (I 또는 ])
+      const idx = G.Shop.gridEntries(inv, 'all').findIndex((en) => en.id === inv.equipped.weapon);
+      equipUI = { cur: Math.max(0, idx), cat: 'all', scroll: 0, cap: INV_CAP, followCur: true, msg: '', msgT: 0, ok: true };
       G.Audio.play('pickup');
       input.endFrame();
       return;
     }
+    for (let n = 1; n <= 5; n++) if (input.wasPressed('Digit' + n) || input.wasPressed('Numpad' + n)) switchWeapon(n - 1); // 숫자 키 = 그 칸의 무기
     if (story.pending && stageName === 'village' && stageTime > 3.4 && !dialog && !story.started) { // 동굴 15번 클리어 후 마을: 이야기가 시작된다
       story.started = true;
       startDialogs(REVEAL_LINES);
@@ -1027,9 +1763,17 @@
     }
     if (input.wasPressed('KeyE')) { // 상점 열기 / 마을 사람과 대화
       const near = nearbyInteract();
-      if (near && near.type === 'shop') {
+      if (near && near.type === 'shop' && near.shop.kind.startsWith('mg')) { // 놀이마당
+        openMini(near.shop.kind.slice(2));
+        input.endFrame();
+        return;
+      } else if (near && near.type === 'shop') {
         shop = { kind: near.shop.kind, def: G.Shop.SHOPS[near.shop.kind], tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
         G.Audio.play('pickup');
+      } else if (near && near.type === 'water') {
+        washCrystals();
+      } else if (near && near.type === 'altar') {
+        blessCrystals();
       } else if (near && near.type === 'slot') { // 집 안 꾸미기: 가진 장식품을 고른다
         const sl = near.slot;
         shop = { kind: 'place', mode: 'place', slot: sl, def: { title: sl.kind === 'floor' ? '바닥 가구 놓기' : '벽 장식 걸기', tabs: G.Shop.placeTabs(inv, sl.kind) }, tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
@@ -1042,7 +1786,7 @@
         input.endFrame();
         return;
       } else if (near && near.type === 'gate') { // 마을의 문으로 숲/설산/화산에, 다크월드 허브의 문으로 던전에
-        if (near.stage === 'dungeon') darkFloor = Math.min(C.DUNGEON_FLOORS, darkBest + 1); // 지금까지 오른 곳 바로 위층부터
+        if (near.stage === 'dungeon') darkFloor = Math.min(C.DUNGEON_FLOORS, Math.max(darkBest + 1, darkFloor)); // 지금까지 오른 곳 바로 위층부터. 죽거나 나갔어도 마지막으로 있던 층(보스 층 포함)에서 다시 시작
         loadStage(near.stage, true);
         input.endFrame();
         return;
@@ -1065,8 +1809,8 @@
     if (input.down.has('KeyR')) respawn(); // 막혔을 때 쓰는 무료 리스폰 (목숨 소모 없음)
     // 스태미나: 대시에 25, 폭탄/총/활에 무기별로 든다. 쓰고 잠깐 뒤부터 천천히 회복
     staminaWait = Math.max(0, staminaWait - dt);
-    if (staminaWait === 0) stamina = Math.min(C.STAMINA_MAX, stamina + C.STAMINA_REGEN * dt);
-    if (input.dashPressedThisFrame && stamina < C.DASH_STAMINA) { // 스태미나가 모자라면 대시가 안 나간다
+    if (staminaWait === 0) stamina = Math.min(stMax(), stamina + G.Shop.staminaRegen(inv) * dt);
+    if (input.dashPressedThisFrame && stamina < dashCost()) { // 스태미나가 모자라면 대시가 안 나간다
       input.dashPressedThisFrame = false;
       popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '스태미나 부족!', t: 0.8, color: 'rgba(255,170,170,A)' });
       G.Audio.play('deny');
@@ -1083,7 +1827,7 @@
     }
     if (player.dashFx) { // 대시 시작: 먼지 + 바람 소리
       player.dashFx = false;
-      stamina -= C.DASH_STAMINA;
+      stamina -= dashCost();
       staminaWait = 0.8;
       G.Audio.play('dash');
       effects.dashDust(player.x + player.w / 2, player.y + player.h, -player.dashDir);
@@ -1110,7 +1854,15 @@
     G.Magic.update(magic, dt, terrain, magicTargets(), magicHooks);
     if (player.swingFx) { // 검을 휘두르기 시작하는 순간 바람 이펙트
       player.swingFx = false;
-      effects.swing(player.x + player.w / 2, player.y + player.h / 2, player.facing);
+      inv.used[inv.equipped.weapon] = (inv.used[inv.equipped.weapon] || 0) + 1; // 휘두른(쏜) 횟수
+      const swingType = G.Shop.ITEMS[inv.equipped.weapon].type;
+      if (swingType === 'spear' || swingType === 'rapier') effects.thrust(player.x + player.w / 2, player.y + player.h / 2, player.facing); // 찌르기: 베는 바람 대신 앞으로 뻗는 불꽃
+      else if (swingType !== 'hammer') effects.swing(player.x + player.w / 2, player.y + player.h / 2, player.facing);
+      if (G.Shop.ITEMS[inv.equipped.weapon].type === 'hammer') { // 망치가 땅에 쾅!
+        effects.quakeDust(player.x + player.w / 2 + player.facing * 36, player.y + player.h, 130);
+        effects.shake(14, 0.35);
+        G.Audio.play('vanish');
+      }
       const weaponDef = G.Shop.ITEMS[inv.equipped.weapon];
       if (weaponDef.shot) { // 폭탄/총/활: 패링 버튼을 누를 때마다 쏜다 (스태미나가 든다)
         if (stamina < weaponDef.stamina) {
@@ -1174,7 +1926,7 @@
         if (STAGES[stageName].dark && !s.noExp && Math.random() < 0.07) pickups.push({ x: s.x + s.w / 2, y: s.y + s.h - 16, id: PICKUP_TABLE[Math.floor(Math.random() * PICKUP_TABLE.length)], t: 0 }); // 가끔 아이템을 떨어뜨린다
         const wd = G.Shop.ITEMS[inv.equipped.weapon];
         if (wd.elem === 'reap' && !s.noExp) { // 낫: 처치하면 스태미나를 거둔다
-          stamina = Math.min(C.STAMINA_MAX, stamina + wd.reapSt);
+          stamina = Math.min(stMax(), stamina + wd.reapSt);
           popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: `수확! 스태미나 +${wd.reapSt}`, t: 0.8, color: 'rgba(200,170,255,A)' });
           reapKills += 1;
           if (reapKills >= 20) { // 20마리를 거두면 피가 반 칸 찬다
@@ -1204,7 +1956,7 @@
       // 처치하는 타(기절한 슬라임/꽃게의 두 번째 타, 박쥐, 대검·전설의 검의 첫 타)는 가드가 아니라 칼 베기: 검이 실제로 내리쳐지는 프레임부터 맞는다
       // 가드 자세는 슬라임/꽃게를 처음 쳐서 밀어낼 때만 취한다
       const finisher = !s.twoHit || s.staggered > 0 || killsInOne();
-      if (player.parrying && s.hitGrace <= 0 && (!finisher || player.swing >= C.SWING_SLASH_FRAME) && s.overlaps(parryBox(player))) {
+      if (player.parrying && s.hitGrace <= 0 && (!finisher || player.swing >= player.slashFrame) && s.overlaps(parryBox(player))) {
         hitMonster(s, player.x + player.w / 2, player.facing);
         if (!finisher) player.parrySucceeded(); // 밀어내는 첫 타(패링)만 가드 자세를 취한다
         G.Audio.play('parry');
@@ -1213,6 +1965,7 @@
         hitStop = C.HIT_STOP;
       } else if (player.invuln === 0 && !player.dashing && !s.staggered && s.overlaps(player)) { // 기절한 몬스터는 해롭지 않다
         loseLife(player.x + player.w / 2, player.y + player.h / 2, s.contactDmg || 1); // 패링하지 못하고 닿으면 목숨 -1 (설산은 -2)
+        armorHurtPerk(s);
         break;
       }
     }
@@ -1235,7 +1988,7 @@
         effects.shake(6, 0.15);
         hitStop = C.HIT_STOP;
       }
-      if (player.parrying && player.swing >= C.SWING_SLASH_FRAME) { // 기절했거나 땅에 박힌 머리를 벤다
+      if (player.parrying && player.swing >= player.slashFrame) { // 기절했거나 땅에 박힌 머리를 벤다
         for (const h of hitBoss(box)) {
           G.Audio.play('parry');
           effects.parryHit(h.cx, h.cy);
@@ -1251,7 +2004,14 @@
         }
       }
     }
+    updateDuelRun(dt);
     updateEnemyShots(dt);
+    updateArmorPerks(dt);
+    usedT += dt; // '많이 쓴 순' 정렬을 위해 입은 방어구의 사용 시간을 센다
+    if (usedT >= 1) {
+      usedT -= 1;
+      for (const sl of ['armor', 'helmet', 'gloves', 'boots']) { const id = inv.equipped[sl]; if (id) inv.used[id] = (inv.used[id] || 0) + 1; }
+    }
     updatePickups(dt);
     if (chest && !won && stageName === 'dungeon' && player.overlaps(chest)) { // 던전: 위층으로 오르는 계단
       clearFloor();
@@ -1348,10 +2108,10 @@
 
   function drawFrame() {
     const st = STAGES[stageName];
-    const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI ? Object.assign({ t: stageTime }, st.banner) : null;
-    const near = !shop && !equipUI && !dialog && !won && !cutscene ? nearbyInteract() : null;
-    const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)' };
-    const prompt = near ? (near.type === 'shop' ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기` : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
+    const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
+    const near = !shop && !equipUI && !devUI && !mini && !dialog && !won && !cutscene ? nearbyInteract() : null;
+    const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
+    const prompt = near ? (near.type === 'shop' ? (near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
     const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }) : null;
     const equipView = equipUI ? Object.assign({}, equipUI, { inv, lives, maxLives: maxLives(), coins, bonus: Object.assign({ critDamage: G.Shop.critDamage(inv) }, G.Shop.homeBonuses(inv)) }) : null;
@@ -1359,7 +2119,12 @@
     const npcs = ending && ending.mode === 'house' && house ? [{ kind: 'elder', x: house.col * C.TILE + C.TILE / 2 + 44, y: (house.row + 1) * C.TILE, facing: -1, alpha: ending.npcAlpha }] : [];
     renderer.draw(terrain, player, camera, monsters, effects, {
       lives, maxLives: maxLives(), coins, exp, potions: inv.potions, gameOver,
-      stamina, staminaMax: C.STAMINA_MAX, consumables: inv.consumables,
+      stamina, staminaMax: stMax(), consumables: inv.consumables,
+      mini: mini ? Object.assign({}, mini, { coins, me: { weaponId: inv.equipped.weapon, armorId: inv.equipped.armor, helmetId: inv.equipped.helmet, glovesId: inv.equipped.gloves, pantsId: inv.equipped.pants, bootsId: inv.equipped.boots } }) : null,
+      caveInfo: stageName === 'mine' ? { level: mineRun, coins: Math.round(STAGES.mine.chest.coins * (1 + G.Shop.homeBonuses(inv).coin)) } : null,
+      weakText: boss && boss.weak ? (inv.items.includes('magnifier') ? `약점: ${WEAK_NAMES[boss.weak]}` : '약점: ? (약점 돋보기가 있으면 보여요)') : null,
+      hotbar: inv.hotbar, weaponId: inv.equipped.weapon,
+      dev: devUI ? Object.assign({}, devUI, { items: devItems().map((q) => ({ head: q.head, label: q.label, hint: q.hint })) }) : null,
       home: stageName === 'home' ? Object.assign({ total: G.Home.houseDef(inv.home.type).floor + G.Home.houseDef(inv.home.type).wall }, G.Shop.homeBonuses(inv)) : null,
       slimeCount: monsters.filter((m) => m.kind === 'slime' && m.alive).length,
       batCount: monsters.filter((m) => m.kind === 'bat' && m.alive).length,
@@ -1399,6 +2164,11 @@
     set coins(v) { coins = v; },
     get shop() { return shop; },
     get equip() { return equipUI; },
+    get dev() { return devUI; },
+    get mini() { return mini; },
+    get duelRun() { return duelRun; },
+    hitBoss, weaponElemOf,
+    devItems,
     get inv() { return inv; },
     get maxLives() { return maxLives(); },
     applyEquipment, enterMine, magic,

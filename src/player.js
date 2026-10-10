@@ -26,7 +26,9 @@
       this.parryTimer = 0;
       this.parryCooldown = 0;
       this.invuln = 0;                  // >0 이면 무적
-      this.swing = -1;                  // 검 휘두르기 프레임 번호(0~SWING_FRAMES-1), 안 휘두르면 -1
+      this.swing = -1;                  // 검 휘두르기 프레임 번호(0~swingFrames-1), 안 휘두르면 -1
+      this.swingFrames = C.SWING_FRAMES; // 무기마다 다르다 (망치는 아주 길다)
+      this.slashFrame = C.SWING_SLASH_FRAME; // 이 프레임부터 실제로 맞는다 (망치는 땅에 닿는 순간)
       this.jumpFx = false;              // 점프하는 순간 켜지는 1회성 플래그 (효과음용)
       this.swingFx = false;             // 베기 시작 프레임에 켜지는 1회성 플래그 (이펙트용)
       this.holdTime = 0;                // 패링 버튼을 계속 누른 시간
@@ -184,13 +186,13 @@
       }
       if (this.swing >= 0) { // 휘두르기 애니메이션: 60Hz 고정 스텝마다 한 프레임씩
         this.swing += 1;
-        if (this.swing >= C.SWING_FRAMES) this.swing = -1;
-        else if (this.swing === C.SWING_SLASH_FRAME) this.swingFx = true;
+        if (this.swing >= this.swingFrames) this.swing = -1;
+        else if (this.swing === this.slashFrame) this.swingFx = true;
       }
       this.parryTimer = Math.max(0, this.parryTimer - dt);
       this.parryCooldown = Math.max(0, this.parryCooldown - dt);
       if (input.parryPressed && this.parryCooldown === 0 && !this.swordOut) { // 검이 없으면 패링 불가
-        this.parryTimer = this.parryWindow;
+        this.parryTimer = this.parryWindow + (this.slashFrame - C.SWING_SLASH_FRAME) / 60; // 늦게 맞는 무기는 맞는 순간까지 패링 판정이 이어진다
         this.parryCooldown = this.parryCooldownTime;
         this.swing = 0;
         this.guardTimer = 0; // 새로 휘두르면 이전 가드 자세는 끝낸다 (두 번째 타의 베기가 가려지지 않게)
