@@ -274,6 +274,13 @@
       ctx.lineTo(38, 3.5);
       ctx.closePath();
       ctx.fill();
+    } else if (weaponItem && weaponItem.lens) { // 약점 돋보기: 손잡이와 둥근 렌즈
+      rect(ctx, '#6a4a2a', -4, -1.5, 14, 3);
+      ctx.strokeStyle = '#6a8fb0'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(17, 0, 6.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(207,232,255,0.5)';
+      ctx.beginPath(); ctx.arc(17, 0, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(14, -4, 3, 2);
     } else if (weaponItem && weaponItem.broken) { // 부서진 목검: 짧고 끝이 뜯겨 나간 나무 칼
       rect(ctx, '#5a3d17', -5, -1.5, 6, 3);       // 낡은 손잡이
       rect(ctx, '#8a6a3a', 1, -4, 3, 8);          // 나무 날밑

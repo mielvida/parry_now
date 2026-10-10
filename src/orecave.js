@@ -81,7 +81,7 @@
       const h = this.host;
       const tier = h.pickTier();
       if (tier <= 0) {
-        h.say('곡괭이가 없어요! 대장간에서 살 수 있어요', 'rgba(255,170,170,A)');
+        h.say('곡괭이를 장착하지 않았어요! 인벤토리(I)에서 장착하거나 대장간에서 사세요', 'rgba(255,170,170,A)');
         h.sound('deny');
         return true;
       }

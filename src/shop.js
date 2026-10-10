@@ -255,7 +255,7 @@
   add({ id: 'darkcrystal', name: '어둠의 크리스탈', desc: '보스가 떨어뜨린 보랏빛 수정. 깊은 어둠의 힘이 느껴진다', quest: true, look: ['#8a4fe0', '#2a1250'] });
 
   // 도구: 한 번 사면 계속 쓴다 (인벤토리 '재료' 칸에 들어간다)
-  add({ id: 'magnifier', name: '약점 돋보기', price: 500, tool: true, desc: '보스를 3번 때린 뒤 5초 동안 분석하면 약점이 드러나고, 이후 약점 노출 시간이 자주 찾아온다 (노출 중 대미지 x2)', look: ['#cfe8ff', '#6a8fb0'] });
+  weapon('magnifier', 'sword', '약점 돋보기', 500, 0.25, 0, 0, ['#cfe8ff', '#6a8fb0'], { lens: true, note: '끼고 보스를 3번 때린 뒤 5초 버티면 약점이 드러난다. 대미지 1' });
 
   // 크리스탈 만들기: 어둠의 크리스탈(보스) -> 숲의 샘물로 씻기 -> 정화된 크리스탈 -> 화산의 제단 -> 신성 크리스탈 -> 대장간에서 칼에 붙이기
   add({ id: 'cleancrystal', name: '정화된 크리스탈', desc: '숲의 샘물로 씻어 어둠이 빠진 크리스탈. 화산의 제단에서 신성한 힘을 얻는다', quest: true, look: ['#a8ecff', '#3a8fc0'] });
@@ -375,6 +375,7 @@
       const own = inv ? inv.home.owned[item.id] || 0 : 0;
       return { name: item.name, desc: item.place === 'floor' ? '바닥에 놓는 가구' : '벽에 거는 장식', slotName: '장식품', note: inv ? `보유 ${own}개 · 남은 ${decorLeft(inv, item.id)}개` : '' };
     }
+    if (item.pickaxe) return { name: item.name, desc: item.desc, slotName: '곡괭이', note: inv && inv.items.includes(item.id) ? (inv.equipped.pick === item.id ? '장착 중 (누르면 뺀다)' : '누르면 장착한다') : '사서 장착하면 광석을 캘 수 있다' };
     if (item.tool) return { name: item.name, desc: item.desc, slotName: '도구', note: inv && inv.items.includes(item.id) ? '가지고 있어요 (계속 쓰인다)' : '한 번 사면 계속 쓴다' };
     if (item.quest) return { name: item.name, desc: item.desc, slotName: '소중한 물건', note: '장착하거나 쓸 수 없는 보물' };
     if (item.heal !== undefined) return { name: item.name, desc: item.desc, slotName: '물약', note: POTION_NOTE };
@@ -542,7 +543,7 @@
       stRegenLevel: 0, // 스태미나 회복 속도 업그레이드 레벨 (보상 상점)
       wlevel: {}, // 무기 강화 레벨 (무기 id마다)
       armorLevel: 0, // 갑옷 강화 레벨 (최대 피 +1칸 / 레벨)
-      equipped: { weapon: 'wood0', helmet: null, armor: 'rags', gloves: null, pants: null, boots: null },
+      equipped: { weapon: 'wood0', helmet: null, armor: 'rags', gloves: null, pants: null, boots: null, pick: null },
     };
   }
 
@@ -669,7 +670,8 @@
     }
     if (item.pickaxe) { // 곡괭이: 가장 좋은 것이 자동으로 쓰인다
       wallet.inv.items.push(item.id);
-      return { ok: true, msg: `${item.name} 구매! 광물 동굴에서 ${item.pickaxe}단계 광석까지 캘 수 있다.` };
+      G.Forge.autoEquipPick(wallet.inv);
+      return { ok: true, msg: `${item.name} 구매! 인벤토리에서 장착하면 광물 동굴에서 ${item.pickaxe}단계 광석까지 캘 수 있다.` };
     }
     if (item.tool) { // 도구는 인벤토리에 들어간다
       wallet.inv.items.push(item.id);
@@ -678,6 +680,10 @@
     if (dupWeapon && wallet.inv.items.includes(item.id)) { // 이미 있는 무기: 한 자루 더
       const n = G.Forge.addCopy(wallet.inv, item.id);
       return { ok: true, msg: `${item.name} 한 자루 더! (보유 ${n}개) 같은 무기 3개는 대장간에서 합칠 수 있어요.` };
+    }
+    if (item.lens) { // 돋보기는 사도 장착하지 않는다 (인벤토리에서 직접 끼운다)
+      wallet.inv.items.push(item.id);
+      return { ok: true, msg: `${item.name} 구매! 인벤토리에서 무기로 장착하면 약점을 분석할 수 있다.` };
     }
     if (item.slot) { // 산 장비는 바로 장착한다
       wallet.inv.items.push(item.id);

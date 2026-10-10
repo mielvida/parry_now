@@ -854,7 +854,7 @@
   function updateAnalysis(dt) {
     const a = analysis;
     a.cd = Math.max(0, a.cd - dt);
-    if (!boss || boss.done || !boss.weak || !inv.items.includes('magnifier')) return;
+    if (!boss || boss.done || !boss.weak || inv.equipped.weapon !== 'magnifier') return;
     if (a.state === 'run') {
       a.t += dt;
       if (a.t >= ANALYZE_TIME) {
@@ -875,7 +875,7 @@
   }
   const analysisText = () => {
     if (!boss || !boss.weak) return null;
-    if (!inv.items.includes('magnifier')) return '약점: ? (약점 돋보기가 있으면 분석할 수 있어요)';
+    if (inv.equipped.weapon !== 'magnifier') return '약점: ? (약점 돋보기를 무기로 장착하면 분석할 수 있어요)';
     const a = analysis;
     if (a.state === 'idle') return `돋보기: 보스를 ${ANALYZE_HITS}번 때리면 분석 시작 (${a.hits}/${ANALYZE_HITS})`;
     if (a.state === 'run') return `분석 중… ${Math.floor((a.t / ANALYZE_TIME) * 100)}%  (맞으면 처음부터)`;
@@ -887,7 +887,7 @@
     const weakMul = boss.weak && weaponElemOf() === boss.weak ? 3 : 1; // 보스의 약점 속성 무기: 대미지 x3
     const expMul = analysis.state === 'done' && analysis.expose > 0 ? 2 : 1; // 분석한 보스의 약점 노출 시간
     const hits = boss.hitHeads(rect, (crit ? G.Shop.critDamage(inv) : bossDamage()) * holy * weakMul * expMul);
-    if (hits.length && boss.weak && analysis.state === 'idle' && analysis.cd === 0 && inv.items.includes('magnifier')) { // 돋보기: 때릴 때마다 분석 준비
+    if (hits.length && boss.weak && analysis.state === 'idle' && analysis.cd === 0 && inv.equipped.weapon === 'magnifier') { // 돋보기: 때릴 때마다 분석 준비
       analysis.cd = 0.3;
       analysis.hits += 1;
       if (analysis.hits >= ANALYZE_HITS) { analysis.state = 'run'; analysis.t = 0; popups.push({ x: player.x + player.w / 2, y: player.y - 50, text: `분석 시작! ${ANALYZE_TIME}초 동안 맞지 말고 버텨요`, t: 2, color: 'rgba(160,220,255,A)' }); G.Audio.play('pickup'); }
@@ -1362,6 +1362,11 @@
       e.msg = r.msg;
       e.ok = r.ok;
       if (!r.ok) G.Audio.play('deny');
+    } else if (item.pickaxe) { // 곡괭이는 끼거나 뺀다 (낀 것만 광석을 캘 수 있다)
+      const on = G.Forge.togglePick(inv, item.id);
+      e.msg = on ? `${item.name} 장착` : `${item.name} 해제`;
+      e.ok = true;
+      G.Audio.play(on ? 'pickup' : 'catch');
     } else if (item.quest || item.tool) {
       e.msg = `${item.name}: 소중히 간직하고 있다`;
       e.ok = true;
@@ -1637,7 +1642,7 @@
       { label: '기본 검 3자루 받기', hint: '합치기 연습', run: give('기본 검 3자루', () => { G.Forge.addCopy(inv, 'sword0', 3); }) },
       { label: '시작 장비로 되돌리기', hint: '목검 + 허름한 옷', run: give('시작 장비로 되돌렸다', () => { const f = G.Shop.newInventory(); inv.items = f.items; inv.copies = f.copies; inv.attach = f.attach; inv.hotbar = f.hotbar; inv.equipped = f.equipped; inv.wlevel = {}; inv.holy = {}; G.Forge.markDirty(); applyEquipment(); }) },
       { head: '광물' },
-      { label: '곡괭이 4종 받기', hint: '나무 · 철 · 강철 · 미스릴', run: give('곡괭이를 모두 받았다', () => { for (const p of G.Forge.PICKS) if (!inv.items.includes(p.id)) inv.items.push(p.id); G.Forge.markDirty(); }) },
+      { label: '곡괭이 4종 받기', hint: '나무 · 철 · 강철 · 미스릴', run: give('곡괭이를 모두 받았다', () => { for (const p of G.Forge.PICKS) if (!inv.items.includes(p.id)) inv.items.push(p.id); inv.equipped.pick = G.Forge.bestOwnedPick(inv); G.Forge.markDirty(); }) },
       { label: '검용 광석 +6씩', hint: '철 구리 은 금 …', run: give('검용 광석 +6', () => { for (const o of G.Forge.ORES) if (o.cls === 'sword') inv.ores[o.id] = (inv.ores[o.id] || 0) + 6; G.Forge.markDirty(); }) },
       { label: '총용 광석 +6씩', hint: '초석 납 황철석 …', run: give('총용 광석 +6', () => { for (const o of G.Forge.ORES) if (o.cls === 'gun') inv.ores[o.id] = (inv.ores[o.id] || 0) + 6; G.Forge.markDirty(); }) },
       { label: '모든 주괴 +2씩', hint: '제련 없이 바로', run: give('주괴 +2', () => { for (const o of G.Forge.ORES) inv.ingots[o.id] = (inv.ingots[o.id] || 0) + 2; G.Forge.markDirty(); }) },

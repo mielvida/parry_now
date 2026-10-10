@@ -75,7 +75,7 @@
   const toHex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
   const lighten = (h, k) => toHex(hex(h).map((v) => v + (255 - v) * k));
   const meleeBase = (w) => w.baseDmg || (w.oneHit ? 2 : 1);
-  const isBase = (it) => it && it.slot === 'weapon' && !it.tier && it.id !== 'wood0';
+  const isBase = (it) => it && it.slot === 'weapon' && !it.tier && it.id !== 'wood0' && !it.lens;
 
   for (const base of Object.values(ITEMS).filter(isBase)) {
     for (let tier = 1; tier <= MAX_TIER; tier++) {
@@ -110,8 +110,8 @@
   const classOf = (w) => (w && w.shot ? 'gun' : 'sword');
   const slotsOf = (w) => Math.min(4, 2 + ((w && w.tier) || 0));
   const copiesOf = (inv, id) => (inv.items.includes(id) ? (inv.copies && inv.copies[id]) || 1 : 0);
-  const canMerge = (item) => !!item && item.slot === 'weapon' && item.id !== 'wood0';
-  const nextOf = (item) => (item && item.slot === 'weapon' && item.id !== 'wood0' && (item.tier || 0) < MAX_TIER ? ITEMS[`${item.baseId || item.id}_t${(item.tier || 0) + 1}`] : null);
+  const canMerge = (item) => !!item && item.slot === 'weapon' && item.id !== 'wood0' && !item.lens;
+  const nextOf = (item) => (item && item.slot === 'weapon' && item.id !== 'wood0' && !item.lens && (item.tier || 0) < MAX_TIER ? ITEMS[`${item.baseId || item.id}_t${(item.tier || 0) + 1}`] : null);
   const baseOf = (item) => (item.baseId ? ITEMS[item.baseId] : item);
   const mergeFee = (item) => ((item.tier || 0) === 0 ? Math.round(baseOf(item).price * 0.4) + 60 : Math.round(baseOf(item).price * 1.2) + 200);
 
@@ -328,13 +328,24 @@
   }
 
   // 지금 가진 곡괭이 중 가장 좋은 단계 (0 = 없음)
-  const bestPick = (inv) => inv.items.reduce((m, id) => Math.max(m, (ITEMS[id] && ITEMS[id].pickaxe) || 0), 0);
+  const bestPick = (inv) => {
+    const id = inv.equipped && inv.equipped.pick;
+    return id && inv.items.includes(id) && ITEMS[id] ? ITEMS[id].pickaxe : 0;
+  };
+  // 가진 곡괭이 중 가장 좋은 것을 낀다 (사거나 받았을 때 낀 게 없으면 자동으로)
+  const bestOwnedPick = (inv) => inv.items.filter((id) => ITEMS[id] && ITEMS[id].pickaxe).sort((a, b) => ITEMS[b].pickaxe - ITEMS[a].pickaxe)[0] || null;
+  const autoEquipPick = (inv) => { if (!bestPick(inv)) inv.equipped.pick = bestOwnedPick(inv); };
+  const togglePick = (inv, id) => { // 인벤토리에서 누르면 끼고, 끼고 있으면 뺀다
+    if (inv.equipped.pick === id) { inv.equipped.pick = null; return false; }
+    inv.equipped.pick = id;
+    return true;
+  };
 
   G.Forge = {
     MAX_TIER, ORES, ORE, PICKS, SMELT_NEED, CLS_NAME,
     bind: (inv) => { bound = ensure(inv); dirty = true; },
     ensure, classOf, slotsOf, copiesOf, canMerge, nextOf, mergeFee, addCopy,
     attachBonus, bonusText, merge, smelt, attach, detach, act,
-    gridExtra, describeExtra, forgeTabs, bestPick, markDirty: () => { dirty = true; },
+    gridExtra, describeExtra, forgeTabs, bestPick, bestOwnedPick, autoEquipPick, togglePick, markDirty: () => { dirty = true; },
   };
 })(window.Game);

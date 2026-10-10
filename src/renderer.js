@@ -482,7 +482,7 @@
         ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(-14, -3, 18, 3);
         ctx.fillStyle = L[1]; ctx.fillRect(-26, 10, 52, 5);
         ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(-26, 13, 52, 2);
-      } else if (item.tool) { // 약점 돋보기: 둥근 렌즈와 손잡이
+      } else if (item.tool || item.lens) { // 약점 돋보기: 둥근 렌즈와 손잡이
         ctx.strokeStyle = L[1]; ctx.lineWidth = 6; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(10, 10); ctx.lineTo(26, 26); ctx.stroke();
         ctx.fillStyle = L[1]; ctx.beginPath(); ctx.arc(-3, -3, 19, 0, Math.PI * 2); ctx.fill();
@@ -807,7 +807,7 @@
       const { x, y, w, h } = geo.panel;
       const eq = e.inv.equipped;
       const defs = G.Shop.ITEMS;
-      const isEquipped = (id) => !!id && eq[defs[id].slot] === id;
+      const isEquipped = (id) => !!id && (defs[id].pickaxe ? eq.pick === id : eq[defs[id].slot] === id);
       const cats = G.Shop.CATEGORIES;
       const entries = G.Shop.gridEntries(e.inv, e.cat);
       const cols = geo.cols;

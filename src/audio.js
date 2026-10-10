@@ -268,10 +268,13 @@
     if (e.key === OWNER_KEY && e.newValue && e.newValue.split(':')[0] !== TAB_ID) musicOwner = false;
   });
   window.addEventListener('focus', claimMusic);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) claimMusic(); });
+  window.addEventListener('keydown', () => { if (!musicOwner) claimMusic(); });
   window.addEventListener('pointerdown', claimMusic);
 
   function scheduleBgm() {
     if (!ctx) return;
+    try { const o = localStorage.getItem(OWNER_KEY); if (o && o.split(':')[0] !== TAB_ID) musicOwner = false; } catch (e) { /* 저장소 없음 */ }
     if (!musicOwner) { bgmTime = ctx.currentTime + 0.05; return; }
     const tr = TRACKS[track];
     if (bgmTime < ctx.currentTime) bgmTime = ctx.currentTime + 0.05; // 탭이 멈췄다 돌아온 경우 따라잡기
