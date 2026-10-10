@@ -468,6 +468,7 @@
     volcano: { name: '화산', a: '#ff7a2a', b: '#ffe08a' },
     darkhub: { name: '다크월드', a: '#5a1a8a', b: '#d9a0ff' },
     dungeon: { name: '던전', a: '#2a0a3a', b: '#ff6a8a' },
+    orecave: { name: '광물 동굴', a: '#4a3320', b: '#ffd68a' },
   };
   // 차원문: 룬이 새겨진 돌 아치, 안쪽에서 소용돌이치는 빛, 문 주위를 도는 룬, 문 안으로 빨려 드는 빛 알갱이, 하늘로 솟는 빛기둥
   function drawGate(ctx, g, baseX, baseY, time) {

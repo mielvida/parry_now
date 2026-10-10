@@ -72,6 +72,7 @@
           if (ch === 'w') this.waters.push({ col: c, row: r });
           if (ch === 'v') this.altars.push({ col: c, row: r });
           if (ch === 'F') this.gates.push({ col: c, row: r, stage: 'forest' });
+          if (ch === 'u') this.gates.push({ col: c, row: r, stage: 'orecave' });
           if (ch === 'N') this.gates.push({ col: c, row: r, stage: 'snow' });
           if (ch === 'M') this.gates.push({ col: c, row: r, stage: 'volcano' });
         }

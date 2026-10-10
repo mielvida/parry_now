@@ -89,6 +89,9 @@
 
   // 낀 갑옷의 몸통 색: [본체, 어깨 하이라이트]
   let armorCol = ['#3b6fd4', '#5b8ff0'];
+  let armorRagged = false; // 허름한 옷(시작 복장): 기운 천 조각과 해진 옷단
+  let weaponItem = null;   // 낀 무기 아이템 (목검/합성 단계 확인용)
+  let animT = 0;
   // 머리: 투구를 끼면 투구 색, 안 끼면 기본 투구 [본체, 하이라이트]
   let headCol = ['#c9d2dc', '#e6edf5'];
 
@@ -98,8 +101,17 @@
     ctx.translate(0, bob);
     rect(ctx, armorCol[0], -7, 12, 14, 13);     // 갑옷
     rect(ctx, armorCol[1], -7, 12, 14, 3);      // 어깨 하이라이트
-    rect(ctx, '#e0b12f', -7, 21, 14, 2);        // 허리띠
-    rect(ctx, '#e0b12f', 5, 12, 2, 9);          // 가슴 장식
+    if (armorRagged) { // 허름한 옷: 기운 천, 밧줄 허리띠, 너덜너덜한 옷단
+      rect(ctx, '#5a4c36', -5, 15, 4, 4);       // 어두운 헝겊
+      rect(ctx, '#a8946a', 1, 17, 5, 4);        // 밝은 헝겊
+      rect(ctx, '#3a2f20', -4, 16, 1, 1); rect(ctx, '#3a2f20', 3, 18, 1, 1); // 꿰맨 자국
+      rect(ctx, '#7a6a4a', -7, 21, 14, 2);      // 밧줄 허리띠
+      for (let i = 0; i < 4; i++) rect(ctx, armorCol[0], -7 + i * 3.6, 25, 2.4, 2 + (i % 2)); // 해진 옷단
+      rect(ctx, 'rgba(0,0,0,0.22)', -7, 12, 2, 13); // 옆구리 그늘
+    } else {
+      rect(ctx, '#e0b12f', -7, 21, 14, 2);      // 허리띠
+      rect(ctx, '#e0b12f', 5, 12, 2, 9);        // 가슴 장식
+    }
     // 투구
     rect(ctx, headCol[0], -7, 1, 14, 11);
     rect(ctx, headCol[1], -7, 1, 14, 3);
@@ -109,11 +121,11 @@
     }
     rect(ctx, '#1b2433', 0, 5, 7, 3);           // 눈구멍
     rect(ctx, '#ffffff', 4, 6, 2, 1);           // 눈빛
-    // 깃털
-    ctx.fillStyle = '#e8334a';
+    // 깃털 (허름한 옷에 투구가 없으면 깃털 대신 낡은 천 모자 끈)
+    ctx.fillStyle = armorRagged && !p.helmetId ? '#7a6a4a' : '#e8334a';
     ctx.beginPath();
     ctx.moveTo(-2, 1);
-    ctx.quadraticCurveTo(-4, -6, -10 - Math.min(4, Math.abs(p.vx) / 60), -2 + Math.sin(p.animTime * 9));
+    ctx.quadraticCurveTo(-4, armorRagged && !p.helmetId ? -2 : -6, -10 - Math.min(4, Math.abs(p.vx) / 60), -2 + Math.sin(p.animTime * 9));
     ctx.quadraticCurveTo(-6, 0, 2, 1);
     ctx.closePath();
     ctx.fill();
@@ -262,6 +274,17 @@
       ctx.lineTo(38, 3.5);
       ctx.closePath();
       ctx.fill();
+    } else if (weaponItem && weaponItem.broken) { // 부서진 목검: 짧고 끝이 뜯겨 나간 나무 칼
+      rect(ctx, '#5a3d17', -5, -1.5, 6, 3);       // 낡은 손잡이
+      rect(ctx, '#8a6a3a', 1, -4, 3, 8);          // 나무 날밑
+      ctx.fillStyle = blade[0];
+      ctx.beginPath();
+      ctx.moveTo(4, -2.2); ctx.lineTo(18, -2.2); ctx.lineTo(21, -0.8); ctx.lineTo(18.5, 0.3); ctx.lineTo(22, 1.2); ctx.lineTo(18, 2.2); ctx.lineTo(4, 2.2);
+      ctx.closePath();
+      ctx.fill();
+      rect(ctx, blade[1], 4, 0.6, 15, 1.4);       // 나뭇결 그늘
+      rect(ctx, '#4a2f10', 11, -2.2, 1, 4.4);     // 갈라진 금
+      rect(ctx, '#e0c89a', 19.5, -0.6, 2, 1.2);   // 부서진 단면
     } else {
       rect(ctx, '#6b4423', -5, -1.5, 6, 3);       // 손잡이
       rect(ctx, '#e0b12f', 1, -5, 3, 10);         // 날밑
@@ -275,8 +298,35 @@
       ctx.closePath();
       ctx.fill();
     }
+    if (weaponItem && weaponItem.tier) drawTierAura(ctx, weaponItem);
     ctx.restore();
   }
+
+  // 합성 단계 광채 (무기 좌표: 앞쪽이 +x). 1단계는 은은한 빛, 최대(2단계)는 짙은 빛에 떠오르는 불꽃
+  function drawTierAura(ctx, w) {
+    const t = w.tier;
+    const pulse = 0.75 + 0.25 * Math.sin(animT * 6);
+    const c = w.glow || w.look[0];
+    const [r, g, b] = hexRGB(c);
+    const grad = ctx.createRadialGradient(18, 0, 2, 18, 0, t === 2 ? 30 : 24);
+    grad.addColorStop(0, `rgba(${r},${g},${b},${(t === 2 ? 0.42 : 0.26) * pulse})`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(-14, -30, 66, 60);
+    const n = t === 2 ? 5 : 2;
+    for (let i = 0; i < n; i++) { // 칼날을 따라 오르는 불꽃/반짝임
+      const ph = ((animT * (t === 2 ? 1.1 : 0.7) + i / n) % 1);
+      const px = 6 + i * 6 + Math.sin(i * 7) * 2;
+      const py = -ph * 16 * (t === 2 ? 1.4 : 1);
+      ctx.fillStyle = `rgba(255,${t === 2 ? 235 : 255},${t === 2 ? 170 : 255},${(1 - ph) * 0.9})`;
+      ctx.fillRect(px, py - 2, 2, 2);
+    }
+    if (t === 2) { // 최대 단계: 날밑에 금빛 보석
+      ctx.fillStyle = '#ffd54a'; ctx.fillRect(1.5, -1.5, 2, 3);
+      ctx.fillStyle = '#fff'; ctx.fillRect(2, -1, 1, 1);
+    }
+  }
+  function hexRGB(h) { return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); }
 
   // 검이 지나간 자리: 베는 순간부터 서서히 사라지는 초승달 궤적
   function drawSlashTrail(ctx, f, angle) {
@@ -400,8 +450,11 @@
       const wp = items[p.weaponId || 'sword0'];
       weaponType = wp.type;
       blade = wp.look;
+      weaponItem = wp;
+      animT = p.animTime || 0;
       armorCol = items[p.armorId || 'armor0'].look;
-      headCol = p.helmetId ? items[p.helmetId].look : ['#c9d2dc', '#e6edf5'];
+      armorRagged = !!items[p.armorId || 'armor0'].ragged;
+      headCol = p.helmetId ? items[p.helmetId].look : armorRagged ? ['#8a6a44', '#a98a5e'] : ['#c9d2dc', '#e6edf5'];
       gloveCol = p.glovesId ? items[p.glovesId].look[0] : '#e8b98a';
       pantsCol = p.pantsId ? items[p.pantsId].look : null;
       bootCol = p.bootsId ? [items[p.bootsId].look[0], items[p.bootsId].look[1], true] : ['#4a3b2a', '#3a2f22'];

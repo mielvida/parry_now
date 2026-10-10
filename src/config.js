@@ -197,3 +197,12 @@ Game.Config = {
   COYOTE_TIME: 0.1,    // 발판을 떠난 직후에도 점프 허용 (초)
   JUMP_BUFFER: 0.1,     // 착지 직전에 누른 점프 입력 기억 (초)
 };
+
+// 사용자 설정 (O 키). 브라우저에 저장된다. 효과를 끄면 몰입도가 떨어질 수 있다
+Game.Settings = (function () {
+  const KEY = 'parry_settings';
+  const S = { music: 0.7, dmgNum: true, parrySound: true, sparkle: true, shake: true };
+  try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* 저장소 없음 */ }
+  Object.defineProperty(S, 'save', { enumerable: false, value() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } } });
+  return S;
+})();

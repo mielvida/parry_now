@@ -16,6 +16,9 @@
       master = ctx.createGain();
       master.gain.value = muted ? 0 : 0.5;
       master.connect(ctx.destination);
+      musicOut = ctx.createGain();
+      musicOut.gain.value = G.Settings.music;
+      musicOut.connect(master);
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -250,9 +253,26 @@
   let wantTrack = 'cave';  // 원하는 곡 (오디오가 깨어나기 전에 정해질 수 있다)
   let bgmStep = 0;
   let bgmTime = 0;
+  let bgmTimer = null;
+  let musicOut = null; // 음악 음량 조절용
+
+  // 같은 게임을 여러 탭에서 열어 두면 탭마다 음악이 나와 겹친다: 마지막으로 만진 탭만 음악을 낸다
+  const TAB_ID = String(Math.random()).slice(2);
+  const OWNER_KEY = 'parry_music_owner';
+  let musicOwner = true;
+  function claimMusic() {
+    musicOwner = true;
+    try { localStorage.setItem(OWNER_KEY, TAB_ID + ':' + Date.now()); } catch (e) { /* 저장소 없음 */ }
+  }
+  window.addEventListener('storage', (e) => {
+    if (e.key === OWNER_KEY && e.newValue && e.newValue.split(':')[0] !== TAB_ID) musicOwner = false;
+  });
+  window.addEventListener('focus', claimMusic);
+  window.addEventListener('pointerdown', claimMusic);
 
   function scheduleBgm() {
     if (!ctx) return;
+    if (!musicOwner) { bgmTime = ctx.currentTime + 0.05; return; }
     const tr = TRACKS[track];
     if (bgmTime < ctx.currentTime) bgmTime = ctx.currentTime + 0.05; // 탭이 멈췄다 돌아온 경우 따라잡기
     while (bgmTime < ctx.currentTime + 0.6) {
@@ -266,28 +286,35 @@
     const g = ctx.createGain();
     g.gain.setValueAtTime(fadeIn ? 0.0001 : vol, ctx.currentTime);
     if (fadeIn) g.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.5);
-    g.connect(master);
+    g.connect(musicOut);
     return g;
   }
 
   function startBgm() {
+    claimMusic();
     track = wantTrack;
     bgm = makeBgmGain(TRACKS[track].vol, false);
     bgmTime = ctx.currentTime + 0.1;
     scheduleBgm();
-    setInterval(scheduleBgm, 150);
+    if (!bgmTimer) bgmTimer = setInterval(scheduleBgm, 150); // 타이머는 하나만
   }
 
-  // 곡 바꾸기: 지금 곡은 0.5초 동안 서서히 작아지고, 새 곡이 처음부터 서서히 커진다
+  // 곡 바꾸기: 지금 곡은 바로(0.12초) 조용해지고 끊기며, 그 뒤 새 곡이 처음부터 서서히 커진다 (두 곡이 겹치지 않게)
   function switchTrack(name) {
     const old = bgm;
-    old.gain.cancelScheduledValues(ctx.currentTime);
-    old.gain.setValueAtTime(old.gain.value, ctx.currentTime);
-    old.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+    const t = ctx.currentTime;
+    old.gain.cancelScheduledValues(t);
+    old.gain.setValueAtTime(old.gain.value, t);
+    old.gain.linearRampToValueAtTime(0.0001, t + 0.12);
+    setTimeout(() => { try { old.disconnect(); } catch (e) { /* 이미 끊김 */ } }, 400); // 미리 예약된 음도 여기서 끊긴다
     track = name;
-    bgm = makeBgmGain(TRACKS[name].vol, true);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t + 0.15);
+    g.gain.linearRampToValueAtTime(TRACKS[name].vol, t + 0.65);
+    g.connect(musicOut);
+    bgm = g;
     bgmStep = 0;
-    bgmTime = ctx.currentTime + 0.1;
+    bgmTime = t + 0.15;
     scheduleBgm();
   }
 
@@ -297,6 +324,7 @@
   const Audio = {
     play(name) {
       if (muted || !ensure()) return;
+      if (name === 'parry' && !G.Settings.parrySound) return;
       const fn = SOUNDS[name];
       if (!fn) return;
       pitch = FIXED_PITCH.has(name) ? 1 : 0.85 + Math.random() * 0.35; // 재생할 때마다 높낮이가 조금씩 다르게
@@ -308,6 +336,10 @@
       if (!TRACKS[name]) return;
       wantTrack = name;
       if (ctx && bgm && name !== track) switchTrack(name);
+    },
+    setMusicVolume(v) {
+      G.Settings.music = Math.max(0, Math.min(1, v));
+      if (musicOut) musicOut.gain.value = G.Settings.music;
     },
     toggleMute() {
       muted = !muted;

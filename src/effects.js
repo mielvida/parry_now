@@ -14,6 +14,7 @@
     }
 
     shake(mag, duration) {
+      if (!G.Settings.shake) return;
       this.shakeMag = Math.max(this.shakeMag * (this.shakeTime / this.shakeDuration), mag);
       this.shakeDuration = duration;
       this.shakeTime = duration;
@@ -62,6 +63,7 @@
 
     // 반짝이는 작은 빛 입자 (컷신의 병, 보물 상자 등)
     sparkle(x, y) {
+      if (!G.Settings.sparkle) return;
       this.particles.push({
         kind: 'blob', x: x + rand(-8, 8), y: y + rand(-6, 6), vx: rand(-14, 14), vy: -rand(20, 60),
         life: rand(0.5, 0.9), max: 0.9, size: rand(1.5, 3), gravity: -20,
@@ -318,7 +320,7 @@
 
     update(dt) {
       this.shakeTime = Math.max(0, this.shakeTime - dt);
-      this.flash = Math.max(0, this.flash - dt);
+      this.flash = G.Settings.sparkle ? Math.max(0, this.flash - dt) : 0;
       for (const p of this.particles) {
         p.life -= dt;
         p.vy += p.gravity * dt;

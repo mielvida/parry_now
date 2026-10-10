@@ -16,7 +16,8 @@
   // 근접 무기의 원소(elem)는 맞힐 때 일어나는 특수 효과다. note = 그 설명, oneHit = 슬라임·꽃게도 첫 타에 처치
   //   gold 황금(처치 코인 +50%) / crystal 수정(주변에 파편 피해) / light 빛(주변 기절) / quake 대지(주변 기절)
   //   fire 화염(불타며 죽음) / ice 얼음(얼면서 부서짐) / thief 도둑(맞힐 때 코인) / cleave 관통(앞의 몬스터도) / shadow 그림자(잠시 무적)
-  weapon('sword0', 'sword', '기본 검', 0, 0.3, 0, 0, ['#e8f1ff', '#9db6d6']);
+  weapon('wood0', 'sword', '부서진 목검', 0, 0.25, 0, 0, ['#c9a86a', '#8a5a2b'], { wood: true, broken: true, note: '낡은 나무 칼. 끝이 부서졌다 — 대장간에서 제대로 된 검을 사 보자' });
+  weapon('sword0', 'sword', '기본 검', 80, 0.3, 0, 0, ['#e8f1ff', '#9db6d6']);
   weapon('sword1', 'sword', '황금 검', 300, 0.4, 1, 0, ['#ffe08a', '#d9a93a'], { elem: 'gold', note: '황금: 처치하면 코인 +50%' });
   weapon('sword2', 'sword', '수정 검', 600, 0.4, 2, 0, ['#9fe8ff', '#4fb5e0'], { elem: 'crystal', note: '수정: 맞은 주변에 파편 피해 1' });
   weapon('sword3', 'sword', '전설의 검', 1000, 0.6, 2, 0, ['#e0a8ff', '#a45ad9'], { elem: 'light', lightRadius: 3, oneHit: true, note: '빛: 주변 3칸 몬스터를 기절시킨다' });
@@ -34,7 +35,9 @@
 
   // 갑옷: hearts = 늘어나는 최대 피(칸), look = [몸통, 어깨]
   const armor = (id, name, price, hearts, look) => add({ id, slot: 'armor', name, price, hearts, look });
-  armor('armor0', '기본 갑옷', 0, 0, ['#3b6fd4', '#5b8ff0']);
+  armor('rags', '허름한 옷', 0, 0, ['#8c7c5e', '#6e5f45']);
+  ITEMS.rags.ragged = true; // 기운 천 조각 옷 (그릴 때 해진 모습)
+  armor('armor0', '기본 갑옷', 120, 0, ['#3b6fd4', '#5b8ff0']);
   armor('armor1', '가죽 갑옷', 200, 1, ['#8a5a2b', '#b8803f']);
   armor('armor2', '강철 갑옷', 450, 2, ['#9aa4b2', '#d0d8e4']);
   armor('armor3', '용사의 갑옷', 800, 3, ['#d4a017', '#ffe27a']);
@@ -222,7 +225,10 @@
   const placedCount = (inv, id) => ['floor', 'wall'].reduce((n, k) => n + inv.home.placed[k].filter((x) => x === id).length, 0);
   // 집에 놓은 장식품 수에 따른 보너스: 놓을 때마다 코인 획득량과 치명타 확률이 오른다
   const placedTotal = (inv) => inv.home.placed.floor.filter(Boolean).length + inv.home.placed.wall.filter(Boolean).length;
-  const homeBonuses = (inv) => { const n = placedTotal(inv); return { n, coin: n * C.DECOR_COIN_BONUS + (ITEMS[inv.equipped.armor] && ITEMS[inv.equipped.armor].perk === 'gold' ? 0.3 : 0) + (inv.equipped.pants && ITEMS[inv.equipped.pants].coinAdd ? ITEMS[inv.equipped.pants].coinAdd : 0), crit: Math.min(1, C.CRIT_BASE_CHANCE + n * C.DECOR_CRIT_BONUS + (ITEMS[inv.equipped.helmet] && ITEMS[inv.equipped.helmet].critAdd ? ITEMS[inv.equipped.helmet].critAdd : 0)) }; };
+  // 지금 든 무기에 붙인 주괴가 주는 보너스 (대장간 forge.js). 없으면 모두 0
+  const NO_ATTACH = { dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false };
+  const attachOf = (inv, w) => (G.Forge && w ? G.Forge.attachBonus(inv, w) : NO_ATTACH);
+  const homeBonuses = (inv) => { const n = placedTotal(inv); const ab = attachOf(inv, ITEMS[inv.equipped.weapon]); return { n, coin: n * C.DECOR_COIN_BONUS + (ITEMS[inv.equipped.armor] && ITEMS[inv.equipped.armor].perk === 'gold' ? 0.3 : 0) + (inv.equipped.pants && ITEMS[inv.equipped.pants].coinAdd ? ITEMS[inv.equipped.pants].coinAdd : 0) + ab.coin, crit: Math.min(1, C.CRIT_BASE_CHANCE + n * C.DECOR_CRIT_BONUS + (ITEMS[inv.equipped.helmet] && ITEMS[inv.equipped.helmet].critAdd ? ITEMS[inv.equipped.helmet].critAdd : 0) + ab.crit) }; };
   const decorLeft = (inv, id) => (inv.home.owned[id] || 0) - placedCount(inv, id); // 아직 안 놓은 개수
   // 방의 자리(kind, index)에 장식품을 놓는다 (id가 null이면 치우기). 결과 { ok, msg }
   function placeDecor(inv, kind, index, id) {
@@ -309,6 +315,7 @@
 
   // 아이템 한 개의 이름/설명 (상점과 인벤토리 창이 보여준다)
   function describe(item, inv) {
+    if (item.forge) return item.view(inv); // 대장간의 합치기/제련/부착 카드
     if (item.upgrade === 'stmax') {
       const lv = inv ? inv.stMaxLevel || 0 : 0;
       const desc = lv >= C.STAMINA_MAX_LEVELS ? `최고 레벨! 최대 스태미나 ${staminaMax(inv)}` : `최대 스태미나 ${staminaMax(inv)} -> ${staminaMax(inv) + C.STAMINA_MAX_STEP}`;
@@ -381,7 +388,7 @@
         parts.push(`대미지 ${item.dmg + wBonus(wl)}`, `스태미나 -${item.stamina}`);
         if (item.radius) parts.push(`폭발 ${item.radius}칸`);
         if (item.count > 1) parts.push(`${item.count}발`);
-        return { name: wname, desc: parts.join(', '), slotName: TYPE_NAMES[item.type], note: item.note || '' };
+        return { name: wname, desc: parts.join(', '), slotName: TYPE_NAMES[item.type], note: [item.note, G.Forge && G.Forge.describeExtra(item, inv)].filter(Boolean).join(' · ') };
       }
       parts.push(`대미지 ${meleeBase(item) + wBonus(wl)}`);
       if (item.element) parts.push(`마법 ${{ fire: '2', poison: '3(지속)', lightning: '1+기절', random: '1~3' }[item.element] || '1'}`);
@@ -391,7 +398,7 @@
       if (item.cd) parts.push(`쿨다운 ${item.cd > 0 ? '+' : ''}${item.cd}초`);
       if (item.oneHit) parts.push('슬라임·꽃게 한 방');
       if (holy) parts.push(`탑 보스 x${1 + holy}`);
-      return { name: wname, desc: parts.join(', '), slotName: TYPE_NAMES[item.type], note: item.note || '' };
+      return { name: wname, desc: parts.join(', '), slotName: TYPE_NAMES[item.type], note: [item.note, G.Forge && G.Forge.describeExtra(item, inv)].filter(Boolean).join(' · ') };
     }
     if (item.slot === 'pants') {
       if (item.hearts) parts.push(`최대 피 +${item.hearts}칸`);
@@ -414,9 +421,9 @@
       tabs: [{ name: '물약·도구', items: ids('potion1', 'potion2', 'magnifier') }],
     },
     sword: {
-      title: '무기 상점',
+      title: '대장간',
       tabs: [
-        { name: '검', items: ids('sword1', 'sword2', 'sword3', 'sword4') },
+        { name: '검', items: ids('sword0', 'sword1', 'sword2', 'sword3', 'sword4') },
         { name: '대검', items: ids('great1', 'great2', 'great3', 'great4') },
         { name: '단검', items: ids('dagger1', 'dagger2', 'dagger3', 'dagger4') },
         { name: '지팡이', items: ids('staff1', 'staff2', 'staff3', 'staff4') },
@@ -514,12 +521,16 @@
   // 인벤토리: items = 가진 아이템 id (얻은 순서), equipped = 칸별로 낀 아이템 id (장갑/신발은 비어 있을 수 있다)
   function newInventory() {
     return {
-      items: ['sword0', 'armor0'],
+      items: ['wood0', 'rags'],
       potions: { potion1: 0, potion2: 0 }, // 물약 개수
       used: {}, // 장비마다 쓴 양 (무기는 휘두른 횟수, 방어구는 입은 초)
       invSort: 'default', // 인벤토리 정렬
       invSub: 'all', // 무기/방어구 탭의 종류 필터
-      hotbar: ['sword0', null, null, null, null], // 왼쪽 위 무기 칸 1~5 (숫자 키로 바꿔 든다)
+      hotbar: ['wood0', null, null, null, null], // 왼쪽 위 무기 칸 1~5 (숫자 키로 바꿔 든다)
+      copies: {}, // 같은 무기를 여러 자루 가졌을 때의 개수 (3개를 대장간에서 합친다). 없으면 1자루
+      ores: {}, // 캔 광석 개수 (광물 동굴)
+      ingots: {}, // 제련한 주괴 개수
+      attach: {}, // 무기마다 붙인 주괴 목록
       holy: {}, // 칼마다 붙인 신성 크리스탈 개수
       materials: { darkcrystal: 0, cleancrystal: 0, holycrystal: 0 }, // 보스가 떨어뜨리는 소중한 물건의 개수 (쌓인다)
       consumables: { st70: 0, st30: 0, icebomb: 0 }, // 다크월드 소모품 개수
@@ -531,7 +542,7 @@
       stRegenLevel: 0, // 스태미나 회복 속도 업그레이드 레벨 (보상 상점)
       wlevel: {}, // 무기 강화 레벨 (무기 id마다)
       armorLevel: 0, // 갑옷 강화 레벨 (최대 피 +1칸 / 레벨)
-      equipped: { weapon: 'sword0', helmet: null, armor: 'armor0', gloves: null, pants: null, boots: null },
+      equipped: { weapon: 'wood0', helmet: null, armor: 'rags', gloves: null, pants: null, boots: null },
     };
   }
 
@@ -544,15 +555,19 @@
     const b = inv.equipped.boots ? ITEMS[inv.equipped.boots] : null;
     const pn = inv.equipped.pants ? ITEMS[inv.equipped.pants] : null;
     const wl = (inv.wlevel && inv.wlevel[inv.equipped.weapon]) || 0;
+    const ab = attachOf(inv, w); // 붙인 주괴 보너스
     return {
-      reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
-      dmgBonus: w.shot ? wBonus(wl) : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
-      bossBonus: w.shot ? 0 : wBonus(wl),            // 강화: 근접 무기는 보스에게 더 아프다 (레벨이 오를수록 더 크게)
-      baseDmg: w.shot ? 1 : meleeBase(w),
-      hitPower: w.shot ? 1 : 1 + Math.floor(wBonus(wl) / 5) + Math.floor(meleeBase(w) / 4), // 단단한 몬스터를 한 번에 깎는 횟수
+      reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl + ab.reach) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
+      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
+      bossBonus: w.shot ? 0 : wBonus(wl) + ab.boss,  // 강화: 근접 무기는 보스에게 더 아프다 (레벨이 오를수록 더 크게)
+      baseDmg: w.shot ? 1 : meleeBase(w) + ab.dmg,
+      hitPower: w.shot ? 1 : 1 + Math.floor(wBonus(wl) / 5) + Math.floor(meleeBase(w) / 4) + ab.hit + Math.floor(ab.dmg / 3), // 단단한 몬스터를 한 번에 깎는 횟수
+      staminaAdd: ab.st,                              // 쏘는 무기: 한 번에 드는 스태미나 증감 (티타늄 등은 줄여 준다)
+      radiusAdd: ab.radius,                           // 폭탄 폭발 범위 증가(칸)
+      pierceAdd: !!ab.pierce,                         // 탄환 관통
       throwTiles: w.throwTiles,
       canThrow: ['sword', 'dagger', 'staff', 'spear', 'katana', 'rapier'].includes(w.type), // 대검/도끼/망치/채찍/폭탄/총/활/방패는 던질 수 없다
-      cooldownAdd: w.cd + (g && g.cdAdd ? g.cdAdd : 0),
+      cooldownAdd: w.cd + (g && g.cdAdd ? g.cdAdd : 0) + ab.cd,
       dashCostAdd: b && b.dashCostAdd ? b.dashCostAdd : 0,
       hearts: (a ? a.hearts : 0) + (pn ? pn.hearts || 0 : 0) + (inv.armorLevel || 0),
       invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0), // 투구 + 그림자 갑옷
@@ -642,7 +657,9 @@
       wallet.inv.speedLevel += 1;
       return { ok: true, msg: `Lv ${wallet.inv.speedLevel}! 마을에서 이동 속도 ${fmtX(speedMult(wallet.inv.speedLevel))}배.` };
     }
-    if ((item.slot || item.tool) && wallet.inv.items.includes(item.id)) return { ok: false, msg: '이미 가지고 있어요.' };
+    if (item.forge) return G.Forge.act(item, wallet); // 대장간: 합치기/제련/부착
+    const dupWeapon = item.slot === 'weapon' && G.Forge && G.Forge.canMerge(item); // 같은 무기를 더 사서 3개를 합칠 수 있다
+    if ((item.slot || item.tool) && wallet.inv.items.includes(item.id) && !dupWeapon) return { ok: false, msg: '이미 가지고 있어요.' };
     if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
     wallet.coins -= item.price;
     if (item.heal !== undefined) { // 물약은 바로 마시지 않고 가방에 넣는다 (피가 가득이어도 살 수 있다)
@@ -650,9 +667,17 @@
       wallet.inv.potions[item.id] = n;
       return { ok: true, msg: `${item.name} 구매! (보유 ${n}개)` };
     }
+    if (item.pickaxe) { // 곡괭이: 가장 좋은 것이 자동으로 쓰인다
+      wallet.inv.items.push(item.id);
+      return { ok: true, msg: `${item.name} 구매! 광물 동굴에서 ${item.pickaxe}단계 광석까지 캘 수 있다.` };
+    }
     if (item.tool) { // 도구는 인벤토리에 들어간다
       wallet.inv.items.push(item.id);
       return { ok: true, msg: `${item.name} 구매! 이제 보스의 약점이 보인다.` };
+    }
+    if (dupWeapon && wallet.inv.items.includes(item.id)) { // 이미 있는 무기: 한 자루 더
+      const n = G.Forge.addCopy(wallet.inv, item.id);
+      return { ok: true, msg: `${item.name} 한 자루 더! (보유 ${n}개) 같은 무기 3개는 대장간에서 합칠 수 있어요.` };
     }
     if (item.slot) { // 산 장비는 바로 장착한다
       wallet.inv.items.push(item.id);
@@ -692,7 +717,8 @@
     if (item.slot === 'weapon') {
       const wl = (inv.wlevel && inv.wlevel[item.id]) || 0;
       const holy = (inv.holy && inv.holy[item.id]) || 0;
-      const dmg = item.shot ? item.dmg + wBonus(wl) : meleeBase(item) + wBonus(wl);
+      const ab = attachOf(inv, item);
+      const dmg = item.shot ? item.dmg + wBonus(wl) + ab.gdmg : meleeBase(item) + wBonus(wl) + ab.dmg;
       return dmg * (1 + holy) * 3 + (item.shot ? 0 : (item.reach + 0.05 * wl) * 2) + (item.shot && item.radius ? item.radius : 0) + (item.price || 0) / 10000;
     }
     if (item.slot) return (item.hearts || 0) * 3 + (item.invuln || 0) * 2 + (item.window || 0) * 10 + (item.speed || 0) * 5 + (item.critAdd || 0) * 20 + (item.perk ? 2 : 0) + (item.stamRegen || 0) * 0.4 + (item.coinAdd || 0) * 8 + (item.reachAdd || 0) * 6 + (-(item.cdAdd || 0)) * 10 + (-(item.dashCostAdd || 0)) * 0.2 + (item.price || 0) / 10000;
@@ -727,7 +753,8 @@
       .map((x) => x.en);
   }
   function gridEntriesAll(inv) {
-    return inv.items.map((id) => ({ id })).concat(
+    return inv.items.map((id) => { const n = inv.copies && inv.copies[id]; return n > 1 ? { id, count: n } : { id }; }).concat(
+      G.Forge ? G.Forge.gridExtra(inv) : [],
       MATERIAL_IDS.filter((id) => inv.materials[id] > 0).map((id) => ({ id, count: inv.materials[id] })),
       CONSUMABLE_IDS.filter((id) => inv.consumables[id] > 0).map((id) => ({ id, count: inv.consumables[id] })),
       POTION_IDS.filter((id) => inv.potions[id] > 0).map((id) => ({ id, count: inv.potions[id] })));

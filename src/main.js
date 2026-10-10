@@ -11,7 +11,15 @@
   // 마을 동굴은 들어갈 때마다 새로 생성된다 (mineRun번째 탐험일수록 길다. 상자 코인은 업그레이드 레벨로 정해진다)
   let mineRun = 0;
   let mineLevel = null;
+  let oreRun = 0;       // 광물 동굴을 들어간 횟수 (많을수록 길고 희귀한 광석이 많다)
+  let oreLevel = null;
   const mineCoins = () => G.Shop.mineReward(inv.mineLevel); // 동굴 상자 코인은 '동굴 보상 상점'에서 업그레이드한 레벨로 정해진다
+  const oreCoins = () => Math.round(mineCoins() * 0.6); // 광물 동굴 상자는 마을 동굴의 60%
+  // 광물 동굴 지형: 마을 동굴 생성기를 쓰되 몬스터는 적게
+  function makeOreCave(run) {
+    const length = Math.min(300, 140 + 24 * run);
+    return G.MineGen.generate(run, Math.random, { length, slimes: Math.max(3, Math.floor(length / 34)), bats: Math.floor(length / 55) });
+  }
   function enterMine() {
     mineRun += 1;
     mineLevel = G.MineGen.generate(mineRun);
@@ -67,6 +75,17 @@
         return { title: '마을 동굴', sub: `${mineRun}번째 탐험 · 길이 ${mineLevel[0].length}칸`, dur: 3.5, caption: '…동굴 안은 어둡고, 슬라임과 박쥐의 기척이 느껴진다.' };
       },
     },
+    // ---- 광물 동굴: 곡괭이로 광석을 캔다 (마을 39열의 문). 들어갈 때마다 새로 생성되고, 끝의 상자는 코인을 준다 ----
+    orecave: {
+      music: 'cave', label: '광물 동굴', returnNear: 'orecave',
+      get level() { return oreLevel; },
+      theme: G.Cave, summon: true, repeatChest: true,
+      get goal() { return `목표: 곡괭이로 광석을 캐자 (E 길게). 동굴 끝의 상자 (+${oreCoins()} G). 돌아가려면 입구의 출구에서 E`; },
+      chest: { mode: 'mine', get coins() { return oreCoins(); }, next: 'village', near: 'orecave' },
+      get banner() {
+        return { title: '광물 동굴', sub: `${oreRun}번째 채굴 · 길이 ${oreLevel[0].length}칸`, dur: 3.5, caption: '…벽 곳곳에서 광석이 반짝인다. 곡괭이로 E를 길게 눌러 캐 보자.' };
+      },
+    },
     // ---- 마을의 문으로 들어가는 스테이지들 (모두 끝에 보물 상자가 있고, 먹으면 코인을 받고 문 앞으로 돌아온다. 상자는 들어갈 때마다 다시 나온다) ----
     forest: {
       music: 'village', label: '속삭이는 숲', level: G.Levels.forest, theme: G.Forest, summon: true, repeatChest: true, returnNear: 'forest', slimeVariant: 'green',
@@ -95,7 +114,7 @@
   const VILLAGER_LINES = [
     '마을 사람: "이 마을엔 몬스터가 없어서 평화롭지."',
     '마을 사람: "물약 가게에서 체력을 회복할 수 있다네."',
-    '마을 사람: "무기 상점엔 검 말고도 대검과 지팡이가 있다네."',
+    '마을 사람: "대장간에선 같은 검 3개를 합쳐 더 강하게 만들 수 있다네. 곡괭이로 광물 동굴에서 광석도 캐 보게."',
     '마을 사람: "해변의 꽃게를 잡으면 코인을 떨어뜨린다더군."',
     '마을 사람: "마을 오른쪽 끝 동굴엔 보물이 있지만, 슬라임과 박쥐가 득시글하다네."',
     '마을 사람: "마을 곳곳의 문으로 숲, 설산, 화산에 갈 수 있다네. 갈수록 위험하지만 상자 보상도 크지."',
@@ -140,6 +159,7 @@
   let coins = 0;        // 보유 코인 (스테이지가 바뀌어도 유지)
   let exp = 0;          // 경험치 (보스 상자에서 얻는다. 아직 표시만 한다)
   const inv = G.Shop.newInventory(); // 가진 아이템과 낀 장비 (스테이지가 바뀌어도 유지)
+  G.Forge.bind(inv); // 대장간(합치기·제련·부착)이 이 인벤토리를 본다
   let equipStats = G.Shop.stats(inv); // 낀 장비의 능력치 합계 (applyEquipment가 갱신)
   const chestTaken = {};            // 이미 연 보물 상자 (같은 상자로 코인을 또 벌 수 없다)
   let nextStage = null;             // 클리어 연출이 끝나면 갈 곳 {name, near}
@@ -352,6 +372,10 @@
       }
       if (betClick || pressed('Enter', 'NumpadEnter', 'Space', 'KeyE')) {
         const cost = m.kind === 'target' ? 100 : m.kind === 'gun' ? 100 : MINI_BETS[m.bi];
+        if (m.kind === 'duel' && (m.mode === 'gun' || m.mode === 'fight')) { // 총싸움/공격!은 장착한 무기 종류가 맞아야 한다
+          const problem = duelWeaponProblem(m.mode, inv.equipped.weapon);
+          if (problem) { m.msg = problem; m.msgT = 3; G.Audio.play('deny'); return; }
+        }
         if (coins < cost) { m.msg = '코인이 부족해요.'; m.msgT = 1.6; G.Audio.play('deny'); return; }
         coins -= cost;
         m.cost = cost;
@@ -747,6 +771,17 @@
   // ---------- 결투장: 보스전처럼 AI 용사와 싸운다 (카우보이 = 총싸움 / 공격! = 칼싸움) ----------
   // 평소 게임 조작 그대로: 이동, 점프, 패링(Enter), 대시, 검 던지기, 총·활·폭탄 쏘기. 상대의 체력은 4~10, 등급은 1~5 무작위.
   let duelRun = null; // {mode, cost, cfg, livesBackup, end, endT}
+  // 던지는 무기 = 던지거나 쏘는 무기(폭탄·총·산탄총·활·석궁). 총싸움은 반드시 끼고, 공격!(칼싸움)은 끼면 안 된다
+  const isThrownWeapon = (id) => { const w = G.Shop.ITEMS[id]; return !!(w && w.shot); };
+  function duelWeaponProblem(mode, weaponId) { // mode: 'gun'(총싸움) | 'fight'(공격!)
+    const thrown = isThrownWeapon(weaponId);
+    if (mode === 'gun' && !thrown) return '총싸움은 던지는 무기(폭탄·총·활 …)를 장착해야 해요. 인벤토리(I)에서 바꿔 끼세요.';
+    if (mode === 'fight' && thrown) return '공격!은 던지는 무기를 장착하고 있으면 안 돼요. 칼·창 같은 근접 무기로 바꾸세요.';
+    return null;
+  }
+  // 결투 중에 규칙을 어기는 무기로 바꾸려는지 (고르는 무기 id)
+  // (결투장 안에서만: 개발 메뉴 등으로 결투장을 벗어나 duelRun이 남아 있어도 평소 무기 교체는 막지 않는다)
+  const duelBlocks = (weaponId) => (duelRun && stageName === 'duelarena' ? duelWeaponProblem(duelRun.mode === 'cowboy' ? 'gun' : 'fight', weaponId) : null);
   function startDuelArena(m) {
     const lv = 1 + Math.floor(Math.random() * 5);
     const hp = 4 + Math.floor(Math.random() * 7);
@@ -882,6 +917,80 @@
     }
   }
 
+  // 던전에서 이벤트가 불러내는 몬스터: 다크월드 몬스터와 똑같이 층에 맞춰 단단해지고, 죽어도 부활하지 않는다(temp)
+  // 땅 몬스터의 y는 발 위치, 그림자(shade)의 y는 몸 가운데
+  function spawnDungeonMonster(kind, x, y) {
+    const st = STAGES[stageName];
+    let mo;
+    if (kind === 'darkstone') mo = new G.DarkStone(x - G.DarkStone.W / 2, y - G.DarkStone.H);
+    else if (kind === 'shade') mo = new G.Shade(x - G.Shade.W / 2, y - G.Shade.H / 2);
+    else { mo = new G.Slime(x - C.SLIME_W / 2, y - C.SLIME_H); mo.variant = 'dark'; }
+    mo.stageSpeed = (st.monsterSpeed || 1) * (1 + Math.min(0.6, darkFloor * 0.006));
+    mo.contactDmg = st.monsterDamage || 3;
+    mo.immune = { ice: !!st.iceZone, fire: !!st.fireZone };
+    mo.dark = true;
+    mo.maxHp = Math.round(mo.maxHp * (1 + darkFloor * 0.06));
+    mo.hp = mo.maxHp;
+    mo.extraHits = Math.floor(darkFloor / 12);
+    mo.temp = true;
+    monsters.push(mo);
+    effects.spawn(x, y);
+    return mo;
+  }
+
+  // 던전 이벤트(src/events.js)가 게임 상태를 건드리는 통로. 이벤트는 규칙을 직접 바꾸지 않고 여기로만 요청한다
+  const dungeonEvents = G.DungeonEvents.create({
+    player,
+    monsters,
+    fx: effects,
+    sound: (n) => G.Audio.play(n),
+    say: (text, color) => say(text, color),
+    popup: (x, y, text, color, t = 1.2) => popups.push({ x, y, text, t, color }),
+    heal(n) { const before = lives; lives = Math.min(maxLives(), lives + n); return lives - before; },
+    hurt(n, x, y) { if (player.invuln > 0) return false; loseLife(x, y, n); return true; },
+    coins(n) { coins += n; },
+    exp(n) { exp += n; },
+    spendCoins(n) { if (coins < n) return false; coins -= n; return true; },
+    giveItem(id, n = 1) { inv.consumables[id] = (inv.consumables[id] || 0) + n; },
+    itemName: (id) => G.Shop.ITEMS[id].name,
+    dialog: (lines) => startDialogs(lines),
+    staminaAdd(n) { stamina = Math.min(stMax(), stamina + n); },
+    staminaFull() { stamina = stMax(); },
+    invuln(sec) { player.invuln = Math.max(player.invuln, sec); },
+    spawnMonster: spawnDungeonMonster,
+    // 폭발: 반경 안의 몬스터에게 피해를 주고, 살아남으면 날려 보낸다 (날아가다 터진다)
+    blast(x, y, r, dmg) {
+      for (const mo of monsters) {
+        if (!mo.alive || mo.flying) continue;
+        if (Math.hypot(mo.x + mo.w / 2 - x, mo.y + mo.h / 2 - y) > r) continue;
+        mo.damage(dmg);
+        if (mo.alive && !mo.flying) mo.knockback(Math.sign(mo.x + mo.w / 2 - x) || 1);
+      }
+    },
+    // 지금 상대에게 피해를 주는 공격 범위들: 베는 순간의 패링 박스, 날아가는 검
+    attackBoxes() {
+      const out = [];
+      if (player.parrying && player.swing >= player.slashFrame) out.push(parryBox(player));
+      if (sword) out.push(sword.box);
+      return out;
+    },
+    nudge(dx) { const ox = player.x; player.x += dx; if (terrain.solidTilesIn(player.x, player.y, player.w, player.h).length) player.x = ox; }, // 돌풍
+    teleport(x, y) { player.placeAt(x, y); camera.follow(player, terrain, C.DT, true); },
+    trapDamage: (floor) => 1 + Math.floor(floor / 30),
+    cameraTop: () => camera.y,
+  });
+
+  // 광물 동굴의 광석 덩어리 (src/orecave.js): 규칙은 여기 host로만 요청한다
+  const oreNodes = new G.OreNodes({
+    player,
+    fx: effects,
+    sound: (n) => G.Audio.play(n),
+    say: (text, color) => say(text, color),
+    popup: (x, y, text, color, t = 1.2) => popups.push({ x, y, text, t, color }),
+    giveOre(id, n) { inv.ores[id] = (inv.ores[id] || 0) + n; G.Forge.markDirty(); },
+    pickTier: () => G.Forge.bestPick(inv),
+  });
+
   function loadStage(name, keepLives = false, near = null) {
     stageName = name;
     skipBanner = name === 'village' && !!seenStages.village;
@@ -893,6 +1002,7 @@
     const st = STAGES[name];
     G.Audio.setMusic(st.music || 'cave'); // 마을은 활기찬 노래, 나머지는 동굴 곡
     if (name === 'dungeon') dungeon = G.Dark.makeFloor(darkFloor); // 층마다 새로 만든다
+    if (name === 'orecave') { oreRun += 1; oreLevel = makeOreCave(oreRun); } // 들어갈 때마다 새 광물 동굴
     terrain = new G.Terrain(st.level);
     renderer.theme = st.theme;
     terrain.story = story;
@@ -951,6 +1061,8 @@
       }
     }
     if (st.dark) scatterPickups(); // 던전에서는 가끔 아이템이 떨어져 있다
+    oreNodes.setup(terrain, oreRun, name === 'orecave'); // 광물 동굴이면 광석 덩어리를 깐다
+    dungeonEvents.setup(terrain, darkFloor, name === 'dungeon' && !!(dungeon && dungeon.tower) && darkFloor % 3 === 0); // 탑의 3층마다(3, 6, 9 …) 이벤트가 나온다. 보스방/허브/그 밖의 층은 비움
     baseMonsterCount = monsters.length;
     spots = terrain.standingSpots();
 
@@ -1127,7 +1239,10 @@
     return { coins, exp, lives, maxLives: maxLives(), inv };
   }
 
-  const shopItems = () => shop.def.tabs[shop.tab].items;
+  const SHOP_PER_PAGE = 4;
+  const shopPages = () => Math.max(1, Math.ceil(shop.def.tabs[shop.tab].items.length / SHOP_PER_PAGE));
+  const shopItems = () => { const pg = Math.min(shop.page || 0, shopPages() - 1); return shop.def.tabs[shop.tab].items.slice(pg * SHOP_PER_PAGE, pg * SHOP_PER_PAGE + SHOP_PER_PAGE); }; // 지금 페이지의 물품
+  const shopPage = (d) => { const n = shopPages(); shop.page = Math.max(0, Math.min(n - 1, (shop.page || 0) + d)); shop.hover = -1; };
 
   // 상점 물품 하나를 산다 (숫자 키와 마우스 클릭이 같이 쓴다)
   // 꾸미기 창에서 장식품 하나를 놓거나(치우기 포함) 한다
@@ -1171,9 +1286,13 @@
     }
     const tabs = shop.def.tabs.length;
     if (tabs > 1) {
+      const was = shop.tab;
       if (input.wasPressed('ArrowRight') || input.wasPressed('KeyD')) shop.tab = (shop.tab + 1) % tabs;
       if (input.wasPressed('ArrowLeft') || input.wasPressed('KeyA')) shop.tab = (shop.tab + tabs - 1) % tabs;
+      if (shop.tab !== was) shop.page = 0;
     }
+    if (input.wasPressed('ArrowDown') || input.wasPressed('KeyS') || input.wasPressed('PageDown')) shopPage(1); // 물품이 4개를 넘으면 페이지 넘김
+    if (input.wasPressed('ArrowUp') || input.wasPressed('KeyW') || input.wasPressed('PageUp')) shopPage(-1);
     shopItems().forEach((item, i) => {
       if (input.wasPressed('Digit' + (i + 1)) || input.wasPressed('Numpad' + (i + 1))) buyItem(item);
     });
@@ -1190,6 +1309,42 @@
     lives = r.lives;
     G.Audio.play(r.ok ? 'pickup' : 'deny');
     return r;
+  }
+
+  // 최고 장착 핵심: 방어구 5칸(갑옷·투구·장갑·바지·신발)을 가진 것 중 가장 좋은 것(powerOf 점수)으로 맞춘다. 바꾼 아이템 이름 목록을 돌려준다
+  function equipBestCore() {
+    const changed = [];
+    for (const slot of ['armor', 'helmet', 'gloves', 'pants', 'boots']) {
+      const cur = inv.equipped[slot] ? G.Shop.ITEMS[inv.equipped[slot]] : null;
+      let best = cur;
+      let bp = cur ? G.Shop.powerOf(cur, inv) : -1;
+      for (const id of inv.items) {
+        const it = G.Shop.ITEMS[id];
+        if (!it || it.slot !== slot) continue;
+        const p = G.Shop.powerOf(it, inv);
+        if (p > bp + 1e-9) { best = it; bp = p; }
+      }
+      if (best && best !== cur) { inv.equipped[slot] = best.id; changed.push(best.name); }
+    }
+    if (changed.length) applyEquipment();
+    return changed;
+  }
+
+  // 인벤토리의 최고 장착 버튼 / H 키
+  function equipBest() {
+    const e = equipUI;
+    const changed = equipBestCore();
+    if (changed.length) {
+      e.msg = `최고 장착! ${changed.length}곳을 바꿨다: ${changed.join(', ')}`;
+      e.ok = true;
+      G.Audio.play('catch');
+    } else {
+      e.msg = '이미 가장 좋은 옷차림이에요!';
+      e.ok = true;
+      G.Audio.play('pickup');
+    }
+    e.msgT = 2.2;
+    return changed.length;
   }
 
   // 선택한 칸의 아이템을 쓴다: 장비는 장착(이미 낀 장갑/신발은 해제, 무기·갑옷은 벗을 수 없음), 물약은 마신다
@@ -1227,6 +1382,10 @@
         e.ok = false;
         G.Audio.play('deny');
       }
+    } else if (item.slot === 'weapon' && duelBlocks(item.id)) {
+      e.msg = duelBlocks(item.id);
+      e.ok = false;
+      G.Audio.play('deny');
     } else {
       inv.equipped[item.slot] = item.id;
       applyEquipment();
@@ -1246,6 +1405,7 @@
     }
     const cats = G.Shop.CATEGORIES;
     if (pressed('KeyQ')) cycleSort();
+    if (pressed('KeyH')) equipBest();
     if (pressed('KeyC')) cycleSub();
     if (pressed('Tab')) {
       const k = (cats.findIndex((c) => c.id === e.cat) + 1) % cats.length;
@@ -1365,6 +1525,8 @@
     const id = inv.hotbar[i];
     if (!id || !inv.items.includes(id)) return;
     if (inv.equipped.weapon === id) return;
+    const blocked = duelBlocks(id);
+    if (blocked) { say(blocked, 'rgba(255,170,170,A)'); G.Audio.play('deny'); return; }
     inv.equipped.weapon = id;
     applyEquipment();
     G.Audio.play('catch');
@@ -1373,6 +1535,7 @@
 
   // ---------- 개발 메뉴 (F1): 앞으로 모든 테스트 기능은 여기에 모은다 ----------
   let devUI = null; // {cur, scroll, msg, msgT, fresh}
+  let settingsUI = null; // 설정 창 {cur}
   let god = false;  // 무적
   // 마을의 가게 앞으로 간다 (개발 메뉴의 순간이동)
   function goVillageShop(kind) {
@@ -1383,6 +1546,19 @@
       camera.follow(player, terrain, C.DT, true);
     }
   }
+  // 마을/다크월드 입구의 가게 앞으로 간다 (stage = 'village' | 'darkhub')
+  function goShop(stage, kind) {
+    if (stage === 'darkhub') { story.revealed = true; story.pending = false; }
+    loadStage(stage, true);
+    const sh = terrain.shops.find((q) => q.kind === kind);
+    if (sh) {
+      player.placeAt(sh.col * C.TILE + C.TILE / 2 - player.w / 2 - 70, (sh.row + 1) * C.TILE - player.h);
+      camera.follow(player, terrain, C.DT, true);
+    }
+  }
+
+  // 개발 메뉴 항목. { head } 는 가로 탭 이름이다 (그 아래 항목들이 그 탭에 들어간다).
+  // img = 지역 사진 파일 이름 (assets/regions/<img>.png). 사진이 있는 항목은 "이름 아래에 사진" 카드로 보인다
   function devItems() {
     const goto = (fn) => () => { cutscene = null; devUI = null; fn(); };
     const goFloor = (n) => { story.revealed = true; story.pending = false; darkFloor = Math.max(1, Math.min(C.DUNGEON_FLOORS, n)); loadStage('dungeon', true); };
@@ -1396,31 +1572,49 @@
       }
       return n;
     };
+    const shopGo = (stage, kind) => goto(() => goShop(stage, kind));
     return [
-      { head: '순간이동 · 지상' },
-      { label: '해변', run: goto(() => loadStage('beach', true)) },
-      { label: '마을', run: goto(() => loadStage('village', true)) },
-      { label: '마을 동굴 (새로 생성)', run: goto(() => enterMine()) },
-      { label: '놀이마당: 야바위', hint: '마을 왼쪽', run: goto(() => goVillageShop('mgshell')) },
-      { label: '놀이마당: 맞추기', hint: '숲 문 옆', run: goto(() => goVillageShop('mgtarget')) },
-      { label: '놀이마당: 다른 용사와 결투', hint: '마을 오른쪽', run: goto(() => goVillageShop('mgduel')) },
-      { label: '놀이마당: 총게임', hint: '마을 맨 오른쪽', run: goto(() => goVillageShop('mggun')) },
-      { label: '우리 집', run: goto(() => loadStage('home', true)) },
-      { label: '숲', hint: '왕슬라임 · 샘물', run: goto(() => loadStage('forest', true)) },
-      { label: '설산', hint: '털복숭이 침팬지', run: goto(() => loadStage('snow', true)) },
-      { label: '화산', hint: '용 · 신성의 제단', run: goto(() => loadStage('volcano', true)) },
-      { head: '순간이동 · 다크월드' },
-      { label: '다크월드 입구', hint: '상점들', run: goto(() => { story.revealed = true; story.pending = false; loadStage('darkhub', true); }) },
-      { label: '던전 1층', run: goto(() => goFloor(1)) },
-      { label: '던전 위층 (+1)', hint: `지금 ${darkFloor}층`, run: goto(() => goFloor(darkFloor + 1)) },
-      { label: '던전 아래층 (-1)', hint: `지금 ${darkFloor}층`, run: goto(() => goFloor(darkFloor - 1)) },
-      { label: '10층', run: goto(() => goFloor(10)) },
-      { label: '33층 보스', hint: '정의의 어둠돌', run: goto(() => goFloor(33)) },
-      { label: '50층', run: goto(() => goFloor(50)) },
-      { label: '66층 보스', hint: '정의의 어둠', run: goto(() => goFloor(66)) },
-      { label: '90층', run: goto(() => goFloor(90)) },
-      { label: '100층 보스', hint: '어둠의 기사 시크너', run: goto(() => goFloor(100)) },
-      { head: '플레이어에게 주기' },
+      { head: '지상' },
+      { label: '해변', hint: '낯선 해변', img: 'beach', run: goto(() => loadStage('beach', true)) },
+      { label: '마을', hint: '가게 · 문', img: 'village', run: goto(() => loadStage('village', true)) },
+      { label: '마을 동굴', hint: '새로 생성', img: 'mine', run: goto(() => enterMine()) },
+      { label: '광물 동굴', hint: '곡괭이로 광석 채굴', img: 'orecave', run: goto(() => loadStage('orecave', true)) },
+      { label: '우리 집', hint: '꾸미기', img: 'home', run: goto(() => loadStage('home', true)) },
+      { label: '숲', hint: '왕슬라임 · 샘물', img: 'forest', run: goto(() => loadStage('forest', true)) },
+      { label: '설산', hint: '털복숭이 침팬지', img: 'snow', run: goto(() => loadStage('snow', true)) },
+      { label: '화산', hint: '용 · 신성의 제단', img: 'volcano', run: goto(() => loadStage('volcano', true)) },
+      { label: '시작 동굴', hint: '첫 동굴 (보물 지도)', img: 'cave', run: goto(() => loadStage('cave', true)) },
+      { head: '다크월드' },
+      { label: '다크월드 입구', hint: '상점들', img: 'darkhub', run: goto(() => { story.revealed = true; story.pending = false; loadStage('darkhub', true); }) },
+      { label: '던전 1층', hint: '어둠의 탑', img: 'd1', run: goto(() => goFloor(1)) },
+      { label: '던전 3층', hint: '이벤트 층 (3층마다)', img: 'd3', run: goto(() => goFloor(3)) },
+      { label: '던전 10층', img: 'd10', run: goto(() => goFloor(10)) },
+      { label: '33층 보스', hint: '정의의 어둠돌', img: 'd33', run: goto(() => goFloor(33)) },
+      { label: '던전 50층', img: 'd50', run: goto(() => goFloor(50)) },
+      { label: '66층 보스', hint: '정의의 어둠', img: 'd66', run: goto(() => goFloor(66)) },
+      { label: '던전 90층', img: 'd90', run: goto(() => goFloor(90)) },
+      { label: '100층 보스', hint: '시크너', img: 'd100', run: goto(() => goFloor(100)) },
+      { label: '던전 위층 (+1)', hint: `지금 ${darkFloor}층`, img: 'd1', run: goto(() => goFloor(darkFloor + 1)) },
+      { label: '던전 아래층 (-1)', hint: `지금 ${darkFloor}층`, img: 'd1', run: goto(() => goFloor(darkFloor - 1)) },
+      { head: '마을 가게' },
+      { label: '대장간', hint: '합치기 · 제련 · 부착', img: 'shop_sword', run: shopGo('village', 'sword') },
+      { label: '특수 무기 상점', hint: '창 · 도끼 · 망치 …', img: 'shop_weapon2', run: shopGo('village', 'weapon2') },
+      { label: '갑옷 가게', img: 'shop_armor', run: shopGo('village', 'armor') },
+      { label: '바지 가게', img: 'shop_pants', run: shopGo('village', 'pants') },
+      { label: '물약 상점', img: 'shop_potion', run: shopGo('village', 'potion') },
+      { label: '동굴 보상 상점', hint: '업그레이드', img: 'shop_mine', run: shopGo('village', 'mine') },
+      { label: '부동산', img: 'shop_estate', run: shopGo('village', 'estate') },
+      { label: '인테리어 가게', img: 'shop_decor', run: shopGo('village', 'decor') },
+      { label: '다크 무기 상점', hint: '폭탄 · 총 · 활', img: 'shop_dweapon', run: shopGo('darkhub', 'dweapon') },
+      { label: '다크 갑옷 가게', img: 'shop_darmor', run: shopGo('darkhub', 'darmor') },
+      { label: '다크 아이템 상점', img: 'shop_ditem', run: shopGo('darkhub', 'ditem') },
+      { label: '강화소 (EXP)', img: 'shop_dupgrade', run: shopGo('darkhub', 'dupgrade') },
+      { head: '놀이마당' },
+      { label: '야바위', hint: '마을 왼쪽', img: 'mg_shell', run: shopGo('village', 'mgshell') },
+      { label: '맞추기', hint: '숲 문 옆', img: 'mg_target', run: shopGo('village', 'mgtarget') },
+      { label: '다른 용사와 결투', hint: '마을 오른쪽', img: 'mg_duel', run: shopGo('village', 'mgduel') },
+      { label: '총게임', hint: '마을 맨 오른쪽', img: 'mg_gun', run: shopGo('village', 'mggun') },
+      { head: '자원' },
       { label: '코인 +1,000', run: give('코인 +1,000', () => { coins += 1000; }) },
       { label: '코인 +10,000', run: give('코인 +10,000', () => { coins += 10000; }) },
       { label: '코인 +100,000', run: give('코인 +100,000', () => { coins += 100000; }) },
@@ -1428,22 +1622,55 @@
       { label: '경험치 +10,000', run: give('경험치 +10,000', () => { exp += 10000; }) },
       { label: '피 가득 채우기', run: give('피를 가득 채웠다', () => { lives = maxLives(); }) },
       { label: '스태미나 가득 채우기', run: give('스태미나를 가득 채웠다', () => { stamina = stMax(); }) },
+      { head: '소모품·재료' },
       { label: '회복 물약 5개씩', hint: '작은 + 큰', run: give('물약 5개씩', () => { inv.potions.potion1 += 5; inv.potions.potion2 += 5; }) },
       { label: '스태미나 물약 5개씩', hint: '30% + 70%', run: give('스태미나 물약 5개씩', () => { addC('st30', 5); addC('st70', 5); }) },
       { label: '얼음 폭탄 5개', run: give('얼음 폭탄 5개', () => addC('icebomb', 5)) },
       { label: '어둠의 크리스탈 +1', run: give('어둠의 크리스탈 +1', () => addM('darkcrystal')) },
       { label: '정화된 크리스탈 +1', run: give('정화된 크리스탈 +1', () => addM('cleancrystal')) },
       { label: '신성 크리스탈 +1', run: give('신성 크리스탈 +1', () => addM('holycrystal')) },
-      { label: '모든 무기 받기', run: give('모든 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon'); devUI.msg = `무기 ${n}개를 받았다`; }) },
-      { label: '모든 방어구 받기', hint: '갑옷 · 투구 · 장갑 · 신발', run: give('모든 방어구를 받았다', () => { const n = giveItems((it) => it.slot !== 'weapon'); devUI.msg = `방어구 ${n}개를 받았다`; }) },
+      { head: '장비' },
+      { label: '모든 무기 받기', hint: '합성 무기 제외', run: give('모든 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon' && !it.tier); devUI.msg = `무기 ${n}개를 받았다`; }) },
+      { label: '합성 무기 모두 받기', hint: '강화된 · 최강의', run: give('합성 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon' && !!it.tier); devUI.msg = `합성 무기 ${n}개를 받았다`; }) },
+      { label: '모든 방어구 받기', hint: '갑옷 · 투구 · 장갑 · 바지 · 신발', run: give('모든 방어구를 받았다', () => { const n = giveItems((it) => it.slot !== 'weapon'); devUI.msg = `방어구 ${n}개를 받았다`; }) },
+      { label: '방어구 최고 장착', hint: '가진 것 중 제일 좋은 것으로', run: give('방어구를 최고로 맞췄다', () => { const c = equipBestCore(); devUI.msg = c.length ? `${c.length}곳을 바꿨다` : '이미 가장 좋은 옷차림'; }) },
+      { label: '기본 검 3자루 받기', hint: '합치기 연습', run: give('기본 검 3자루', () => { G.Forge.addCopy(inv, 'sword0', 3); }) },
+      { label: '시작 장비로 되돌리기', hint: '목검 + 허름한 옷', run: give('시작 장비로 되돌렸다', () => { const f = G.Shop.newInventory(); inv.items = f.items; inv.copies = f.copies; inv.attach = f.attach; inv.hotbar = f.hotbar; inv.equipped = f.equipped; inv.wlevel = {}; inv.holy = {}; G.Forge.markDirty(); applyEquipment(); }) },
+      { head: '광물' },
+      { label: '곡괭이 4종 받기', hint: '나무 · 철 · 강철 · 미스릴', run: give('곡괭이를 모두 받았다', () => { for (const p of G.Forge.PICKS) if (!inv.items.includes(p.id)) inv.items.push(p.id); G.Forge.markDirty(); }) },
+      { label: '검용 광석 +6씩', hint: '철 구리 은 금 …', run: give('검용 광석 +6', () => { for (const o of G.Forge.ORES) if (o.cls === 'sword') inv.ores[o.id] = (inv.ores[o.id] || 0) + 6; G.Forge.markDirty(); }) },
+      { label: '총용 광석 +6씩', hint: '초석 납 황철석 …', run: give('총용 광석 +6', () => { for (const o of G.Forge.ORES) if (o.cls === 'gun') inv.ores[o.id] = (inv.ores[o.id] || 0) + 6; G.Forge.markDirty(); }) },
+      { label: '모든 주괴 +2씩', hint: '제련 없이 바로', run: give('주괴 +2', () => { for (const o of G.Forge.ORES) inv.ingots[o.id] = (inv.ingots[o.id] || 0) + 2; G.Forge.markDirty(); }) },
+      { head: '설정' },
       { label: `무적 ${god ? '끄기' : '켜기'}`, hint: god ? '지금 켜짐' : '지금 꺼짐', run: () => { god = !god; devUI.msg = god ? '무적 켜짐' : '무적 꺼짐'; devUI.msgT = 2; G.Audio.play('pickup'); } },
       { label: '시크너 이야기 건너뛰기', hint: '다크월드 열기', run: give('다크월드가 열렸다', () => { story.revealed = true; story.pending = false; }) },
+      { label: '오프닝 컷신 다시 보기', hint: '보물 지도', run: goto(() => { loadStage('cave', true); cutscene = new G.Cutscene(terrain, player); }) },
     ];
   }
 
+  // 개발 메뉴를 { head } 기준으로 가로 탭들로 나눈다: [{ name, items }]
+  function devTabs() {
+    const tabs = [];
+    for (const it of devItems()) {
+      if (it.head) tabs.push({ name: it.head, items: [] });
+      else tabs[tabs.length - 1].items.push(it);
+    }
+    return tabs;
+  }
+  // 지금 탭의 항목, 사진 카드 여부, 칸 배치
+  function devLayout() {
+    const tabs = devTabs();
+    const d = devUI;
+    d.tab = Math.max(0, Math.min(tabs.length - 1, d.tab || 0));
+    const items = tabs[d.tab].items;
+    const photo = items.some((q) => q.img);
+    const geo = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, tabs.length, items.length, photo, d.scroll);
+    return { tabs, items, photo, geo };
+  }
+  const devSetTab = (t) => { devUI.tab = t; devUI.cur = 0; devUI.scroll = 0; G.Audio.play('catch'); };
+
   function updateDev(dt) {
     const d = devUI;
-    const items = devItems();
     const pressed = (...codes) => codes.some((c) => input.wasPressed(c));
     const fresh = d.fresh;
     d.fresh = false;
@@ -1451,23 +1678,30 @@
       devUI = null;
       return;
     }
-    const move = (dir) => {
-      let i = d.cur;
-      do { i += dir; } while (i >= 0 && i < items.length && items[i].head);
-      if (i >= 0 && i < items.length) d.cur = i;
-    };
-    if (pressed('ArrowDown', 'KeyS')) move(1);
-    if (pressed('ArrowUp', 'KeyW')) move(-1);
+    let L = devLayout();
+    const nTabs = L.tabs.length;
+    // 가로 탭: Tab / Shift+Tab, PageUp / PageDown (방향키는 칸 이동에 쓴다)
+    if (pressed('Tab')) devSetTab((d.tab + (input.down.has('ShiftLeft') || input.down.has('ShiftRight') ? nTabs - 1 : 1)) % nTabs);
+    if (pressed('PageDown')) devSetTab((d.tab + 1) % nTabs);
+    if (pressed('PageUp')) devSetTab((d.tab + nTabs - 1) % nTabs);
+    L = devLayout();
+    const n = L.items.length;
+    const cols = L.geo.cols;
+    if (pressed('ArrowRight', 'KeyD')) d.cur = Math.min(n - 1, d.cur + 1);
+    if (pressed('ArrowLeft', 'KeyA')) d.cur = Math.max(0, d.cur - 1);
+    if (pressed('ArrowDown', 'KeyS')) d.cur = Math.min(n - 1, d.cur + cols);
+    if (pressed('ArrowUp', 'KeyW')) d.cur = Math.max(0, d.cur - cols);
     if (pressed('Enter', 'NumpadEnter', 'KeyE', 'Space')) {
-      const it = items[d.cur];
+      const it = L.items[d.cur];
       if (it && it.run) it.run();
       if (!devUI) return;
     }
-    const vis = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, items.length, 0).visible;
-    if (d.cur < d.scroll) d.scroll = d.cur;
-    if (d.cur >= d.scroll + vis) d.scroll = d.cur - vis + 1;
-    if (d.cur <= 1) d.scroll = 0;
-    d.scroll = Math.max(0, Math.min(Math.max(0, items.length - vis), d.scroll));
+    // 고른 칸이 보이도록 스크롤 (줄 단위)
+    const row = Math.floor(d.cur / cols);
+    const vis = L.geo.rowsVisible;
+    if (row < d.scroll) d.scroll = row;
+    if (row >= d.scroll + vis) d.scroll = row - vis + 1;
+    d.scroll = Math.max(0, Math.min(Math.max(0, L.geo.totalRows - vis), d.scroll));
     d.msgT = Math.max(0, d.msgT - dt);
   }
 
@@ -1536,24 +1770,25 @@
       d.y = p.y;
       if (!d.active && Math.hypot(p.x - d.sx, p.y - d.sy) > 8) d.active = true;
     }
-    if (devUI) { // 버튼 위에 올리면 선택
-      const items = devItems();
-      const geo = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, items.length, devUI.scroll);
-      const r = geo.rows.find((q) => inRect(p, q));
-      if (r && !items[r.idx].head) devUI.cur = r.idx;
+    if (devUI) { // 칸 위에 올리면 선택
+      const L = devLayout();
+      const c = L.geo.cells.find((q) => inRect(p, q));
+      if (c) devUI.cur = c.idx;
     } else if (equipUI) { // 칸 위에 올리면 선택
       const i = G.Renderer.equipGeometry(C.VIEW_W, C.VIEW_H).cells.findIndex((c) => inRect(p, c));
       if (i >= 0) { equipUI.cur = i + equipUI.scroll * INV_COLS; equipUI.followCur = false; }
     } else if (shop) { // 물품 줄 위에 올리면 강조
-      shop.hover = G.Renderer.shopGeometry(C.VIEW_W, C.VIEW_H, shop.def, shop.tab).rows.findIndex((r) => inRect(p, r));
+      shop.hover = G.Renderer.shopGeometry(C.VIEW_W, C.VIEW_H, shop.def, shop.tab, shop.page || 0).rows.findIndex((r) => inRect(p, r));
     }
   });
   canvas.addEventListener('wheel', (ev) => { // 휠: 인벤토리/개발 메뉴 스크롤
     if (devUI) {
       ev.preventDefault();
-      const n = devItems().length;
-      const vis = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, n, 0).visible;
-      devUI.scroll = Math.max(0, Math.min(Math.max(0, n - vis), devUI.scroll + (ev.deltaY > 0 ? 1 : -1)));
+      const L = devLayout();
+      devUI.scroll = Math.max(0, Math.min(Math.max(0, L.geo.totalRows - L.geo.rowsVisible), devUI.scroll + (ev.deltaY > 0 ? 1 : -1)));
+    } else if (shop && shopPages() > 1) {
+      ev.preventDefault();
+      shopPage(ev.deltaY > 0 ? 1 : -1);
     } else if (equipUI) {
       ev.preventDefault();
       const entries = G.Shop.gridEntries(inv, equipUI.cat);
@@ -1567,14 +1802,25 @@
     if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
     if (mini) { mini.click = p; mini.mouse = p; mini.useMouse = true; return; }
-    if (devUI) { // 버튼 클릭 = 실행
-      const items = devItems();
-      const geo = G.Renderer.devGeometry(C.VIEW_W, C.VIEW_H, items.length, devUI.scroll);
-      const r = geo.rows.find((q) => inRect(p, q));
-      if (r && !items[r.idx].head && items[r.idx].run) { devUI.cur = r.idx; items[r.idx].run(); }
+    if (settingsUI) { // 설정 창: 줄 클릭 = 토글, 음량 막대 클릭 = 그 위치로
+      const L = G.Renderer.settingsRows(C.VIEW_W, C.VIEW_H);
+      const i = L.rows.findIndex((r) => inRect(p, r));
+      if (i < 0) return;
+      settingsUI.cur = i;
+      if (i === 0) { if (p.x >= L.bar.x - 6 && p.x <= L.bar.x + L.bar.w + 6) { G.Audio.setMusicVolume(Math.round(((p.x - L.bar.x) / L.bar.w) * 20) / 20); G.Settings.save(); G.Audio.play('catch'); } }
+      else changeSetting(i, 0);
+      return;
+    }
+    if (devUI) { // 탭 클릭 = 분류 전환, 칸 클릭 = 실행
+      const L = devLayout();
+      const t = L.geo.tabs.findIndex((r) => inRect(p, r));
+      if (t >= 0) { devSetTab(t); return; }
+      const c = L.geo.cells.find((q) => inRect(p, q));
+      if (c && L.items[c.idx].run) { devUI.cur = c.idx; L.items[c.idx].run(); }
     } else if (equipUI) { // 탭 클릭 = 분류, 칸 클릭 = 장착. 왼쪽 장착 슬롯 클릭 = 그 아이템이 있는 칸을 가리킴
       const geo = G.Renderer.equipGeometry(C.VIEW_W, C.VIEW_H);
       if (inRect(p, geo.sort)) { cycleSort(); return; }
+      if (inRect(p, geo.best)) { equipBest(); return; }
       const subs = G.Shop.subList(inv, equipUI.cat);
       const si = subs.findIndex((sb, i) => inRect(p, geo.chip(i, subs.length)));
       if (si >= 0) { setSub(subs[si].id); return; }
@@ -1595,13 +1841,16 @@
         }
       }
     } else if (shop) { // 탭 클릭 = 전환, 물품 줄 클릭 = 구매
-      const geo = G.Renderer.shopGeometry(C.VIEW_W, C.VIEW_H, shop.def, shop.tab);
+      const geo = G.Renderer.shopGeometry(C.VIEW_W, C.VIEW_H, shop.def, shop.tab, shop.page || 0);
       const t = geo.tabs.findIndex((r) => inRect(p, r));
       if (t >= 0) {
         shop.tab = t;
+        shop.page = 0;
         shop.hover = -1;
         return;
       }
+      if (geo.pager && inRect(p, geo.pager.prev)) { shopPage(-1); return; }
+      if (geo.pager && inRect(p, geo.pager.next)) { shopPage(1); return; }
       const row = geo.rows.findIndex((r) => inRect(p, r));
       if (row >= 0) buyItem(shopItems()[row]);
     }
@@ -1904,13 +2153,38 @@
     }
   }
 
+  // 설정 값을 바꾼다 (dir: -1/+1 = 음량 조절 또는 토글, 0 = 토글만)
+  const SETTING_KEYS = ['music', 'dmgNum', 'parrySound', 'sparkle', 'shake'];
+  function changeSetting(i, dir) {
+    const S = G.Settings;
+    if (i === 0) { if (dir) G.Audio.setMusicVolume(Math.round((S.music + dir * 0.1) * 10) / 10); }
+    else S[SETTING_KEYS[i]] = !S[SETTING_KEYS[i]];
+    S.save();
+    G.Audio.play('catch');
+  }
+  function updateSettings() {
+    const pressed = (...c) => c.some((k) => input.wasPressed(k));
+    if (pressed('Escape', 'KeyO')) { settingsUI = null; return; }
+    if (pressed('ArrowUp')) settingsUI.cur = (settingsUI.cur + 4) % 5;
+    if (pressed('ArrowDown')) settingsUI.cur = (settingsUI.cur + 1) % 5;
+    if (pressed('ArrowLeft')) changeSetting(settingsUI.cur, -1);
+    else if (pressed('ArrowRight')) changeSetting(settingsUI.cur, 1);
+    else if (pressed('Enter', 'Space')) changeSetting(settingsUI.cur, settingsUI.cur === 0 ? 1 : 0);
+  }
+
   function step(dt) {
     if (!devUI && input.wasPressed('F1')) { // F1: 개발 메뉴 (모든 테스트 기능)
-      devUI = { cur: 1, scroll: 0, msg: '', msgT: 0, fresh: true };
+      devUI = { tab: 0, cur: 0, scroll: 0, msg: '', msgT: 0, fresh: true };
       G.Audio.play('pickup');
     }
     if (devUI) { // 메뉴가 열려 있는 동안 게임이 멈춘다
       updateDev(dt);
+      input.endFrame();
+      return;
+    }
+    if (!settingsUI && input.wasPressed('KeyO') && !shop && !equipUI && !mini && !cutscene) { settingsUI = { cur: 0 }; G.Audio.play('pickup'); input.endFrame(); return; }
+    if (settingsUI) { // 설정 창이 열려 있는 동안 게임이 멈춘다
+      updateSettings();
       input.endFrame();
       return;
     }
@@ -1992,7 +2266,7 @@
       popups[i].y -= 24 * dt;
       if (popups[i].t <= 0) popups.splice(i, 1);
     }
-    if (input.wasPressed('KeyE')) { // 상점 열기 / 마을 사람과 대화
+    if (input.wasPressed('KeyE') && !(stageName === 'dungeon' && dungeonEvents.interact()) && !(stageName === 'orecave' && oreNodes.interact())) { // 상점 열기 / 마을 사람과 대화 (던전에서는 가까운 이벤트가 먼저)
       const near = nearbyInteract();
       if (near && near.type === 'shop' && near.shop.kind.startsWith('mg')) { // 놀이마당
         openMini(near.shop.kind.slice(2));
@@ -2100,14 +2374,15 @@
       }
       const weaponDef = G.Shop.ITEMS[inv.equipped.weapon];
       if (weaponDef.shot) { // 폭탄/총/활: 패링 버튼을 누를 때마다 쏜다 (스태미나가 든다)
-        if (stamina < weaponDef.stamina) {
+        const shotCost = Math.max(4, weaponDef.stamina + equipStats.staminaAdd); // 티타늄 같은 주괴를 붙이면 덜 든다
+        if (stamina < shotCost) {
           popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '스태미나 부족!', t: 0.8, color: 'rgba(255,170,170,A)' });
           G.Audio.play('deny');
         } else {
-          stamina -= weaponDef.stamina;
+          stamina -= shotCost;
           staminaWait = 0.8;
           const h = player.hand;
-          G.Magic.cast(magic, weaponDef.shot, h.x + player.facing * 26, h.y - 2, player.facing, terrain, magicTargets(), magicHooks, { dmg: weaponDef.dmg + equipStats.dmgBonus, radius: (weaponDef.radius || 0) * C.TILE, pierce: weaponDef.pierce, count: weaponDef.count });
+          G.Magic.cast(magic, weaponDef.shot, h.x + player.facing * 26, h.y - 2, player.facing, terrain, magicTargets(), magicHooks, { dmg: weaponDef.dmg + equipStats.dmgBonus, radius: weaponDef.radius ? (weaponDef.radius + equipStats.radiusAdd) * C.TILE : 0, pierce: weaponDef.pierce || equipStats.pierceAdd, count: weaponDef.count });
           G.Audio.play(weaponDef.shot === 'bullet' ? 'gun' : weaponDef.shot === 'arrow' ? 'bow' : 'throw');
         }
       } else if (weaponDef.element) { // 지팡이: 패링할 때마다 지팡이 끝에서 원소가 나간다
@@ -2151,13 +2426,13 @@
         if (s.golden) effects.treasure(s.x + s.w / 2, s.y + s.h / 2); // 황금박쥐는 금화가 쏟아진다
         const base = s.kind === 'darkstone' ? C.DARKSTONE_COIN : s.kind === 'shade' ? C.SHADE_COIN : s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'golem' ? C.GOLEM_COIN : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
         const floorMul = STAGES[stageName].dark ? 1 + darkFloor * 0.05 : 1; // 던전은 올라갈수록 코인과 경험치가 늘어난다
-        const drop = Math.round(base * floorMul * (G.Shop.ITEMS[inv.equipped.weapon].elem === 'gold' ? 1.5 : 1) * (1 + G.Shop.homeBonuses(inv).coin)); // 황금 검은 코인 +50%, 집 장식 보너스
+        const drop = Math.round(base * floorMul * (G.Shop.ITEMS[inv.equipped.weapon].elem === 'gold' ? 1.5 : 1) * (1 + G.Shop.homeBonuses(inv).coin) * dungeonEvents.rewardMul()); // 황금 검은 코인 +50%, 집 장식 보너스, 던전 층 이벤트(혈월 등)
         if (drop) {
           coins += drop;
           popups.push({ x: s.x + s.w / 2, y: s.y - 6, text: `+${drop} G`, t: 1.2 });
           G.Audio.play('coin');
         }
-        const gain = Math.round(({ slime: C.SLIME_EXP, bat: C.BAT_EXP, crab: C.CRAB_EXP, golem: C.GOLEM_EXP, darkstone: C.DARKSTONE_EXP, shade: C.SHADE_EXP }[s.kind] || 0) * (STAGES[stageName].dark ? 1 + darkFloor * 0.1 : 1)); // 경험치: 슬라임 1, 박쥐 2, 꽃게 3, 흙골렘 3 (던전은 층마다 늘어난다)
+        const gain = Math.round(({ slime: C.SLIME_EXP, bat: C.BAT_EXP, crab: C.CRAB_EXP, golem: C.GOLEM_EXP, darkstone: C.DARKSTONE_EXP, shade: C.SHADE_EXP }[s.kind] || 0) * (STAGES[stageName].dark ? 1 + darkFloor * 0.1 : 1) * dungeonEvents.rewardMul()); // 경험치: 슬라임 1, 박쥐 2, 꽃게 3, 흙골렘 3 (던전은 층마다 늘어난다)
         if (STAGES[stageName].dark && !s.noExp && Math.random() < 0.07) pickups.push({ x: s.x + s.w / 2, y: s.y + s.h - 16, id: PICKUP_TABLE[Math.floor(Math.random() * PICKUP_TABLE.length)], t: 0 }); // 가끔 아이템을 떨어뜨린다
         const wd = G.Shop.ITEMS[inv.equipped.weapon];
         if (wd.elem === 'reap' && !s.noExp) { // 낫: 처치하면 스태미나를 거둔다
@@ -2249,6 +2524,8 @@
       for (const sl of ['armor', 'helmet', 'gloves', 'boots']) { const id = inv.equipped[sl]; if (id) inv.used[id] = (inv.used[id] || 0) + 1; }
     }
     updatePickups(dt);
+    if (stageName === 'dungeon') dungeonEvents.update(dt);
+    if (stageName === 'orecave') oreNodes.update(dt, input.down.has('KeyE')); // E 길게: 곡괭이질
     if (chest && !won && stageName === 'dungeon' && player.overlaps(chest)) { // 던전: 위층으로 오르는 계단
       clearFloor();
       input.endFrame();
@@ -2360,7 +2637,8 @@
       caveInfo: stageName === 'mine' ? { level: mineRun, coins: Math.round(STAGES.mine.chest.coins * (1 + G.Shop.homeBonuses(inv).coin)) } : null,
       weakText: analysisText(),
       hotbar: inv.hotbar, weaponId: inv.equipped.weapon,
-      dev: devUI ? Object.assign({}, devUI, { items: devItems().map((q) => ({ head: q.head, label: q.label, hint: q.hint })) }) : null,
+      settings: settingsUI,
+      dev: devUI ? (() => { const L = devLayout(); return Object.assign({}, devUI, { tabs: L.tabs.map((t) => t.name), photo: L.photo, items: L.items.map((q) => ({ label: q.label, hint: q.hint, img: q.img })) }); })() : null,
       home: stageName === 'home' ? Object.assign({ total: G.Home.houseDef(inv.home.type).floor + G.Home.houseDef(inv.home.type).wall }, G.Shop.homeBonuses(inv)) : null,
       slimeCount: monsters.filter((m) => m.kind === 'slime' && m.alive).length,
       batCount: monsters.filter((m) => m.kind === 'bat' && m.alive).length,
@@ -2368,7 +2646,7 @@
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
       won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, equip: equipView, boss: bossOn() ? boss : null,
-    }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
+    }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   requestAnimationFrame(frame);
 
@@ -2389,7 +2667,7 @@
     get cutscene() { return cutscene; },
     get stamina() { return stamina; },
     set stamina(v) { stamina = v; },
-    story, pickups, enemyShots,
+    story, pickups, enemyShots, dungeonEvents, oreNodes, spawnDungeonMonster,
     get darkFloor() { return darkFloor; },
     set darkFloor(v) { darkFloor = v; },
     get darkBest() { return darkBest; },
@@ -2401,6 +2679,7 @@
     get shop() { return shop; },
     get equip() { return equipUI; },
     get dev() { return devUI; },
+    get settings() { return settingsUI; },
     get mini() { return mini; },
     get duelRun() { return duelRun; },
     get analysis() { return analysis; },
