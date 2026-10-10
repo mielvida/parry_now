@@ -545,6 +545,7 @@
     volcano: { name: '화산', a: '#ff7a2a', b: '#ffe08a' },
     darkhub: { name: '다크월드', a: '#5a1a8a', b: '#d9a0ff' },
     dungeon: { name: '던전', a: '#2a0a3a', b: '#ff6a8a' },
+    kingdom: { name: '왕국', a: '#d4a017', b: '#fff2b0' },
     orecave: { name: '광물 동굴', a: '#4a3320', b: '#ffd68a' },
   };
   // 차원문: 룬이 새겨진 돌 아치, 안쪽에서 소용돌이치는 빛, 문 주위를 도는 룬, 문 안으로 빨려 드는 빛 알갱이, 하늘로 솟는 빛기둥
@@ -758,7 +759,8 @@
         G.Home.drawLot(ctx, terrain.home && terrain.home.type, bx, (Y.row + 1) * TILE, time);
       }
       for (const G2 of terrain.gates) {
-        if (G2.stage === 'darkhub' && !(terrain.story && terrain.story.revealed)) continue; // 시크너 이야기를 본 뒤에만 다크월드 문이 보인다
+        if (G2.stage === 'darkhub' && !(terrain.story && terrain.story.revealed)) continue;
+        if (G2.stage === 'kingdom' && !(terrain.story && terrain.story.cleared)) continue; // 시크너를 쓰러뜨린 뒤(챕터 2)에만 왕국의 문이 열린다 // 시크너 이야기를 본 뒤에만 다크월드 문이 보인다
         const bx = G2.col * TILE + TILE / 2;
         if (bx < camera.x - 100 || bx > camera.x + view) continue;
         drawGate(ctx, G2, bx, (G2.row + 1) * TILE, time);

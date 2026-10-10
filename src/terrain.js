@@ -29,6 +29,8 @@
       this.caveEntrances = []; // 마을의 동굴 입구 {col,row}
       this.waters = [];     // 숲의 샘물 'w' {col,row}: 어둠의 크리스탈을 씻는다
       this.altars = [];     // 화산의 신성의 제단 'v' {col,row}: 정화된 크리스탈을 신성 크리스탈로 바꾼다
+      this.castles = [];    // 왕국의 성 'e' {col,row}
+      this.kings = [];      // 왕 'o' {col,row}: 말을 걸면 왕이 이야기한다
       this.exits = [];      // 동굴의 마을 출구 {col,row}
       this.gates = [];      // 마을의 스테이지 문 {col,row,stage}: F 숲, N 설산, M 화산
 
@@ -54,6 +56,9 @@
           if (ch === 'd') this.shops.push({ col: c, row: r, kind: 'mgduel' });
           if (ch === 'q') this.shops.push({ col: c, row: r, kind: 'mggun' });
           if (ch === 'O') this.shops.push({ col: c, row: r, kind: 'dupgrade' });
+          if (ch === 'z') this.gates.push({ col: c, row: r, stage: 'kingdom' });
+          if (ch === 'e') this.castles.push({ col: c, row: r });
+          if (ch === 'o') this.kings.push({ col: c, row: r });
           if (ch === 'Z') this.gates.push({ col: c, row: r, stage: 'darkhub' });
           if (ch === 'J') this.gates.push({ col: c, row: r, stage: 'dungeon' });
           if (ch === 'T') this.treasure = { col: c, row: r };

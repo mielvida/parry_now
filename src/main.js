@@ -40,6 +40,11 @@
       music: 'village', level: G.Levels.village, theme: G.Beach, monsterless: true, goal: '마을을 둘러보자: 가게 앞에서 E 키, 오른쪽 끝에는 동굴 입구가 있다 (장비: I 키)',
       banner: { title: 'STAGE 3', sub: '해변 마을', dur: 5, caption: '…마을이다! 몬스터는 보이지 않고, 가게들이 늘어서 있다.' },
     },
+    kingdom: { // 챕터 2: 왕이 다스리는 거대한 왕국의 도시. 가게가 길게 늘어서 있고 가운데 성에 왕이 있다
+      music: 'village', label: '왕국', level: G.Levels.kingdom, theme: G.KingdomTheme, monsterless: true, returnNear: 'kingdom', exitTo: 'village',
+      goal: '챕터 2 왕국: 거리를 따라 여러 가게가 늘어서 있다. 가운데 성에서 왕을 만나자 (가게 앞에서 E). 왼쪽 끝 문에서 E: 마을로',
+      banner: { title: 'CHAPTER 2', sub: '왕이 다스리는 도시', dur: 6.5, caption: '…하얀 성이 하늘 높이 솟아 있다. 끝이 보이지 않는 큰 도시, 여기가 왕국이다.' },
+    },
     darkhub: { // 다크월드 입구: 무기 상점, 아이템 상점, 던전으로 오르는 문
       music: 'cave', label: '다크월드', level: G.Levels.darkhub, theme: G.DarkTheme, monsterless: true, returnNear: 'darkhub', exitTo: 'village',
       goal: '다크월드: 무기/아이템 상점이 있다. 오른쪽 문으로 던전(100층)에 올라 시크너를 쓰러뜨려라!',
@@ -138,10 +143,31 @@
     '마을 사람: "스태미나가 바닥나면 대시도 못 해요. 아이템 상점의 스태미나 물약을 챙기세요."',
     '마을 사람: "중간에 정의의 어둠돌, 정의의 어둠이라는 무시무시한 것들이 길을 막고 있답니다."',
   ];
+  const KINGDOM_LINES = [
+    '시민: "와, 새로 오신 용사님이다! 시크너를 쓰러뜨린 분이래!"',
+    '시민: "이 거리 끝까지 가게가 쭉 이어져 있어요. 없는 게 없답니다."',
+    '상인: "왕국의 물건은 마을보다 종류가 훨씬 많지요. 천천히 둘러보세요."',
+    '시민: "가운데 성에 왕께서 계세요. 용사님을 몹시 만나고 싶어 하셨죠."',
+    '병사: "왕국은 평화롭습니다. 하지만 성 너머에서 이상한 기운이 느껴진다는 소문이…"',
+    '시민: "저 하얀 성 좀 보세요. 하늘 끝까지 닿을 것 같죠?"',
+    '아이: "나도 크면 용사가 될 거예요!"',
+  ];
+  const KING_FIRST = [
+    '왕: "오오, 그대가 어둠의 탑을 정복한 용사로구나! 짐은 이 왕국의 왕이다."',
+    '왕: "시크너의 어둠이 걷혔다는 소식에 온 왕국이 기뻐 춤을 추었지."',
+    '왕: "작은 사례를 하겠다. 받아 주게. 왕국의 가게들도 마음껏 이용하게나."',
+    '왕: "…허나 이것은 시작일 뿐. 성 너머에서 새로운 위협이 깨어나고 있네. — 챕터 2의 막이 오른다 —"',
+  ];
+  const KING_LINES = [
+    '왕: "어서 오게, 용사여. 왕국은 그대 덕에 평화롭다네."',
+    '왕: "거리의 가게들은 둘러보았는가? 왕국에서만 파는 물건도 많다네."',
+    '왕: "새로운 위협에 대비해 힘을 기르게. 때가 오면 짐이 알려 주겠네."',
+  ];
   const FINALE_LINES = [
     '시크너가 쓰러지자, 마을을 짓누르던 어둠이 서서히 걷혔다.',
     '마을 사람: "해냈어요! 용사님이 우리 마을을 구하셨어요!"',
-    '용사는 오늘도 가게에서 장식을 고르며, 이 마을에 정착하기로 했다.  — THE END —',
+    '…그때, 마을 왼쪽 끝에 눈부신 빛의 문이 활짝 열렸다.',
+    '문 너머에는 왕이 다스리는 거대한 도시, 왕국이 있다고 한다.  — CHAPTER 2 —',
   ];
   let stageName = '';
   let terrain = null;
@@ -167,6 +193,7 @@
   let nextStage = null;             // 클리어 연출이 끝나면 갈 곳 {name, near}
   let skipBanner = false; // 마을에 처음 왔을 때의 소개/말은 한 번만
   const seenStages = {};
+  let fanfare = false;          // 왕국에 처음 들어선 직후 (loadStage 끝에서 소리와 빛을 터뜨린다)
   let equipUI = null;   // 인벤토리 창 {cur(선택한 칸 번호), msg, msgT, ok}
   const maxLives = () => G.Shop.maxLivesFor(inv, C.PLAYER_LIVES); // 갑옷에 따라 늘어나는 최대 피
   let shop = null;      // 열려 있는 상점 {kind, def, msg, msgT, ok}
@@ -1028,6 +1055,7 @@
   function loadStage(name, keepLives = false, near = null) {
     stageName = name;
     skipBanner = name === 'village' && !!seenStages.village;
+    if (name === 'kingdom' && !seenStages.kingdom) fanfare = true; // 처음 왕국에 들어서면 웅장하게
     seenStages[name] = true;
     if (name === 'mine' && !mineLevel) { // ?stage=mine 처럼 입구를 거치지 않고 바로 온 경우
       mineRun = 1;
@@ -1118,13 +1146,20 @@
     applySpeed(); // 마을에서만 달리기 업그레이드가 적용된다
     setupBoss();
     camera.follow(player, terrain, C.DT, true);
+    if (fanfare) { // 챕터 2의 시작: 번쩍임, 흔들림, 팡파르
+      fanfare = false;
+      G.Audio.play('treasure');
+      effects.flash = 0.6; effects.flashColor = '255,236,170';
+      effects.shake(7, 0.7);
+      effects.treasure(player.x + player.w / 2, player.y - 20);
+    }
   }
 
   // 낀 장비를 플레이어에게 반영: 무기(던지기 거리/쿨다운, 패링 범위는 parryBox가), 갑옷(최대 피),
   // 장갑(패링 지속 시간), 신발(이동 속도), 그리고 그림용 장비 id
   // 이동 속도: 신발 + 마을 달리기 업그레이드 (마을에서만)
   function applySpeed() {
-    player.speedMult = (1 + equipStats.speedAdd) * (stageName === 'village' ? G.Shop.speedMult(inv.speedLevel) : 1);
+    player.speedMult = (1 + equipStats.speedAdd) * (stageName === 'village' || stageName === 'kingdom' ? G.Shop.speedMult(inv.speedLevel) : 1);
   }
 
   function applyEquipment() {
@@ -1237,6 +1272,9 @@
     for (const s of terrain.shops) {
       if (Math.abs(px - (s.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (s.row + 1) * T) < T * 2) return { type: 'shop', shop: s };
     }
+    for (const k of terrain.kings) {
+      if (Math.abs(px - (k.col * T + T / 2)) < T * 2.4 && Math.abs(feet - (k.row + 1) * T) < T * 2) return { type: 'king' };
+    }
     for (let i = 0; i < terrain.villagers.length; i++) {
       const v = terrain.villagers[i];
       if (Math.abs(px - (v.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (v.row + 1) * T) < T * 2) return { type: 'talk', index: i };
@@ -1261,6 +1299,7 @@
     if (best) return { type: 'slot', slot: best.slot };
     for (const g of terrain.gates) {
       if (g.stage === 'darkhub' && !story.revealed) continue; // 이야기를 보기 전에는 다크월드 문이 없다
+      if (g.stage === 'kingdom' && !story.cleared) continue; // 시크너를 쓰러뜨리기 전에는 왕국의 문이 없다
       if (Math.abs(px - (g.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (g.row + 1) * T) < T * 2) return { type: 'gate', stage: g.stage };
     }
     for (const x of terrain.exits) {
@@ -1276,7 +1315,7 @@
   // ---- 합치기 작업대 (용광로 '합치기' 탭): 3칸에 같은 무기 3개를 올려 1분 뒤에 한 단계 위로. 직접(무료, 곁에서 대기) / 대장장이에게 맡기기(70G) ----
   const isMergeTab = () => !!shop && !!shop.def.tabs[shop.tab] && shop.def.tabs[shop.tab].custom === 'merge';
   const nearFurnace = () => {
-    if (stageName !== 'village') return false;
+    if (stageName !== 'village' && stageName !== 'kingdom') return false;
     const f = terrain.shops.find((q) => q.kind === 'furnace');
     return !!f && Math.abs(player.x + player.w / 2 - (f.col * C.TILE + C.TILE / 2)) < C.TILE * 7;
   };
@@ -2256,6 +2295,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { label: '설산', hint: '털복숭이 침팬지', img: 'snow', run: goto(() => loadStage('snow', true)) },
       { label: '화산', hint: '용 · 신성의 제단', img: 'volcano', run: goto(() => loadStage('volcano', true)) },
       { label: '시작 동굴', hint: '첫 동굴 (보물 지도)', img: 'cave', run: goto(() => loadStage('cave', true)) },
+      { label: '왕국 (챕터 2)', hint: '왕 · 거대한 도시', img: 'village', run: goto(() => loadStage('kingdom', true)) },
       { head: '다크월드' },
       { label: '다크월드 입구', hint: '상점들', img: 'darkhub', run: goto(() => { story.revealed = true; story.pending = false; loadStage('darkhub', true); }) },
       { label: '던전 1층', hint: '어둠의 탑', img: 'd1', run: goto(() => goFloor(1)) },
@@ -2838,7 +2878,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (floor >= C.DUNGEON_FLOORS) { // 시크너를 쓰러뜨렸다
       story.cleared = true;
       darkFloor = 1;
-      loadStage('village', true, 'darkhub');
+      loadStage('village', true, 'kingdom'); // 새로 열린 왕국의 문 앞에서 시작
+      effects.flash = 0.5; effects.flashColor = '255,236,170';
+      effects.shake(6, 0.6);
       startDialogs(FINALE_LINES);
       return;
     }
@@ -2848,6 +2890,19 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   }
 
   // 여러 줄 대사를 차례로 보여준다 (E로 다음 줄)
+  // 왕: 처음 만나면 챕터 2 이야기를 들려주고 사례금을 준다. 그다음부터는 한마디씩
+  function talkToKing() {
+    if (!story.kingMet) {
+      story.kingMet = true;
+      coins += 3000;
+      G.Audio.play('treasure');
+      effects.treasure(player.x + player.w / 2, player.y);
+      effects.shake(5, 0.3);
+      popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '왕의 사례금 +3000 G', t: 3, color: 'rgba(255,225,120,A)' });
+      startDialogs(KING_FIRST);
+    } else dialog = { text: KING_LINES[(story.kingTalk = (story.kingTalk || 0) + 1) % KING_LINES.length], t: 4 };
+  }
+
   function startDialogs(lines) {
     dialog = { text: lines[0], t: 9999, queue: lines.slice(1) };
   }
@@ -3028,6 +3083,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           shop = { kind: near.shop.kind, def: G.Shop.SHOPS[near.shop.kind], tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
           G.Audio.play('pickup');
         }
+      } else if (near && near.type === 'king') {
+        talkToKing();
       } else if (near && near.type === 'water') {
         washCrystals();
       } else if (near && near.type === 'altar') {
@@ -3053,7 +3110,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         input.endFrame();
         return;
       } else if (near) {
-        const lines = story.revealed && !story.cleared ? DARK_VILLAGER_LINES : VILLAGER_LINES; // 시크너 이야기 뒤에는 마을 사람들 말이 달라진다
+        const lines = stageName === 'kingdom' ? KINGDOM_LINES : story.revealed && !story.cleared ? DARK_VILLAGER_LINES : VILLAGER_LINES; // 시크너 이야기 뒤에는 마을 사람들 말이 달라진다
         dialog = { text: lines[near.index % lines.length], t: 4 };
       }
     }
@@ -3377,7 +3434,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
     const near = !shop && !equipUI && !devUI && !mini && !ag && !sg && !wc && !fp && !dialog && !won && !cutscene ? nearbyInteract() : null;
-    const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
+    const PROMPTS = { talk: 'E: 대화', king: 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
     const prompt = near ? (near.type === 'shop' ? (near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
     const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }, isMergeTab() ? { merge: mergeView() } : {}) : null;
