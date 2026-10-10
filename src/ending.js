@@ -6,7 +6,7 @@
   const COIN_START = 0.8, COIN_END = 2.6;
   const FADE_OUT = 3.4, CAVE_DONE = 5.3, HOUSE_FADE = 12.6;
   // 모드별 시간표와 자막. 'cave'/'mine' = 상자에서 코인 획득 후 다음 스테이지로, 'house' = 노인과 대화 후 마을로
-  function modeConfig(mode, coins) {
+  function modeConfig(mode, coins, exp) {
     if (mode === 'house') {
       return {
         end: 13.6,
@@ -21,7 +21,7 @@
     return {
       end: CAVE_DONE,
       lines: [
-        { from: 0.3, to: 3.3, text: `상자 안에는 금화가 가득했다! 용사는 ${coins}코인을 얻었다.` },
+        { from: 0.3, to: 3.3, text: `상자 안에는 금화가 가득했다! 용사는 ${coins}코인${exp ? `과 경험치 ${exp}` : ''}을 얻었다.` },
         { from: 3.7, to: 5.1, text: mode === 'mine' ? '용사는 보물을 챙겨 마을로 돌아왔다…' : '용사는 보물을 챙겨 지상으로 올라갔다…' },
       ],
     };
@@ -30,10 +30,11 @@
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
   class Ending {
-    constructor(mode = 'cave', coins = 50) {
+    constructor(mode = 'cave', coins = 50, exp = 0) {
       this.mode = mode;
+      this.exp = exp; // 이번 연출에서 얻는 경험치 (0이면 표시하지 않는다)
       this.coins = coins; // 이번 연출에서 얻는 코인 (cave/mine)
-      this.cfg = modeConfig(mode, coins);
+      this.cfg = modeConfig(mode, coins, exp);
       this.t = 0;
       this.coinShown = 0;
     }
@@ -112,6 +113,15 @@
         ctx.fillStyle = '#fff';
         ctx.fillText(`+${this.coinShown} COIN`, -32, 0);
         ctx.restore();
+      }
+      if (this.exp && coins && t >= COIN_END) { // 경험치: 코인 숫자가 다 오른 뒤 아래에 나타난다
+        const a = clamp01((t - COIN_END) / 0.4);
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 44px sans-serif';
+        ctx.fillStyle = `rgba(0,0,0,${a})`;
+        ctx.fillText(`+${this.exp} EXP`, w / 2 + 2, h * 0.54 + 2);
+        ctx.fillStyle = `rgba(150,215,255,${a})`;
+        ctx.fillText(`+${this.exp} EXP`, w / 2, h * 0.54);
       }
       ctx.textAlign = 'start';
     }

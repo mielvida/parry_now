@@ -11,6 +11,10 @@
     fire: { speed: 380, life: 1.1, r: 8 },
     poison: { speed: 300, life: 1.2, r: 8 },
     lightning: { range: 6 * T, half: 16, show: 0.22 },
+    arrow: { speed: 720, life: 0.9, r: 6 },
+    bullet: { speed: 1100, life: 0.7, r: 5 },
+    bomb: { speed: 340, life: 1.8, r: 24, gravity: 900 }, // r이 커서 가까운 적 위를 지나가도 터진다
+    icebomb: { speed: 340, life: 1.8, r: 24, gravity: 900 },
   };
 
   const pickElement = (el, rnd = Math.random) => (el === 'random' ? ['fire', 'poison', 'lightning'][Math.floor(rnd() * 3)] : el);
@@ -20,7 +24,17 @@
   const alive = (m) => m.alive && !m.flying && m.appear <= 0;
 
   // 발사. (x, y) = 지팡이 끝. hooks.hit(monster, element, dir, x, y)
-  function cast(state, el, x, y, dir, terrain, monsters, hooks) {
+  // opts: 다크월드 무기용 {dmg, radius(px), pierce, count}
+  function cast(state, el, x, y, dir, terrain, monsters, hooks, opts = {}) {
+    if (el === 'arrow' || el === 'bullet' || el === 'bomb' || el === 'icebomb') {
+      const n = opts.count || 1;
+      for (let i = 0; i < n; i++) {
+        const spread = n === 1 ? 0 : (i - (n - 1) / 2) * 70;
+        const bomb = el === 'bomb' || el === 'icebomb';
+        state.shots.push({ el, x, y, dir, vx: dir * EL[el].speed, vy: bomb ? -240 : spread, g: EL[el].gravity || 0, life: EL[el].life, t: 0, dead: false, dmg: opts.dmg || 3, radius: opts.radius || 0, pierce: !!opts.pierce, hitSet: new Set() });
+      }
+      return;
+    }
     if (el !== 'lightning') {
       state.shots.push({ el, x, y, dir, vx: dir * EL[el].speed, life: EL[el].life, t: 0, dead: false });
       return;
@@ -52,25 +66,34 @@
     for (const s of state.shots) {
       s.t += dt;
       s.life -= dt;
+      if (s.g) s.vy = (s.vy || 0) + s.g * dt; // 폭탄은 포물선
       const nx = s.x + s.vx * dt;
-      if (terrain.isSolid(Math.floor(nx / T), Math.floor(s.y / T))) { // 벽에 부딪힘
+      const ny = s.y + (s.vy || 0) * dt;
+      if (terrain.isSolid(Math.floor(nx / T), Math.floor(ny / T))) { // 벽/땅에 부딪힘
+        if (s.radius) hooks.explode(s);
         hooks.burst(s.el, s.x, s.y);
         s.dead = true;
         continue;
       }
       s.x = nx;
+      s.y = ny;
       const r = EL[s.el].r;
       for (const m of monsters) {
-        if (!alive(m)) continue;
+        if (!alive(m) || (s.hitSet && s.hitSet.has(m))) continue;
         const cx = clamp(s.x, m.x, m.x + m.w);
         const cy = clamp(s.y, m.y, m.y + m.h);
         if ((s.x - cx) * (s.x - cx) + (s.y - cy) * (s.y - cy) <= r * r) {
-          hooks.hit(m, s.el, s.dir, s.x, s.y);
+          hooks.hit(m, s.el, s.dir, s.x, s.y, s);
+          if (s.radius) hooks.explode(s); // 폭탄: 닿으면 터진다
+          if (s.pierce && !s.radius) { s.hitSet.add(m); continue; } // 관통 탄환
           s.dead = true;
           break;
         }
       }
-      if (s.life <= 0) s.dead = true;
+      if (s.life <= 0 && !s.dead) {
+        if (s.radius) hooks.explode(s);
+        s.dead = true;
+      }
     }
     state.shots = state.shots.filter((s) => !s.dead);
   }
@@ -88,6 +111,28 @@
         ctx.fillStyle = g; ctx.fillRect(s.x - 14, s.y - 14, 28, 28);
         ctx.fillStyle = '#ff7a2a'; ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(s.x + s.dir * 1, s.y, 3, 0, Math.PI * 2); ctx.fill();
+      } else if (s.el === 'arrow') { // 화살
+        ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(s.x - s.dir * 22, s.y - (s.vy || 0) * 0.03); ctx.lineTo(s.x + s.dir * 6, s.y); ctx.stroke();
+        ctx.fillStyle = '#c9d2dc';
+        ctx.beginPath(); ctx.moveTo(s.x + s.dir * 12, s.y); ctx.lineTo(s.x + s.dir * 4, s.y - 4); ctx.lineTo(s.x + s.dir * 4, s.y + 4); ctx.fill();
+        ctx.fillStyle = '#c0504d'; ctx.fillRect(s.x - s.dir * 24 - 2, s.y - 3, 5, 6);
+      } else if (s.el === 'bullet') { // 탄환: 빛나는 짧은 줄
+        ctx.fillStyle = 'rgba(255,230,140,0.45)';
+        ctx.fillRect(Math.min(s.x, s.x - s.dir * 34), s.y - 2, 34, 4);
+        ctx.fillStyle = '#fff6c0';
+        ctx.fillRect(Math.min(s.x, s.x - s.dir * 12), s.y - 2, 12, 4);
+      } else if (s.el === 'bomb' || s.el === 'icebomb') { // 폭탄: 둥근 몸 + 타는 심지
+        const ice = s.el === 'icebomb';
+        ctx.fillStyle = ice ? '#5fa8d9' : '#2a2a32';
+        ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = ice ? '#bfe8ff' : '#5a5a66';
+        ctx.beginPath(); ctx.arc(s.x - 3, s.y - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#a66a33'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(s.x + 3, s.y - 8); ctx.quadraticCurveTo(s.x + 8, s.y - 14, s.x + 6, s.y - 17); ctx.stroke();
+        const f = 0.6 + 0.4 * Math.sin(s.t * 40);
+        ctx.fillStyle = ice ? `rgba(160,230,255,${f})` : `rgba(255,170,50,${f})`;
+        ctx.beginPath(); ctx.arc(s.x + 6, s.y - 18, 3 + f * 2, 0, Math.PI * 2); ctx.fill();
       } else { // 독 방울
         const g = ctx.createRadialGradient(s.x, s.y, 1, s.x, s.y, 13);
         g.addColorStop(0, 'rgba(180,255,140,0.9)'); g.addColorStop(1, 'rgba(60,200,60,0)');

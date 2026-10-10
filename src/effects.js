@@ -36,6 +36,30 @@
       }
     }
 
+    // 치명타: 금빛 별 모양 폭발 + 붉은 충격파 + 번쩍임 + 사방으로 튀는 불꽃
+    critBurst(x, y) {
+      this.flash = 0.22;
+      this.flashColor = '255,225,90';
+      this.rings.push({ x, y, r0: 8, r1: 110, life: 0.32, max: 0.32, color: '255,225,90', width: 8 });
+      this.rings.push({ x, y, r0: 4, r1: 70, life: 0.4, max: 0.4, color: '255,70,60', width: 5 });
+      this.rings.push({ x, y, r0: 2, r1: 42, life: 0.22, max: 0.22, color: '255,255,255', width: 4 });
+      for (let i = 0; i < 26; i++) {
+        const a = (i / 26) * Math.PI * 2 + rand(-0.1, 0.1);
+        const sp = i % 2 ? rand(520, 820) : rand(240, 460); // 긴 불꽃과 짧은 불꽃이 번갈아 별 모양으로
+        this.particles.push({
+          kind: 'spark', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          life: rand(0.22, 0.42), max: 0.42, size: i % 2 ? 5 : 3, gravity: 0,
+          color: i % 3 === 0 ? '255,255,255' : i % 3 === 1 ? '255,215,70' : '255,90,60',
+        });
+      }
+      for (let i = 0; i < 12; i++) {
+        this.particles.push({
+          kind: 'blob', x: x + rand(-8, 8), y: y + rand(-8, 8), vx: rand(-200, 200), vy: -rand(120, 380),
+          life: rand(0.5, 0.9), max: 0.9, size: rand(2.5, 5), gravity: 700, color: '255,215,70',
+        });
+      }
+    }
+
     // 반짝이는 작은 빛 입자 (컷신의 병, 보물 상자 등)
     sparkle(x, y) {
       this.particles.push({

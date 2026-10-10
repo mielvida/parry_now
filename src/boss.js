@@ -1,7 +1,7 @@
 // 화산의 보스: 용머리 3개. 패턴은 무작위로 이어지고, 5번째 패턴이 끝날 때마다 모두 기절한다.
 //   fire  화염구: 머리마다 불덩이를 쏜다. 패링으로 쳐내면 쏜 머리에게 되돌아가 큰 피해를 준다
 //   tail  꼬리 내려찍기: 꼬리 2개가 경고 표시 뒤에 땅을 내려친다 (두 번 반복)
-//   slam  머리 찍기: 머리 하나가 플레이어 위에서 내리찍고, 1.5초 동안 땅에 박혀 있다가 올라간다. 그때가 공격 기회
+//   slam  머리 찍기: 머리 하나가 플레이어 위에서 내리찍고 (그동안 나머지 머리들은 화염구를 쏜다), 1.5초 동안 땅에 박혀 있다가 올라간다. 그때가 공격 기회
 //   meteor 운석: 바닥에 표시가 뜬 곳에 하늘에서 운석이 연달아 떨어진다
 //   lava  용암: 바닥이 붉게 달아오르다가 용암이 차오른다. 위의 발판으로 점프해 피한다
 //   stun  5패턴마다 2.5초 동안 모든 머리가 땅에 떨어져 기절한다. 역시 공격 기회
@@ -27,7 +27,7 @@
       this.w = HEAD_W;
       this.h = HEAD_H;
       this.cx = baseX; // 세 머리 모두 한 구멍(경기장 가운데)에서 솟아 나와 각자 자리로 퍼진다
-      this.idleY = 170;
+      this.idleY = 170; // 가만히 떠 있는 높이: 높은 발판에서 점프하면 닿는다 (머리 바로 아래 발판)
       this.cy = groundY + 130; // 용암 속에서 시작해 솟아오른다
       this.maxHp = C.BOSS_HEAD_HP;
       this.hp = this.maxHp;
@@ -55,7 +55,7 @@
     }
 
     get restY() { return this.groundY - this.h / 2; }
-    get vulnerable() { return this.alive && (this.state === 'down' || this.state === 'stun'); }
+    get vulnerable() { return this.alive && (this.state === 'down' || this.state === 'stun' || this.state === 'idle'); } // 가만히 떠 있을 때도 때릴 수 있다
     get dead() { return this.state === 'dead'; }
     get busy() { return this.state !== 'idle'; }
 
@@ -279,6 +279,11 @@
         this.pat.h = live[Math.floor(Math.random() * live.length)];
         this.pat.h.state = 'slamPrep';
         this.pat.h.st = 0;
+        this.pat.shots = []; // 찍는 머리 말고 나머지 머리는 그동안 화염구를 쏜다
+        live.filter((h) => h !== this.pat.h).forEach((h, j) => {
+          this.pat.shots.push({ h, at: 0.9 + j * 0.5, fired: false });
+          this.pat.shots.push({ h, at: 2.3 + j * 0.5, fired: false });
+        });
       }
       this.phase = 'pattern';
     }
@@ -331,12 +336,14 @@
         const p = this.pat;
         p.t += dt;
         let finished = false;
-        if (p.type === 'fire') {
+        if (p.shots) { // 화염구 쏘기 (fire 패턴, 그리고 slam 패턴의 나머지 머리들)
           for (const s of p.shots) {
             if (s.fired || !s.h.alive) continue;
             if (p.t >= s.at) { s.fired = true; s.h.glow = 0; this._fire(s.h); }
-            else if (p.t > s.at - 0.55) s.h.glow = (p.t - (s.at - 0.55)) / 0.55;
+            else if (p.t > s.at - 0.55 && s.h.state === 'idle') s.h.glow = (p.t - (s.at - 0.55)) / 0.55;
           }
+        }
+        if (p.type === 'fire') {
           finished = p.t >= p.end;
         } else if (p.type === 'tail') {
           while (p.wave < 9 && p.t >= p.wave * 0.4) { this._spawnTail(p.wave); p.wave += 1; }

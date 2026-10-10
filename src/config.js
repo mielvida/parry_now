@@ -75,12 +75,43 @@ Game.Config = {
   CRAB_COIN: 8,            // 꽃게를 쓰러뜨리면 떨어뜨리는 코인
   SLIME_COIN: 5,           // 슬라임을 쓰러뜨리면 떨어뜨리는 코인
   BAT_COIN: 6,             // 박쥐를 쓰러뜨리면 떨어뜨리는 코인
+  SLIME_EXP: 1,            // 몬스터를 쓰러뜨리면 얻는 경험치
+  BAT_EXP: 2,
+  CRAB_EXP: 3,
+  GOLEM_EXP: 3,
   GOLDEN_BAT_CHANCE: 0.05, // 박쥐가 생기거나 부활할 때 황금박쥐가 될 확률 (아주 가끔)
   GOLDEN_BAT_HP: 5,        // 황금박쥐 체력: 근접 공격은 한 대에 1씩 깎여서 5대를 때려야 죽는다 (독 3은 부족)
   GOLDEN_BAT_SPEED: 1.35,  // 황금박쥐는 더 빠르다
   GOLDEN_BAT_COIN: 200,    // 황금박쥐가 떨어뜨리는 코인
-  MINE_COINS: 100,         // 마을 동굴 보물 상자의 코인 (첫 탐험)
-  MINE_COINS_PER_RUN: 25,  // 탐험을 거듭할수록 상자 코인이 이만큼씩 늘어난다
+  MINE_COINS: 100,         // 마을 동굴 보물 상자의 코인 (업그레이드 1레벨)
+  MINE_COINS_PER_LEVEL: 25, // 동굴 보상 업그레이드 한 레벨마다 늘어나는 상자 코인 (15레벨 = 450)
+  MINE_MAX_LEVEL: 15,      // 동굴 보상 업그레이드 최고 레벨
+  MINE_UPGRADE_PRICE: 100, // 1 -> 2레벨 업그레이드 가격
+  MINE_UPGRADE_STEP: 30,   // 레벨이 오를수록 가격이 이만큼씩 늘어난다
+  CRIT_BASE_DAMAGE: 10,    // 치명타 대미지 (0레벨). 보상 상점에서 한 레벨마다 +1, 20레벨이면 30
+  CRIT_MAX_LEVEL: 20,
+  CRIT_UPGRADE_PRICE: 200, // 1레벨 업그레이드 가격
+  CRIT_UPGRADE_STEP: 80,   // 레벨이 오를수록 가격이 이만큼씩 늘어난다
+  CRIT_BASE_CHANCE: 0.01,  // 기본 치명타 확률 (1%). 집 장식을 놓을수록 오른다
+  DECOR_COIN_BONUS: 0.01,  // 집에 장식품을 하나 놓을 때마다 코인 획득량이 이만큼(+1%) 늘어난다
+  DECOR_CRIT_BONUS: 0.003, // 집에 장식품을 하나 놓을 때마다 치명타 확률이 이만큼(+0.3%) 늘어난다
+  // 이야기와 다크월드: 마을 동굴을 15번 클리어하면 시크너의 이야기가 나오고 다크월드로 가는 문이 열린다
+  CAVE_CLEARS_FOR_STORY: 15,
+  DUNGEON_FLOORS: 100,     // 다크월드 던전 층 수 (100층에 시크너)
+  STAMINA_MAX: 100,        // 스태미나 최대치: 대시와 폭탄/총/활 공격에 쓴다
+  STAMINA_REGEN: 16,       // 초당 회복량
+  DASH_STAMINA: 25,        // 대시 한 번에 드는 스태미나
+  BOSS_STONE_HP: 1500,     // 정의의 어둠돌 (33층)
+  BOSS_JUSTICE_HP: 3000,   // 정의의 어둠 (66층)
+  BOSS_SIKNER_HP: 8000,    // 시크너 (100층, 최종보스)
+  DARKSTONE_COIN: 15,
+  DARKSTONE_EXP: 4,
+  SHADE_COIN: 18,
+  SHADE_EXP: 5,
+  VILLAGE_SPEED_MAX: 3,    // 마을 달리기 업그레이드 최고 레벨의 이동 속도 배수 (마을에서만 적용)
+  VILLAGE_SPEED_LEVELS: 5, // 마을 달리기 업그레이드 레벨 수
+  VILLAGE_SPEED_PRICE: 300, // 1레벨 가격
+  VILLAGE_SPEED_STEP: 150, // 레벨이 오를수록 가격이 이만큼씩 늘어난다
   TREASURE_COINS: 50,      // 동굴 보물 상자에서 얻는 코인
   SLIME_SAFE_DROP: 3,      // 추적 중 이 타일 수 안에 바닥이 있으면 낭떠러지로 보지 않음
 
@@ -134,6 +165,7 @@ Game.Config = {
   // 설산: 몬스터가 느리지만 한 방이 아프다. 끝에는 하얀 털복숭이 보스
   SNOW_MOB_SPEED: 0.6,     // 설산에서는 모든 몬스터의 이동 속도가 이 배수로 느려진다
   SNOW_MOB_DAMAGE: 2,      // 설산 몬스터에게 닿으면 목숨이 이만큼 깎인다
+  BOSS_KING_HP: 500,       // 왕슬라임 보스 체력 (숲)
   BOSS_YETI_HP: 1000,       // 털복숭이 침팬지 보스 체력
   BOSS_FIRE_BONUS: 3,      // 불 속성 무기는 털복숭이 침팬지에게 한 대당 이만큼 더 큰 피해
   // 흙괴물 (설산)

@@ -181,9 +181,14 @@
   function drawShop(ctx, shop, baseX, baseY, time) {
     const potion = shop.kind === 'potion';
     const armor = shop.kind === 'armor';
+    const mine = shop.kind === 'mine';
+    const estate = shop.kind === 'estate';
+    const decor = shop.kind === 'decor';
+    const dweapon = shop.kind === 'dweapon';
+    const ditem = shop.kind === 'ditem';
     const w = 140;
     const x = baseX - w / 2;
-    const stripeA = potion ? '#8a4fb8' : armor ? '#c0504d' : '#4f7fd4';
+    const stripeA = potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : '#4f7fd4';
     ctx.fillStyle = 'rgba(0,0,0,0.14)';
     ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒤쪽 벽 + 기둥
@@ -203,6 +208,51 @@
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(bx + 2, baseY - 82, 5, 6);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(bx + 2, baseY - 84, 5, 3);
       });
+    } else if (dweapon) { // 벽에 걸린 총, 활, 방패, 폭탄
+      ctx.fillStyle = '#4a2f1a'; ctx.fillRect(x + 12, baseY - 70, 36, 7); ctx.fillRect(x + 16, baseY - 64, 7, 14); // 총
+      ctx.fillStyle = '#8a8f9a'; ctx.fillRect(x + 12, baseY - 76, 40, 6);
+      ctx.strokeStyle = '#c9a86a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x + 76, baseY - 64, 15, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke(); // 활
+      ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 76, baseY - 79); ctx.lineTo(x + 76, baseY - 49); ctx.stroke();
+      ctx.fillStyle = '#6a2fb0'; ctx.beginPath(); ctx.arc(x + 112, baseY - 62, 14, 0, Math.PI * 2); ctx.fill(); // 방패
+      ctx.fillStyle = '#e0b12f'; ctx.fillRect(x + 110, baseY - 74, 4, 24); ctx.fillRect(x + 100, baseY - 64, 24, 4);
+    } else if (ditem) { // 선반 위 병, 햄버거, 수박
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
+      ctx.fillStyle = '#7dffd0'; ctx.fillRect(x + 18, baseY - 80, 12, 18); ctx.fillStyle = '#e8f1ff'; ctx.fillRect(x + 21, baseY - 86, 6, 7);
+      ctx.fillStyle = '#d9a05a'; ctx.beginPath(); ctx.arc(x + 58, baseY - 68, 12, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#6b3a1a'; ctx.fillRect(x + 46, baseY - 68, 24, 5); ctx.fillStyle = '#d9a05a'; ctx.fillRect(x + 46, baseY - 63, 24, 4);
+      ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(x + 100, baseY - 62, 14, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#3f9a45'; ctx.fillRect(x + 86, baseY - 62, 28, 3);
+    } else if (estate) { // 선반 위 작은 집 모형들
+      ctx.fillStyle = '#7a5530';
+      ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
+      [['#e8c896', '#a0522d'], ['#9a6b3c', '#4f8a3a'], ['#b5523b', '#3a3f4a'], ['#f4f1e8', '#3a8fd4']].forEach((c, i) => {
+        const hx = x + 18 + i * 29;
+        ctx.fillStyle = c[0]; ctx.fillRect(hx, baseY - 78, 20, 14);
+        ctx.fillStyle = c[1]; ctx.beginPath(); ctx.moveTo(hx - 3, baseY - 78); ctx.lineTo(hx + 10, baseY - 90); ctx.lineTo(hx + 23, baseY - 78); ctx.closePath(); ctx.fill();
+      });
+    } else if (decor) { // 선반 위 화분, 액자, 시계
+      ctx.fillStyle = '#7a5530';
+      ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
+      ctx.fillStyle = '#b5651d'; ctx.fillRect(x + 18, baseY - 74, 14, 12);
+      ctx.fillStyle = '#3f9a45'; ctx.beginPath(); ctx.arc(x + 25, baseY - 80, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 48, baseY - 86, 30, 24);
+      ctx.fillStyle = '#9fd8f0'; ctx.fillRect(x + 51, baseY - 83, 24, 18);
+      ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.arc(x + 102, baseY - 74, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f8f4e8'; ctx.beginPath(); ctx.arc(x + 102, baseY - 74, 9, 0, Math.PI * 2); ctx.fill();
+    } else if (mine) { // 선반 위 금화 더미 + 곡괭이
+      ctx.fillStyle = '#7a5530';
+      ctx.fillRect(x + 10, baseY - 62, w - 20, 4);
+      for (let i = 0; i < 4; i++) {
+        const cx0 = x + 24 + i * 28;
+        for (let k = 0; k <= i; k++) {
+          ctx.fillStyle = '#b8860b'; ctx.fillRect(cx0, baseY - 66 - k * 4, 18, 5);
+          ctx.fillStyle = '#ffd54a'; ctx.fillRect(cx0, baseY - 67 - k * 4, 18, 3);
+        }
+      }
+      ctx.save(); // 벽의 곡괭이
+      ctx.translate(x + w - 22, baseY - 44);
+      ctx.rotate(0.5);
+      ctx.fillStyle = '#6b4423'; ctx.fillRect(-2, -28, 4, 50);
+      ctx.fillStyle = '#9aa4b2'; ctx.fillRect(-16, -30, 32, 6);
+      ctx.restore();
     } else if (armor) {
       const sets = [['#8a5a2b', '#b8803f'], ['#9aa4b2', '#d0d8e4'], ['#d4a017', '#ffe27a']];
       sets.forEach((c, i) => { // 걸이에 걸린 갑옷 세 벌
@@ -226,7 +276,7 @@
       }
     }
     // 주인
-    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', sword: 'smith' }[shop.kind], baseX, baseY - 16, 1, time);
+    G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', sword: 'smith', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);
@@ -237,6 +287,21 @@
     if (potion) { // 계산대 위 물약 병
       ctx.fillStyle = '#e8334a'; ctx.fillRect(x + 14, baseY - 44, 9, 12);
       ctx.fillStyle = '#4fd37f'; ctx.fillRect(x + w - 28, baseY - 44, 9, 12);
+    } else if (dweapon) { // 계산대 위 폭탄
+      ctx.fillStyle = '#2a2a32'; ctx.beginPath(); ctx.arc(x + w - 32, baseY - 38, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff9a3a'; ctx.fillRect(x + w - 30, baseY - 49, 3, 5);
+    } else if (ditem) { // 계산대 위 수박 조각
+      ctx.fillStyle = '#3f9a45'; ctx.beginPath(); ctx.arc(x + w - 32, baseY - 36, 11, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(x + w - 32, baseY - 36, 8, Math.PI, 0); ctx.closePath(); ctx.fill();
+    } else if (estate) { // 계산대 위 열쇠
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(x + w - 36, baseY - 40, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(x + w - 31, baseY - 41, 16, 3); ctx.fillRect(x + w - 20, baseY - 41, 3, 8);
+    } else if (decor) { // 계산대 위 꽃병
+      ctx.fillStyle = '#7ac0e8'; ctx.fillRect(x + w - 38, baseY - 44, 12, 14);
+      ctx.fillStyle = '#e8334a'; ctx.fillRect(x + w - 36, baseY - 50, 3, 7); ctx.fillRect(x + w - 31, baseY - 52, 3, 9);
+    } else if (mine) { // 계산대 위 금화 주머니
+      ctx.fillStyle = '#b8860b'; ctx.fillRect(x + w - 40, baseY - 44, 16, 12);
+      ctx.fillStyle = '#ffd54a'; ctx.fillRect(x + w - 37, baseY - 47, 10, 4);
     } else if (armor) { // 투구
       ctx.fillStyle = '#c9d2dc'; ctx.fillRect(x + w - 40, baseY - 46, 22, 14);
       ctx.fillStyle = '#e6edf5'; ctx.fillRect(x + w - 40, baseY - 46, 22, 4);
@@ -262,7 +327,7 @@
     ctx.fillRect(baseX - 34, topY - 26, 68, 22);
     ctx.fillStyle = '#e9d8a6';
     ctx.fillRect(baseX - 31, topY - 23, 62, 16);
-    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    G.TextLayer.add(potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
@@ -324,6 +389,8 @@
     forest: { name: '숲', a: '#6fd25a', b: '#d8ffb0' },
     snow: { name: '설산', a: '#9fd6ff', b: '#ffffff' },
     volcano: { name: '화산', a: '#ff7a2a', b: '#ffe08a' },
+    darkhub: { name: '다크월드', a: '#5a1a8a', b: '#d9a0ff' },
+    dungeon: { name: '던전', a: '#2a0a3a', b: '#ff6a8a' },
   };
   function drawGate(ctx, g, baseX, baseY, time) {
     const L = GATE_LOOK[g.stage];
@@ -529,7 +596,13 @@
         if (bx < camera.x - 150 || bx > camera.x + view) continue;
         drawHouse(ctx, bx, (H.row + 1) * TILE, time);
       }
+      for (const Y of terrain.homeLots) { // 내 집 터 (샀으면 산 집이 지어져 있다)
+        const bx = Y.col * TILE + TILE / 2;
+        if (bx < camera.x - 200 || bx > camera.x + view) continue;
+        G.Home.drawLot(ctx, terrain.home && terrain.home.type, bx, (Y.row + 1) * TILE, time);
+      }
       for (const G2 of terrain.gates) {
+        if (G2.stage === 'darkhub' && !(terrain.story && terrain.story.revealed)) continue; // 시크너 이야기를 본 뒤에만 다크월드 문이 보인다
         const bx = G2.col * TILE + TILE / 2;
         if (bx < camera.x - 100 || bx > camera.x + view) continue;
         drawGate(ctx, G2, bx, (G2.row + 1) * TILE, time);

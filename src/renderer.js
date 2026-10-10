@@ -8,6 +8,7 @@
     green: ['#4fd37f', '#f0558c', '#2c9b55', '#b02a5c'],
     ice: ['#7fd6ff', '#d6f1ff', '#3a8fc0', '#7fb4d6'],
     lava: ['#ff8a3a', '#ff4a2a', '#b04a10', '#8a1a10'],
+    dark: ['#6a3aa0', '#c05a9a', '#2a1250', '#7a1a50'], // 다크월드의 어둠의 슬라임
   };
 
   class Renderer {
@@ -89,6 +90,8 @@
       if (extras.boss) extras.boss.drawBack(ctx); // 땅 뒤: 용암에서 올라오는 목
       this._drawTerrain(ctx, terrain, camera);
       if (extras.chest) this._drawChest(ctx, extras.chest);
+      if (extras.pickups) for (const p of extras.pickups) this._drawPickup(ctx, p, time);
+      if (extras.enemyShots) for (const f of extras.enemyShots) this._drawEnemyShot(ctx, f);
       if (extras.boss) extras.boss.drawFront(ctx); // 머리, 꼬리, 화염구
       const crisp = !G.Config.SMOOTH_SPRITES;
       this.snapOn = crisp; // 몬스터와 플레이어: 반 도트 단위로 부드럽게 움직인다
@@ -128,7 +131,9 @@
         extras.ending.drawOverlay(main, this.viewW, this.viewH);
         return;
       }
+      if (extras.darken) this._drawDarkVillage(main, extras.darken, time);
       this._drawHud(main, hud);
+      if (hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (hud && hud.boss) this._drawBossBars(main, hud.boss);
       if (hud && hud.banner) this._drawStageBanner(main, hud.banner);
     }
@@ -149,7 +154,7 @@
         ctx.fillStyle = '#3a0d08';
         ctx.fillRect(x, y, bw, 16);
         if (h.hp > 0) {
-          ctx.fillStyle = h.vulnerable ? '#ffd54a' : '#e2431f';
+          ctx.fillStyle = h.state === 'down' || h.state === 'stun' ? '#ffd54a' : '#e2431f'; // 노랑 = 땅에 박혔거나 기절 (가장 좋은 기회)
           ctx.fillRect(x, y, (bw * h.hp) / h.maxHp, 16);
         }
         ctx.fillStyle = '#fff';
@@ -202,8 +207,41 @@
       ctx.restore();
     }
 
+    // 집 안에서만: 놓은 장식품이 주는 보너스 (코인 획득량, 치명타 확률). 장식을 놓거나 치우면 바로 바뀐다
+    _drawHomeHud(ctx, h) {
+      ctx.save();
+      const w = 232;
+      const x = this.viewW - 14 - w;
+      const y = 112;
+      ctx.fillStyle = 'rgba(20,24,40,0.78)';
+      ctx.fillRect(x, y, w, 92);
+      ctx.strokeStyle = '#e0b12f';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, 92);
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText('집 장식 보너스', x + 12, y + 16);
+      ctx.textAlign = 'right';
+      ctx.font = '13px sans-serif';
+      ctx.fillStyle = '#b8c2dc';
+      ctx.fillText(`장식 ${h.n} / ${h.total}개`, x + w - 12, y + 16);
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 17px sans-serif';
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText(`코인 획득 +${Math.round(h.coin * 1000) / 10}%`, x + 12, y + 44);
+      ctx.fillStyle = '#ff9a8a';
+      ctx.fillText(`치명타 확률 ${Math.round(h.crit * 1000) / 10}%`, x + 12, y + 68);
+      ctx.font = '12px sans-serif';
+      ctx.fillStyle = '#9aa4c0';
+      ctx.textAlign = 'right';
+      ctx.fillText(`(기본 1% + 장식)`, x + w - 12, y + 68);
+      ctx.restore();
+    }
+
     // 우측 상단 코인 표시
-    _drawCoinHud(ctx, coins, potions) {
+    _drawCoinHud(ctx, coins, potions, exp) {
       ctx.save();
       ctx.font = 'bold 20px sans-serif';
       ctx.textAlign = 'right';
@@ -222,13 +260,22 @@
       ctx.beginPath(); ctx.arc(x - w - 16, y, 8, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#fff4b8';
       ctx.fillRect(x - w - 19, y - 5, 3, 6);
+      let ly = y + 24;
+      if (exp > 0) { // 경험치 (보스를 쓰러뜨리면 얻는다)
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillText(`EXP ${exp}`, x + 1, ly + 1);
+        ctx.fillStyle = '#96d7ff';
+        ctx.fillText(`EXP ${exp}`, x, ly);
+        ly += 20;
+      }
       if (potions && potions.potion1 + potions.potion2 > 0) { // 가진 물약 (Q로 마신다)
         ctx.font = 'bold 14px sans-serif';
         const t = `물약  치유 ${potions.potion1} · 회복 ${potions.potion2}   (Q)`;
         ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillText(t, x + 1, y + 25);
+        ctx.fillText(t, x + 1, ly + 1);
         ctx.fillStyle = '#ffb3c0';
-        ctx.fillText(t, x, y + 24);
+        ctx.fillText(t, x, ly);
       }
       ctx.restore();
     }
@@ -282,11 +329,94 @@
       ctx.translate(cx, cy);
       ctx.scale(s, s);
       const L = item.look || [];
-      if (item.heal !== undefined) { // 물약 병
+      if (item.house) { // 집
+        G.Home.drawHouseIcon(ctx, item);
+      } else if (item.decor) { // 가구/장식
+        G.Home.drawDecorIcon(ctx, item, 0);
+      } else if (item.clear) { // 치우기: 붉은 엑스
+        ctx.strokeStyle = '#ff8a8a'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-16, -16); ctx.lineTo(16, 16); ctx.moveTo(16, -16); ctx.lineTo(-16, 16); ctx.stroke();
+        ctx.lineCap = 'butt';
+      } else if (item.upgrade === 'crit') { // 치명타: 붉은 별 폭발과 검
+        ctx.fillStyle = '#e8334a';
+        ctx.beginPath();
+        for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; const rr = k % 2 ? 12 : 26; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffd54a';
+        ctx.beginPath();
+        for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; const rr = k % 2 ? 7 : 17; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        ctx.closePath(); ctx.fill();
+      } else if (item.upgrade === 'speed') { // 마을 달리기: 신발과 속도선
+        for (const dx of [-14, 2]) {
+          ctx.fillStyle = L[0]; ctx.fillRect(dx, -14, 12, 22); ctx.fillRect(dx, 0, 20, 9);
+          ctx.fillStyle = L[1]; ctx.fillRect(dx, 9, 20, 4);
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        for (let i = 0; i < 3; i++) ctx.fillRect(-34 - i * 3, -8 + i * 9, 14 + i * 4, 3);
+      } else if (item.upgrade) { // 동굴 보상 업그레이드: 금화 더미와 위로 향한 화살표
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = '#b8860b'; ctx.beginPath(); ctx.ellipse(-8, 14 - i * 7, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.ellipse(-8, 11 - i * 7, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#7dffa0';
+        ctx.beginPath(); ctx.moveTo(14, -22); ctx.lineTo(26, -6); ctx.lineTo(19, -6); ctx.lineTo(19, 14); ctx.lineTo(9, 14); ctx.lineTo(9, -6); ctx.lineTo(2, -6); ctx.closePath(); ctx.fill();
+      } else if (item.quest) { // 어둠의 크리스탈: 보랏빛 육각 수정과 빛
+        const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
+        g.addColorStop(0, 'rgba(190,140,255,0.7)'); g.addColorStop(1, 'rgba(120,60,200,0)');
+        ctx.fillStyle = g; ctx.fillRect(-32, -32, 64, 64);
+        ctx.fillStyle = L[1];
+        ctx.beginPath(); ctx.moveTo(0, -26); ctx.lineTo(16, -10); ctx.lineTo(12, 18); ctx.lineTo(0, 26); ctx.lineTo(-12, 18); ctx.lineTo(-16, -10); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[0];
+        ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(12, -9); ctx.lineTo(9, 15); ctx.lineTo(0, 22); ctx.lineTo(-9, 15); ctx.lineTo(-12, -9); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.beginPath(); ctx.moveTo(-4, -18); ctx.lineTo(2, -8); ctx.lineTo(-3, 8); ctx.lineTo(-8, -6); ctx.closePath(); ctx.fill();
+      } else if (item.heal !== undefined) { // 물약 병
         ctx.fillStyle = L[0]; ctx.fillRect(-11, -8, 22, 28);
         ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(-7, -4, 4, 18);
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(-5, -20, 10, 13);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(-6, -27, 12, 7);
+      } else if (item.consumable) { // 소모품 아이콘
+        if (item.id === 'icebomb') {
+          ctx.fillStyle = L[1]; ctx.beginPath(); ctx.arc(0, 4, 17, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = L[0]; ctx.beginPath(); ctx.arc(-4, 0, 6, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#a66a33'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(4, -12); ctx.quadraticCurveTo(10, -20, 7, -24); ctx.stroke();
+          ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.arc(7, -26, 5, 0, Math.PI * 2); ctx.fill();
+        } else if (item.id === 'burger') {
+          ctx.fillStyle = '#d9a05a'; ctx.beginPath(); ctx.arc(0, -4, 17, Math.PI, 0); ctx.fill();
+          ctx.fillStyle = '#3f9a45'; ctx.fillRect(-18, -4, 36, 5);
+          ctx.fillStyle = '#6b3a1a'; ctx.fillRect(-17, 1, 34, 8);
+          ctx.fillStyle = '#ffd54a'; ctx.fillRect(-18, 9, 36, 4);
+          ctx.fillStyle = '#d9a05a'; ctx.fillRect(-17, 13, 34, 7);
+        } else if (item.id === 'melon') {
+          ctx.fillStyle = '#3f9a45'; ctx.beginPath(); ctx.arc(0, 0, 20, Math.PI, 0); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(0, 0, 16, Math.PI, 0); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#2a2a30'; for (const [sx, sy] of [[-8, -4], [0, -9], [8, -4], [0, -2]]) ctx.fillRect(sx - 1, sy - 1, 3, 4);
+        } else { // 스태미나: 병 안의 번개
+          ctx.fillStyle = L[1]; ctx.fillRect(-11, -8, 22, 28);
+          ctx.fillStyle = L[0]; ctx.fillRect(-8, -5, 16, 22);
+          ctx.fillStyle = '#e8f1ff'; ctx.fillRect(-5, -20, 10, 13);
+          ctx.fillStyle = '#9a6b3c'; ctx.fillRect(-6, -27, 12, 7);
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(2, -3); ctx.lineTo(-5, 9); ctx.lineTo(0, 9); ctx.lineTo(-2, 17); ctx.lineTo(6, 4); ctx.lineTo(1, 4); ctx.closePath(); ctx.fill();
+        }
+      } else if (item.slot === 'weapon' && item.type === 'bomb') {
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.arc(0, 6, 16, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(-5, 1, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#a66a33'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(4, -9); ctx.quadraticCurveTo(10, -18, 7, -22); ctx.stroke();
+        ctx.fillStyle = L[1]; ctx.beginPath(); ctx.arc(7, -24, 5, 0, Math.PI * 2); ctx.fill();
+      } else if (item.slot === 'weapon' && item.type === 'gun') {
+        ctx.fillStyle = '#4a2f1a'; ctx.fillRect(-14, 0, 10, 20);
+        ctx.fillStyle = L[0]; ctx.fillRect(-18, -12, 40, 12);
+        ctx.fillStyle = L[1]; ctx.fillRect(-18, -4, 40, 4);
+        ctx.fillStyle = '#2a2f3a'; ctx.fillRect(18, -14, 8, 16);
+      } else if (item.slot === 'weapon' && item.type === 'bow') {
+        ctx.strokeStyle = L[0]; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(-6, 0, 28, -Math.PI * 0.45, Math.PI * 0.45); ctx.stroke();
+        ctx.strokeStyle = L[1]; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(12, -20); ctx.lineTo(12, 20); ctx.stroke();
+        ctx.fillStyle = '#c9d2dc'; ctx.fillRect(-14, -1.5, 36, 3);
+      } else if (item.slot === 'weapon' && item.type === 'shield') {
+        ctx.fillStyle = L[1]; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.arc(0, 0, 19, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e0b12f'; ctx.fillRect(-3, -13, 6, 26); ctx.fillRect(-13, -3, 26, 6);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(-8, -8, 6, 0, Math.PI * 2); ctx.fill();
       } else if (item.slot === 'weapon' && item.type === 'staff') {
         ctx.rotate(-0.8);
         ctx.fillStyle = '#6b4423'; ctx.fillRect(-3, -26, 6, 64);
@@ -376,9 +506,13 @@
       });
       items.forEach((it, i) => {
         const row = geo.rows[i];
-        const d = G.Shop.describe(it);
-        const owned = !!it.slot && s.inv.items.includes(it.id);
-        const afford = s.coins >= it.price;
+        const d = G.Shop.describe(it, s.inv);
+        const price = G.Shop.priceOf(it, s.inv);
+        const maxed = G.Shop.upMaxed(it, s.inv);
+        const placing = s.mode === 'place'; // 꾸미기 창: 가격 대신 놓기/치우기
+        const lives_here = !!it.house && s.inv.home.type === it.id;
+        const owned = maxed || lives_here || (!!it.slot && s.inv.items.includes(it.id));
+        const afford = s.coins >= price;
         const hover = s.hover === i;
         ctx.fillStyle = hover ? 'rgba(255,213,74,0.16)' : 'rgba(255,255,255,0.07)';
         ctx.fillRect(row.x, row.y, row.w, row.h);
@@ -401,12 +535,15 @@
         }
         ctx.textAlign = 'right';
         ctx.font = 'bold 23px sans-serif';
-        ctx.fillStyle = owned ? '#8a93a8' : afford ? '#ffd54a' : '#ff6b7a';
-        ctx.fillText(owned ? '보유 중' : `${it.price} G`, row.x + row.w - 16, row.y + row.h / 2 - (it.heal !== undefined ? 8 : 0));
-        if (it.heal !== undefined) { // 물약은 가진 개수를 보여준다
+        ctx.fillStyle = placing ? (it.id === s.slotItem ? '#8a93a8' : '#7dffa0') : owned ? '#8a93a8' : afford ? '#ffd54a' : '#ff6b7a';
+        const label = placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : `${price} G`;
+        const twoLine = it.heal !== undefined || it.consumable || (it.decor && !it.clear);
+        ctx.fillText(label, row.x + row.w - 16, row.y + row.h / 2 - (twoLine ? 8 : 0));
+        if (twoLine) { // 물약/장식품은 가진 개수를 보여준다
           ctx.font = '14px sans-serif';
           ctx.fillStyle = '#b8c2dc';
-          ctx.fillText(`보유 ${s.inv.potions[it.id]}개`, row.x + row.w - 16, row.y + row.h / 2 + 16);
+          const cnt = it.heal !== undefined ? `보유 ${s.inv.potions[it.id]}개` : it.consumable ? `보유 ${s.inv.consumables[it.id] || 0}개` : placing ? `남은 ${G.Shop.decorLeft(s.inv, it.id)}개` : `보유 ${s.inv.home.owned[it.id] || 0}개`;
+          ctx.fillText(cnt, row.x + row.w - 16, row.y + row.h / 2 + 16);
         }
       });
       ctx.textAlign = 'center';
@@ -506,6 +643,9 @@
         `패링 쿨다운 ${Math.max(0.25, C.PARRY_COOLDOWN + st.cooldownAdd).toFixed(1)}초`,
         st.canThrow ? `던지기 +${st.throwTiles}칸` : '던지기 불가 (대검)',
         `이동 속도 ${Math.round((1 + st.speedAdd) * 100)}%`,
+        `코인 획득 +${Math.round(e.bonus.coin * 100)}%  (집 장식 ${e.bonus.n}개)`,
+        `치명타 확률 ${Math.round(e.bonus.crit * 1000) / 10}%`,
+        `치명타 대미지 ${e.bonus.critDamage}`,
       ];
       ctx.textAlign = 'left';
       ctx.font = '14px sans-serif';
@@ -689,7 +829,10 @@
       if (m.kind === 'bat') this._paintBat(ctx, m);
       else if (m.kind === 'crab') this._paintCrab(ctx, m);
       else if (m.kind === 'golem') this._paintGolem(ctx, m);
+      else if (m.kind === 'darkstone') this._paintDarkStone(ctx, m);
+      else if (m.kind === 'shade') this._paintShade(ctx, m);
       else this._paintSlime(ctx, m);
+      if (m.dark) this._drawDarkAura(ctx, m);
       if (m.staggered > 0) this._drawDazed(ctx, m);
       if (m.poison) this._drawPoisoned(ctx, m);
       if (m.burn) this._drawBurning(ctx, m);
@@ -898,6 +1041,163 @@
     }
 
     // 꽃게: 옆걸음 다리, 눈자루, 두 집게. 예비동작엔 집게를 번쩍 들고 눈이 붉어지며, 돌진 땐 집게를 앞으로 내민다
+    // 던전 바닥의 아이템: 위아래로 둥실거리며 빛난다
+    _drawPickup(ctx, p, time) {
+      const bob = Math.sin((p.t + time) * 3) * 4;
+      const g = ctx.createRadialGradient(p.x, p.y + bob, 2, p.x, p.y + bob, 26);
+      g.addColorStop(0, 'rgba(255,255,200,0.55)');
+      g.addColorStop(1, 'rgba(255,255,200,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - 26, p.y + bob - 26, 52, 52);
+      this._drawItemIcon(ctx, G.Shop.ITEMS[p.id], p.x, p.y + bob, 0.6);
+    }
+
+    // 몬스터가 쏜 어둠 구슬 (쳐내면 하얗게 변해 되돌아간다)
+    _drawEnemyShot(ctx, f) {
+      const white = f.reflected;
+      const g = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, 18);
+      g.addColorStop(0, white ? 'rgba(255,255,255,0.95)' : 'rgba(230,170,255,0.9)');
+      g.addColorStop(1, white ? 'rgba(200,220,255,0)' : 'rgba(120,40,200,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(f.x - 18, f.y - 18, 36, 36);
+      ctx.fillStyle = white ? '#e8f0ff' : '#5a1fa0';
+      ctx.beginPath(); ctx.arc(f.x, f.y, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = white ? '#ffffff' : '#a05aff';
+      ctx.beginPath(); ctx.arc(f.x - 1, f.y - 1, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // 시크너에게 통제받던 마을: 보랏빛 어둠이 드리우고 어둠의 연기가 피어오른다
+    _drawDarkVillage(ctx, a, time) {
+      ctx.save();
+      ctx.fillStyle = `rgba(30,8,55,${a})`;
+      ctx.fillRect(0, 0, this.viewW, this.viewH);
+      const g = ctx.createRadialGradient(this.viewW / 2, this.viewH * 0.55, this.viewH * 0.25, this.viewW / 2, this.viewH * 0.55, this.viewW * 0.7);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, `rgba(15,0,30,${a * 1.6})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, this.viewW, this.viewH);
+      for (let i = 0; i < 18; i++) { // 천천히 피어오르는 어둠의 연기
+        const x = ((G.Cave.rnd(i, 1, 9) * this.viewW + Math.sin(time * 0.4 + i) * 30) % this.viewW);
+        const y = this.viewH - (((time * (12 + (i % 4) * 5)) + G.Cave.rnd(i, 2, 9) * this.viewH) % this.viewH);
+        ctx.fillStyle = `rgba(110,40,190,${0.18 * (y / this.viewH)})`;
+        ctx.beginPath(); ctx.arc(x, y, 14 + (i % 3) * 8, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 스태미나: 왼쪽 아래 초록 막대 (모자라면 붉게)
+    _drawStamina(ctx, hud) {
+      const w = 170;
+      const x = 14;
+      const y = this.viewH - 30;
+      const k = Math.max(0, Math.min(1, hud.stamina / hud.staminaMax));
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(x - 2, y - 2, w + 4, 18);
+      ctx.fillStyle = '#143a2a';
+      ctx.fillRect(x, y, w, 14);
+      ctx.fillStyle = k < 0.25 ? '#ff6a5a' : '#4fe0a0';
+      ctx.fillRect(x, y, w * k, 14);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(x, y, w * k, 4);
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`스태미나 ${Math.round(hud.stamina)}`, x + 6, y + 7);
+      const c = hud.consumables || {};
+      const bits = [];
+      if (c.icebomb > 0) bits.push(`얼음폭탄 ${c.icebomb} (B)`);
+      const food = (c.burger || 0) + (c.melon || 0) + (c.st30 || 0) + (c.st70 || 0);
+      if (food > 0) bits.push(`먹기 ${food} (V)`);
+      if (bits.length) {
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillText(bits.join('   '), x + 1, y - 9);
+        ctx.fillStyle = '#d8f8e8';
+        ctx.fillText(bits.join('   '), x, y - 10);
+      }
+      ctx.restore();
+    }
+
+    // 다크월드 몬스터: 보랏빛 어둠의 기운과 붉은 눈이 덧입혀진다 (외형이 조금 달라진다)
+    _drawDarkAura(ctx, m) {
+      const t = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
+      const cx = sp(m.x + m.w / 2);
+      const cy = sp(m.y + m.h / 2);
+      const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, Math.max(m.w, m.h) * 0.95);
+      g.addColorStop(0, 'rgba(150,60,230,0.28)');
+      g.addColorStop(1, 'rgba(60,10,120,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - m.w, cy - m.h, m.w * 2, m.h * 2);
+      ctx.fillStyle = 'rgba(40,10,70,0.28)'; // 몸을 어둡게
+      ctx.fillRect(m.x, m.y, m.w, m.h);
+      ctx.fillStyle = 'rgba(255,60,90,0.9)'; // 붉게 번득이는 눈
+      const ey = m.y + m.h * 0.38;
+      ctx.fillRect(cx + m.dir * 3 - 6, ey, 4, 3);
+      ctx.fillRect(cx + m.dir * 3 + 2, ey, 4, 3);
+      for (let k = 0; k < 3; k++) { // 위로 피어오르는 어둠 연기
+        const a = (t * 0.9 + k / 3) % 1;
+        ctx.fillStyle = `rgba(120,50,200,${0.4 * (1 - a)})`;
+        ctx.fillRect(cx - 8 + k * 8 + Math.sin(t * 3 + k) * 3, m.y - a * 20, 3, 3);
+      }
+    }
+
+    // 어둠의 돌: 보랏빛 균열이 가득한 검은 바위 몸. 팔을 들면 눈이 더 붉어진다
+    _paintDarkStone(ctx, g) {
+      const windup = g.state === 'windup';
+      const lunge = g.state === 'lunge';
+      const flash = g.flying && Math.floor(g.flightTime / 0.05) % 2 === 0;
+      const rock = flash ? '#ffffff' : '#3a2a58';
+      const dark = flash ? '#ffffff' : '#150a24';
+      const bob = Math.abs(g.vx) > 5 ? Math.abs(Math.sin(g.time * 5)) * 1.5 : 0;
+      ctx.save();
+      ctx.translate(sp(g.x + g.w / 2), sp(g.y + g.h));
+      ctx.scale(g.dir >= 0 ? 1 : -1, 1);
+      ctx.translate(lunge ? 5 : 0, -bob);
+      ctx.rotate(lunge ? 0.16 : 0);
+      ctx.fillStyle = dark; ctx.fillRect(-14, -12, 11, 12); ctx.fillRect(3, -12, 11, 12);
+      ctx.fillStyle = rock;
+      ctx.beginPath(); ctx.moveTo(-19, -10); ctx.lineTo(-21, -30); ctx.lineTo(-12, -42); ctx.lineTo(12, -42); ctx.lineTo(21, -30); ctx.lineTo(19, -10); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = dark; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(210,120,255,0.9)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-8, -40); ctx.lineTo(-4, -28); ctx.lineTo(-12, -18); ctx.moveTo(9, -38); ctx.lineTo(12, -26); ctx.lineTo(5, -14); ctx.stroke();
+      ctx.strokeStyle = dark; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(side * 19, -32);
+        if (windup) ctx.lineTo(side * 22, -52); else if (lunge) ctx.lineTo(22, -26); else ctx.lineTo(side * 24, -18);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      ctx.fillStyle = flash ? '#ffffff' : (windup || lunge ? '#ff2a4a' : '#ff6a8a');
+      ctx.fillRect(-9, -32, 6, 4); ctx.fillRect(3, -32, 6, 4);
+      ctx.restore();
+    }
+
+    // 시크너의 그림자: 두건을 쓴 검은 형체가 떠다니며, 구슬을 모을 때 손이 빛난다
+    _paintShade(ctx, b) {
+      const cx = sp(b.x + b.w / 2);
+      const cy = sp(b.y + b.h / 2);
+      const flash = (b.flying && Math.floor(b.flightTime / 0.05) % 2 === 0) || b.hurtFlash > 0;
+      ctx.save();
+      ctx.translate(cx, cy + Math.sin(b.time * 3) * 2);
+      ctx.scale(b.dir >= 0 ? 1 : -1, 1);
+      ctx.fillStyle = flash ? '#ffffff' : '#1a0a2e';
+      ctx.beginPath(); ctx.moveTo(-12, 16); ctx.quadraticCurveTo(-16, -6, 0, -16); ctx.quadraticCurveTo(16, -6, 12, 16);
+      for (let k = 0; k < 4; k++) ctx.lineTo(12 - (k + 0.5) * 6, 16 + (k % 2 ? 0 : 5)); // 일렁이는 아랫단
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = flash ? '#ffffff' : '#7a3ad0'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = flash ? '#ffffff' : '#ff3a5a';
+      ctx.fillRect(2, -8, 4, 3); ctx.fillRect(8, -8, 4, 3);
+      if (b.cast > 0) { // 구슬을 모으는 중
+        const k = 1 - b.cast / 0.6;
+        const g = ctx.createRadialGradient(16, 2, 1, 16, 2, 6 + 10 * k);
+        g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(160,70,240,0)');
+        ctx.fillStyle = g; ctx.fillRect(2, -14, 30, 32);
+      }
+      ctx.restore();
+    }
+
     // 흙괴물: 진흙과 바위로 된 몸. 몸을 던지기 전에 팔을 번쩍 든다. 머리와 어깨에 눈이 쌓여 있다
     _paintGolem(ctx, g) {
       const windup = g.state === 'windup';
@@ -1076,8 +1376,9 @@
         this._drawHeart(ctx, this.viewW - 28 - (hud.maxLives - 1 - i) * 34, 10, 26, i < hud.lives);
       }
 
-      if (hud.coins !== undefined) this._drawCoinHud(ctx, hud.coins, hud.potions);
-      if (hud.dialog) this._drawBottomText(ctx, hud.dialog.text, Math.min(1, hud.dialog.t / 0.3));
+      if (hud.coins !== undefined) this._drawCoinHud(ctx, hud.coins, hud.potions, hud.exp);
+      if (hud.home) this._drawHomeHud(ctx, hud.home);
+      if (hud.dialog) this._drawBottomText(ctx, hud.dialog.text + (hud.dialog.queue ? '   ▶ E' : ''), Math.min(1, hud.dialog.t / 0.3));
       else if (hud.prompt) this._drawBottomText(ctx, hud.prompt);
       if (hud.shop) this._drawShop(ctx, hud.shop);
       if (hud.equip) this._drawEquip(ctx, hud.equip);

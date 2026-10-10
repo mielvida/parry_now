@@ -15,6 +15,12 @@
       this.batSpawns = [];
       this.crabSpawns = [];
       this.golemSpawns = []; // 흙괴물 (G)
+      this.darkStoneSpawns = []; // 어둠의 돌 (k)
+      this.shadeSpawns = [];     // 시크너의 그림자 (j)
+      this.story = null;         // 이야기 진행 (다크월드 문을 보일지 정한다). main이 연결한다
+      this.homeLots = [];    // 마을의 내 집 터 (Y)
+      this.home = null;      // 인벤토리의 home (산 집 종류, 놓은 장식품). main이 연결한다
+      this.homeSlots = [];   // 집 안의 꾸밀 자리 (home 스테이지에서 main이 채운다)
       this.treasure = null; // 보물 상자 위치 {col,row}
       this.houses = [];     // 해변 집 위치 {col,row} (장식)
       this.luggage = [];    // 짐더미 위치 {col,row} (장식)
@@ -34,12 +40,22 @@
           if (ch === 'B') this.batSpawns.push({ col: c, row: r });
           if (ch === 'C') this.crabSpawns.push({ col: c, row: r });
           if (ch === 'G') this.golemSpawns.push({ col: c, row: r });
+          if (ch === 'k') this.darkStoneSpawns.push({ col: c, row: r });
+          if (ch === 'j') this.shadeSpawns.push({ col: c, row: r });
+          if (ch === 'E') this.shops.push({ col: c, row: r, kind: 'dweapon' });
+          if (ch === 'I') this.shops.push({ col: c, row: r, kind: 'ditem' });
+          if (ch === 'Z') this.gates.push({ col: c, row: r, stage: 'darkhub' });
+          if (ch === 'J') this.gates.push({ col: c, row: r, stage: 'dungeon' });
           if (ch === 'T') this.treasure = { col: c, row: r };
           if (ch === 'H') this.houses.push({ col: c, row: r });
           if (ch === 'L') this.luggage.push({ col: c, row: r });
           if (ch === 'K') this.shops.push({ col: c, row: r, kind: 'potion' });
           if (ch === 'W') this.shops.push({ col: c, row: r, kind: 'sword' });
           if (ch === 'A') this.shops.push({ col: c, row: r, kind: 'armor' });
+          if (ch === 'U') this.shops.push({ col: c, row: r, kind: 'mine' });
+          if (ch === 'R') this.shops.push({ col: c, row: r, kind: 'estate' });
+          if (ch === 'Q') this.shops.push({ col: c, row: r, kind: 'decor' });
+          if (ch === 'Y') this.homeLots.push({ col: c, row: r });
           if (ch === 'V') this.villagers.push({ col: c, row: r });
           if (ch === 'D') this.caveEntrances.push({ col: c, row: r });
           if (ch === 'X') this.exits.push({ col: c, row: r });

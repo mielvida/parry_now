@@ -11,6 +11,11 @@
     villager: { robe: '#4f9a6a', trim: '#7fcf98', hat: '#e0c36a', beard: null, hair: '#6b4423', skin: '#e8b98a' },
     potion: { robe: '#8a4fb8', trim: '#c79cf0', hat: '#5a2d82', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
     armor: { robe: '#7a3b3b', trim: '#b86060', hat: '#c9d2dc', beard: '#8a5a2b', hair: '#3a2f22', skin: '#e0a878' },
+    darksmith: { robe: '#3a2a5a', trim: '#8a60d0', hat: '#1a1030', beard: '#c9c0d8', hair: '#1a1030', skin: '#c8b0a0', apron: '#1a1030' },
+    darkmerchant: { robe: '#2a4a4a', trim: '#60d0b0', hat: '#10302a', beard: null, hair: '#10302a', skin: '#c8b0a0' },
+    agent: { robe: '#2f3a52', trim: '#c9d2dc', hat: '#2a2a30', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
+    designer: { robe: '#d4608a', trim: '#ffc0d8', hat: '#8a2a5a', beard: null, hair: '#6b4423', skin: '#e8b98a' },
+    miner: { robe: '#8a6a2b', trim: '#d4a017', hat: '#e0b12f', beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070' },
     smith: { robe: '#5b5f6b', trim: '#8b90a0', hat: null, beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070', apron: '#3a2f22' },
   };
 

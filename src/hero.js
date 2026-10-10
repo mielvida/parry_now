@@ -115,6 +115,13 @@
     ctx.lineCap = 'butt';
   }
 
+  function circle(ctx, color, x, y, r) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   function drawSword(ctx, angle) {
     ctx.save();
     ctx.rotate(angle * DEG);
@@ -130,6 +137,27 @@
       ctx.fillStyle = blade[0];
       ctx.beginPath(); ctx.arc(33, 0, 4.5, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = blade[1]; ctx.lineWidth = 1.2; ctx.stroke();
+    } else if (weaponType === 'bomb') { // 폭탄: 둥근 몸 + 타는 심지
+      circle(ctx, blade[0], 8, 0, 6);
+      circle(ctx, 'rgba(255,255,255,0.35)', 6, -2, 2);
+      rect(ctx, '#a66a33', 8, -9, 2, 4);
+      circle(ctx, blade[1], 9, -11, 2.5);
+    } else if (weaponType === 'gun') { // 총: 손잡이 + 총신
+      rect(ctx, '#4a2f1a', -2, 1, 6, 8);
+      rect(ctx, blade[0], 0, -3, 22, 5);
+      rect(ctx, blade[1], 0, 0, 22, 2);
+      rect(ctx, '#2a2f3a', 20, -4, 5, 7);
+    } else if (weaponType === 'bow') { // 활: 휘어진 몸 + 시위
+      ctx.strokeStyle = blade[0]; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(8, 0, 13, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
+      ctx.strokeStyle = blade[1]; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(8, -13); ctx.lineTo(8, 13); ctx.stroke();
+      rect(ctx, '#c9d2dc', 0, -1, 14, 2);
+    } else if (weaponType === 'shield') { // 방패: 둥근 방패를 앞에 든다
+      circle(ctx, blade[1], 14, 0, 12);
+      circle(ctx, blade[0], 14, 0, 9.5);
+      circle(ctx, 'rgba(255,255,255,0.35)', 11, -3, 3);
+      rect(ctx, '#e0b12f', 12.5, -1.5, 3, 3);
     } else if (weaponType === 'dagger') { // 단검: 짧고 가는 칼날
       rect(ctx, '#6b4423', -4, -1.5, 5, 3);
       rect(ctx, '#e0b12f', 1, -3.5, 2.5, 7);
