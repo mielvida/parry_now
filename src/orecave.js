@@ -139,7 +139,7 @@
       p.facing = this.swingDir;
       this.swingT = SWING_TIME;
       if (tier < nd.ore.tier) { // 너무 단단해서 튕겨 나온다
-        h.say(`${nd.ore.name} 광석은 ${nd.ore.tier}단계 곡괭이가 필요해요 (지금 ${tier}단계)`, 'rgba(255,170,170,A)');
+        h.say(h.hasLens() ? `${nd.ore.name} 광석은 ${nd.ore.tier}단계 곡괭이가 필요해요 (지금 ${tier}단계)` : `${nd.ore.name} 광석은 너무 단단해서 곡괭이가 튕겨 나와요`, 'rgba(255,170,170,A)');
         h.sound('deny');
         nd.shake = 0.5;
         h.fx.shake(1.5, 0.06);
@@ -271,9 +271,10 @@
           const d = dn[0];
           G.TextLayer.add(`E: ${d.ore.name} 광석 줍기${dn.length > 1 ? ` 외 ${dn.length - 1}개` : ''}`, d.x, d.y - 46, 'bold 13px sans-serif', '#ffe9a0');
         } else if (near) {
-          const ok = this.host.pickTier() >= near.ore.tier;
+          const h = this.host;
+          const ok = h.pickTier() >= near.ore.tier || !h.hasLens(); // 돋보기가 없으면 단계를 알 수 없으니 빨갛게 알리지 않는다
           const sz = sizeOf(near.ore);
-          G.TextLayer.add(`E 길게: ${near.ore.name} 광석 (곡괭이 ${near.ore.tier}단계)`, near.x, near.y - 52 * sz - 14, 'bold 13px sans-serif', ok ? '#ffffff' : '#ff9a9a');
+          G.TextLayer.add(`E 길게: ${near.ore.name} 광석${h.hasLens() ? ` (곡괭이 ${near.ore.tier}단계)` : ''}`, near.x, near.y - 52 * sz - 14, 'bold 13px sans-serif', ok ? '#ffffff' : '#ff9a9a');
         }
       }
     }

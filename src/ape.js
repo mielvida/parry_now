@@ -55,7 +55,7 @@
       this.hold = 0.55;       // 착지 후 주저앉아 있는 시간
     }
 
-    get vulnerable() { return this.alive && (this.state === 'down' || this.state === 'stun'); }
+    get vulnerable() { return this.alive && (this.state === 'down' || this.state === 'stun' || this.state === 'cling'); }
     get dead() { return this.state === 'dead'; }
     get landing() { return this.state === 'air' && this.attacking && this.st / this.dur > 0.45; }
     damage(n) { this.boss.damageBody(n); }

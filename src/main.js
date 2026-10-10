@@ -182,6 +182,15 @@
   let staminaWait = 0;           // 스태미나를 쓴 직후 회복이 잠깐 멈추는 시간
   const story = { caves: 0, pending: false, revealed: false, cleared: false }; // 이야기: 동굴 15번 클리어 -> 시크너 이야기 -> 다크월드 문
   let darkFloor = 1;             // 던전에서 지금 도전할 층
+  const floorSeeds = {};         // 층마다 한번 정해진 지형/이벤트 씨앗: 죽어도 클리어 전까지는 똑같은 방에서 다시 시작한다
+  // fn 안의 Math.random을 씨앗으로 고정해 같은 결과를 만든다
+  function seeded(seed, fn) {
+    const orig = Math.random;
+    let a = seed >>> 0;
+    Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    try { return fn(); } finally { Math.random = orig; }
+  }
+  const floorSeed = (f) => (floorSeeds[f] === undefined ? (floorSeeds[f] = Math.floor(Math.random() * 4294967296)) : floorSeeds[f]);
   let darkBest = 0;              // 지금까지 클리어한 가장 높은 층
   let dungeon = null;            // 지금 층의 지형 {floor, rows, boss}
   const pickups = [];            // 던전에서 주울 수 있는 아이템 {x,y,id,t}
@@ -1002,6 +1011,7 @@
     popup: (x, y, text, color, t = 1.2) => popups.push({ x, y, text, t, color }),
     giveOre(id, n) { inv.ores[id] = (inv.ores[id] || 0) + n; G.Forge.markDirty(); },
     pickTier: () => G.Forge.bestPick(inv),
+    hasLens: () => inv.equipped.weapon === 'magnifier', // 약점 돋보기를 끼면 광석 단계가 보인다
     pickLook: () => { const id = inv.equipped.pick; return id && G.Shop.ITEMS[id] ? G.Shop.ITEMS[id].look : null; },
     hitStop: (sec) => { hitStop = Math.max(hitStop, sec); },
   });
@@ -1016,7 +1026,7 @@
     }
     const st = STAGES[name];
     G.Audio.setMusic(st.music || 'cave'); // 마을은 활기찬 노래, 나머지는 동굴 곡
-    if (name === 'dungeon') dungeon = G.Dark.makeFloor(darkFloor); // 층마다 새로 만든다
+    if (name === 'dungeon') dungeon = seeded(floorSeed(darkFloor), () => G.Dark.makeFloor(darkFloor)); // 층마다 한 번 정해지면 클리어할 때까지 같은 방
     if (name === 'orecave') { oreRun += 1; oreLevel = makeOreCave(oreRun); } // 들어갈 때마다 새 광물 동굴
     terrain = new G.Terrain(st.level);
     renderer.theme = st.theme;
@@ -1077,7 +1087,7 @@
     }
     if (st.dark) scatterPickups(); // 던전에서는 가끔 아이템이 떨어져 있다
     oreNodes.setup(terrain, oreRun, name === 'orecave'); // 광물 동굴이면 광석 덩어리를 깐다
-    dungeonEvents.setup(terrain, darkFloor, name === 'dungeon' && !!(dungeon && dungeon.tower) && darkFloor % 3 === 0); // 탑의 3층마다(3, 6, 9 …) 이벤트가 나온다. 보스방/허브/그 밖의 층은 비움
+    seeded(floorSeed(darkFloor) ^ 0x9e3779b9, () => dungeonEvents.setup(terrain, darkFloor, name === 'dungeon' && !!(dungeon && dungeon.tower) && darkFloor % 3 === 0)); // 탑의 3층마다(3, 6, 9 …) 이벤트가 나온다. 보스방/허브/그 밖의 층은 비움
     baseMonsterCount = monsters.length;
     spots = terrain.standingSpots();
 
@@ -2813,6 +2823,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const gain = floor * 5 + (dungeon.bossKind ? 200 + floor * 5 : 0);
     exp += gain;
     darkBest = Math.max(darkBest, floor);
+    delete floorSeeds[floor]; // 클리어한 층은 다음에 새 방으로
     G.Audio.play('treasure');
     effects.treasure(player.x + player.w / 2, player.y);
     if (floor >= C.DUNGEON_FLOORS) { // 시크너를 쓰러뜨렸다
