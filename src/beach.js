@@ -177,8 +177,64 @@
     ctx.fillRect(baseX + 20, baseY - 56, 5, 7);
   }
 
+  // 용광로: 돌로 쌓은 화로에 불이 이글거리고, 굴뚝에서 연기가 오른다 (광석을 녹여 주괴를 만든다)
+  function drawFurnace(ctx, baseX, baseY, time) {
+    const x = baseX - 46;
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.beginPath(); ctx.ellipse(baseX, baseY, 70, 7, 0, 0, Math.PI * 2); ctx.fill();
+    // 불빛 (바닥과 주변을 붉게 비춘다)
+    const flick = 0.75 + 0.25 * Math.sin(time * 9) + 0.1 * Math.sin(time * 23);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(baseX, baseY - 30, 4, baseX, baseY - 30, 110);
+    g.addColorStop(0, 'rgba(255,150,40,' + (0.32 * flick) + ')');
+    g.addColorStop(1, 'rgba(255,90,20,0)');
+    ctx.fillStyle = g; ctx.fillRect(baseX - 110, baseY - 140, 220, 160);
+    ctx.restore();
+    // 굴뚝
+    ctx.fillStyle = '#5a5560'; ctx.fillRect(baseX + 14, baseY - 150, 24, 80);
+    ctx.fillStyle = '#6e6874'; ctx.fillRect(baseX + 12, baseY - 154, 28, 8);
+    // 몸통 (돌)
+    ctx.fillStyle = '#6a646f'; ctx.fillRect(x, baseY - 92, 92, 92);
+    ctx.fillStyle = '#7d7784'; ctx.fillRect(x + 4, baseY - 88, 84, 8);
+    ctx.fillStyle = '#58535e';
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) ctx.fillRect(x + 6 + c * 22 + (r % 2) * 10, baseY - 72 + r * 18, 18, 2);
+    // 아궁이 구멍 + 불꽃
+    ctx.fillStyle = '#1b1218';
+    ctx.beginPath(); ctx.moveTo(x + 22, baseY); ctx.lineTo(x + 22, baseY - 38); ctx.quadraticCurveTo(baseX, baseY - 62, x + 70, baseY - 38); ctx.lineTo(x + 70, baseY); ctx.closePath(); ctx.fill();
+    for (let i = 0; i < 5; i++) {
+      const fx = x + 28 + i * 9;
+      const h = 14 + 10 * Math.abs(Math.sin(time * 6 + i * 1.7)) + 6 * Math.sin(time * 13 + i);
+      ctx.fillStyle = i % 2 ? '#ff9a2a' : '#ff5a1a';
+      ctx.beginPath(); ctx.moveTo(fx - 5, baseY - 2); ctx.quadraticCurveTo(fx - 2, baseY - h * 0.7, fx, baseY - h - 6); ctx.quadraticCurveTo(fx + 2, baseY - h * 0.7, fx + 5, baseY - 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffe27a';
+      ctx.beginPath(); ctx.moveTo(fx - 2.5, baseY - 2); ctx.quadraticCurveTo(fx, baseY - h * 0.5, fx, baseY - h * 0.7); ctx.quadraticCurveTo(fx + 1, baseY - h * 0.4, fx + 2.5, baseY - 2); ctx.closePath(); ctx.fill();
+    }
+    // 불똥
+    for (let i = 0; i < 4; i++) {
+      const t = (time * 0.7 + i * 0.25) % 1;
+      ctx.fillStyle = 'rgba(255,200,90,' + (1 - t) + ')';
+      ctx.fillRect(baseX - 14 + i * 9 + Math.sin(time * 4 + i) * 5, baseY - 50 - t * 60, 2, 2);
+    }
+    // 굴뚝 연기
+    for (let i = 0; i < 4; i++) {
+      const t = (time * 0.35 + i * 0.25) % 1;
+      ctx.fillStyle = 'rgba(160,155,170,' + (0.35 * (1 - t)) + ')';
+      ctx.beginPath(); ctx.arc(baseX + 26 + Math.sin(time + i * 2) * 8 + t * 16, baseY - 160 - t * 70, 7 + t * 12, 0, Math.PI * 2); ctx.fill();
+    }
+    // 앞의 모루와 주괴 틀
+    ctx.fillStyle = '#3a3a44'; ctx.fillRect(baseX + 50, baseY - 14, 26, 8); ctx.fillRect(baseX + 56, baseY - 6, 14, 6);
+    ctx.fillStyle = '#d98a3a'; ctx.fillRect(baseX + 56, baseY - 18, 12, 4);
+    // 간판
+    ctx.fillStyle = '#7a5530'; ctx.fillRect(baseX - 26, baseY - 112, 52, 18);
+    ctx.fillStyle = '#e9d8a6'; ctx.fillRect(baseX - 24, baseY - 110, 48, 14);
+    G.TextLayer.add('용광로', baseX, baseY - 103, 'bold 12px sans-serif', '#5a3d17');
+    ctx.textAlign = 'start';
+  }
+
   // 상점 가판대: baseX = 가운데, baseY = 땅 윗면. 뒤에 주인이 서 있고 앞에 계산대가 있다
   function drawShop(ctx, shop, baseX, baseY, time) {
+    if (shop.kind === 'furnace') { drawFurnace(ctx, baseX, baseY, time); return; }
     const potion = shop.kind === 'potion';
     const armor = shop.kind === 'armor';
     const mine = shop.kind === 'mine';

@@ -1,6 +1,6 @@
 // 대장간: 같은 무기 3개 합치기(최대 2단계), 광석 제련, 주괴 붙이기, 곡괭이.
 // 데이터와 규칙만 다룬다 (화면은 Renderer가, 입력은 main이). shop.js 뒤에 불러와 G.Shop.ITEMS 에 새 아이템을 더하고
-// 대장간 상점(SHOPS.sword)에 합치기/제련/부착/곡괭이 탭을 이어 붙인다.
+// 대장간 상점(SHOPS.sword)에 합치기/부착/곡괭이 탭을, 용광로 상점(SHOPS.furnace)에 제련 탭을 이어 붙인다.
 //
 //  - 합치기: 같은 무기 3개 -> 한 단계 위 무기(1단계 "강화된 …", 2단계 "최강의 …" = 최대). 단계가 오를수록 모습과 공격이 강해진다
 //  - 곡괭이로 광물 동굴(orecave.js)에서 광석을 캔다. 광석 3개를 제련하면 주괴 1개
@@ -269,7 +269,7 @@
         run: (wallet) => attach(wallet.inv, o.id, wallet),
       }));
     }
-    if (!ingots.length) out.push(infoCard(`${CLS_NAME[cls]}에 붙일 주괴가 없어요`, [`${CLS_NAME[cls]}용 광석을 캐서 제련하세요.`, cls === 'sword' ? '검용: 철·구리·은·금·미스릴·흑요석·별철·심연석' : '총용: 초석·납·황철석·유황·티타늄·폭렬석·백금·암흑강'], ITEMS[cls === 'sword' ? 'ore_iron' : 'ore_saltpeter']));
+    if (!ingots.length) out.push(infoCard(`${CLS_NAME[cls]}에 붙일 주괴가 없어요`, [`${CLS_NAME[cls]}용 광석을 캐서 용광로에서 제련하세요.`, cls === 'sword' ? '검용: 철·구리·은·금·미스릴·흑요석·별철·심연석' : '총용: 초석·납·황철석·유황·티타늄·폭렬석·백금·암흑강'], ITEMS[cls === 'sword' ? 'ore_iron' : 'ore_saltpeter']));
     if (list.length) {
       out.push(card({
         id: 'attach:detach', kind: 'detach', icon: ITEMS['ingot_' + list[list.length - 1]],
@@ -299,7 +299,10 @@
   }
 
   const baseTabs = Shop.SHOPS.sword.tabs; // 검/대검/단검/지팡이/신성 강화
-  Object.defineProperty(Shop.SHOPS.sword, 'tabs', { get: () => (bound ? baseTabs.concat(forgeTabs(bound)) : baseTabs), configurable: true, enumerable: true });
+  // 대장간: 합치기·부착·곡괭이. 제련은 따로 있는 용광로(마을)에서 한다
+  Object.defineProperty(Shop.SHOPS.sword, 'tabs', { get: () => (bound ? baseTabs.concat(forgeTabs(bound).filter((t) => t.name !== '제련')) : baseTabs), configurable: true, enumerable: true });
+  Shop.SHOPS.furnace = { title: '용광로' };
+  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name === '제련') : []), configurable: true, enumerable: true });
 
   function act(item, wallet) {
     const r = item.run(wallet);
