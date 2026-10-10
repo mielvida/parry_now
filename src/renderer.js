@@ -755,6 +755,59 @@
       ctx.restore();
     }
 
+    // 대장 레벨 표시 (레벨 + 경험치 막대)
+    _smithBadge(ctx, sm, x, y) {
+      if (!sm) return;
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#ffd9a0';
+      ctx.fillText(`⚒ 대장 Lv ${sm.lv}${sm.lv >= sm.max ? ' (최고)' : ''}`, x, y - 6);
+      if (sm.need) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x - 50, y + 6, 100, 6);
+        ctx.fillStyle = '#ffb347'; ctx.fillRect(x - 50, y + 6, 100 * (sm.xp / sm.need), 6);
+      }
+      ctx.restore();
+    }
+
+    static workChoiceGeometry(vw, vh) {
+      const w = 600, h = 300;
+      const x = (vw - w) / 2, y = (vh - h) / 2;
+      return { panel: { x, y, w, h }, self: { x: x + 24, y: y + 112, w: 262, h: 100 }, smith: { x: x + 314, y: y + 112, w: 262, h: 100 }, cancel: { x: x + w - 108, y: y + h - 44, w: 90, h: 30 } };
+    }
+
+    // 제련/부착을 직접(미니게임) 할지, 대장장이에게 맡길지 고른다
+    _drawWorkChoice(ctx, k) {
+      const g = Renderer.workChoiceGeometry(this.viewW, this.viewH);
+      const P = g.panel;
+      const label = k.kind === 'smelt' ? '제련' : '부착';
+      const tierName = ['쉬움', '보통', '어려움', '최대'][k.tier - 1];
+      const total = k.base + k.smithFee;
+      const canSmith = k.coins >= total;
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, this.viewW, this.viewH);
+      ctx.fillStyle = '#1d2233'; ctx.fillRect(P.x, P.y, P.w, P.h);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#e0b12f'; ctx.strokeRect(P.x, P.y, P.w, P.h);
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffd54a';
+      ctx.fillText(`${label} — ${k.oreName} (${k.tier}단계 · 난이도 ${tierName})`, P.x + 24, P.y + 34);
+      this._smithBadge(ctx, k.smith, P.x + P.w - 90, P.y + 38);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#b8c2dc';
+      ctx.fillText('어떻게 할까요?', P.x + 24, P.y + 76);
+      const box = (r, on, hot, title, l1, l2, c2) => {
+        ctx.fillStyle = on ? 'rgba(111,208,255,0.16)' : 'rgba(255,255,255,0.05)'; ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.lineWidth = 2; ctx.strokeStyle = on ? '#6fd0ff' : 'rgba(255,255,255,0.15)'; ctx.strokeRect(r.x, r.y, r.w, r.h);
+        ctx.textAlign = 'center'; ctx.font = 'bold 19px sans-serif'; ctx.fillStyle = on ? '#e6f6ff' : '#667088';
+        ctx.fillText(`${hot}. ${title}`, r.x + r.w / 2, r.y + 24);
+        ctx.font = '13px sans-serif'; ctx.fillStyle = on ? '#9fe8a8' : '#667088'; ctx.fillText(l1, r.x + r.w / 2, r.y + 52);
+        ctx.fillStyle = on ? c2 : '#667088'; ctx.fillText(l2, r.x + r.w / 2, r.y + 76);
+      };
+      box(g.self, true, 1, '직접 하기', k.kind === 'smelt' ? '불 온도 맞추기 미니게임' : '두드려 붙이기 미니게임', `수수료 ${k.base} G · 경험치를 얻어요`, '#ffd54a');
+      box(g.smith, canSmith, 2, '대장장이에게 맡기기', '확실히 성공 (경험치는 없어요)', `${total} G (재료 ${k.base} + 맡김 ${k.smithFee})`, '#ffd54a');
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(g.cancel.x, g.cancel.y, g.cancel.w, g.cancel.h);
+      ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#b8c2dc'; ctx.fillText('Esc 취소', g.cancel.x + g.cancel.w / 2, g.cancel.y + g.cancel.h / 2);
+      ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = k.msgT > 0 ? '#ff8a8a' : 'rgba(0,0,0,0)';
+      ctx.textAlign = 'left'; ctx.fillText(k.msg, P.x + 24, P.y + P.h - 29);
+      ctx.restore();
+    }
+
     // 제련 미니게임: 풀무질로 온도를 초록 띠에 맞춘다
     _drawSmeltGame(ctx, a) {
       const W = this.viewW, H = this.viewH;
@@ -768,6 +821,7 @@
       ctx.lineWidth = 4; ctx.strokeStyle = '#e0b12f'; ctx.strokeRect(P.x, P.y, P.w, P.h);
       ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffd54a';
       ctx.fillText('제련 — 불 온도 맞추기', P.x + 24, P.y + 32);
+      this._smithBadge(ctx, a.smith, P.x + P.w / 2, P.y + 32);
       ctx.textAlign = 'right'; ctx.font = 'bold 24px sans-serif';
       const sec = Math.ceil(a.t);
       ctx.fillStyle = sec <= 15 ? '#ff8a8a' : '#fff';
@@ -857,6 +911,7 @@
       ctx.lineWidth = 4; ctx.strokeStyle = '#e0b12f'; ctx.strokeRect(P.x, P.y, P.w, P.h);
       ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffd54a';
       ctx.fillText('부착 — 두드려 붙이기', P.x + 24, P.y + 32);
+      this._smithBadge(ctx, a.smith, P.x + P.w / 2, P.y + 32);
       ctx.textAlign = 'right'; ctx.font = 'bold 24px sans-serif';
       const sec = Math.ceil(a.t);
       ctx.fillStyle = sec <= 20 ? '#ff8a8a' : '#fff';
@@ -941,6 +996,7 @@
       ctx.font = 'bold 30px sans-serif';
       ctx.fillStyle = '#ffd54a';
       ctx.fillText(s.def.title, x + 28, y + 36);
+      if (s.kind === 'furnace' && G.Forge) { const sm = G.Forge.smithOf(s.inv); this._smithBadge(ctx, { lv: sm.lv, xp: sm.xp, need: sm.lv >= G.Forge.SMITH_MAX_LV ? 0 : G.Forge.smithNeed(sm.lv), max: G.Forge.SMITH_MAX_LV }, x + w / 2 - 20, y + 36); ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; }
       ctx.textAlign = 'right';
       ctx.font = 'bold 22px sans-serif';
       ctx.fillStyle = '#fff';
@@ -2854,6 +2910,7 @@
       if (hud.dialog) this._drawBottomText(ctx, hud.dialog.text + (hud.dialog.queue ? '   ▶ E' : ''), Math.min(1, hud.dialog.t / 0.3));
       else if (hud.prompt) this._drawBottomText(ctx, hud.prompt);
       if (hud.shop) this._drawShop(ctx, hud.shop);
+      if (hud.work) this._drawWorkChoice(ctx, hud.work);
       if (hud.attach) this._drawAttachGame(ctx, hud.attach);
       if (hud.smelt) this._drawSmeltGame(ctx, hud.smelt);
       if (hud.equip) this._drawEquip(ctx, hud.equip);
@@ -2861,7 +2918,7 @@
       if (hud.mini) this._drawMini(ctx, hud.mini);
       if (hud.settings) this._drawSettings(ctx, hud.settings);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.attach && !hud.smelt) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.attach && !hud.smelt && !hud.work) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

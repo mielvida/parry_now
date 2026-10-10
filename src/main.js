@@ -1279,17 +1279,54 @@
   //  움직이는 눈금이 초록 칸(가운데는 완벽)에 있을 때 Space/Enter/클릭. 진행 100%가 되면 붙는다.
   //  시간이 다 되거나 Esc로 나가면 실패: 주괴와 수수료는 그대로다. 성공할 때만 수수료를 낸다
   let ag = null;
-  // 광석이 희귀할수록 어렵다: 4단계가 가장 어렵고(초록 칸이 가장 좁고 눈금이 가장 빠르며 빗나가면 -6), 1단계는 아주 쉽다.
-  // 처음의 '보통' 난이도(초록 칸 ±0.14, 눈금 2 rad/s, +14/+8/-6)가 최대 단계다. 진행이 식거나 칸이 흔들리지 않는다
+  // 광석이 희귀할수록 어렵다: 4단계가 가장 어렵고(초록 칸이 가장 좁고 눈금이 가장 빠르며 빗나가면 -8), 1단계는 쉽다.
+  // 너무 쉬운 첫 난이도와 너무 어려운 둘째 난이도의 중간이 최대 단계다: 진행이 조금 식고 칸이 살짝 흔들리지만 눈금은 읽을 만하다
   function attachDifficulty(tier) {
     const d = (tier - 1) / 3; // 0(쉬움) ~ 1(최대)
-    return {
-      goodW: 0.24 - 0.1 * d, perfW: 0.09 - 0.04 * d,
-      spd0: 1.4 + 0.6 * d, spdP: 0.01 + 0.01 * d, // 눈금 속도(rad/s) = spd0 + 진행 × spdP
-      decay: 0, driftAmp: 0, harm: 0,
-      gainP: Math.round(16 - 2 * d), gainG: Math.round(10 - 2 * d), lossM: Math.round(2 + 4 * d),
+    const e = G.Forge.smithEase(inv); // 대장 레벨이 오를수록 쉬워진다 (최고 레벨 e=1)
+    const raw = {
+      goodW: 0.18 - 0.09 * d, perfW: 0.07 - 0.038 * d,
+      spd0: 2.0 + 1.2 * d, spdP: 0.01 + 0.005 * d, // 눈금 속도(rad/s) = spd0 + 진행 × spdP
+      decay: 0.4 * d, driftAmp: 0.1 * d, harm: tier >= 4 ? 0.3 : 0, // 진행이 식는 속도, 칸이 흔들리는 정도, 눈금 속도의 들쭉날쭉함
+      gainP: Math.round(15 - 3 * d), gainG: Math.round(9 - 3 * d), lossM: Math.round(3 + 5 * d),
     };
+    return Object.assign(raw, {
+      goodW: raw.goodW * (1 + 0.5 * e), perfW: raw.perfW * (1 + 0.4 * e), spd0: raw.spd0 * (1 - 0.25 * e), spdP: raw.spdP * (1 - 0.25 * e),
+      decay: raw.decay * (1 - e), driftAmp: raw.driftAmp * (1 - e), harm: raw.harm * (1 - e), lossM: Math.max(1, Math.round(raw.lossM * (1 - 0.4 * e))),
+    });
   }
+  // 대장 경험치를 더하고 결과 문구 꼬리를 돌려준다 (레벨이 오르면 알린다)
+  function smithGain(xp) {
+    if (!xp) return '';
+    const up = G.Forge.addSmithXp(inv, xp);
+    return ` · 대장 경험치 +${xp}${up ? ` — 대장 Lv ${up}! 미니게임이 더 쉬워져요` : ''}`;
+  }
+  const smithInfo = () => { const sm = G.Forge.smithOf(inv); return { lv: sm.lv, xp: sm.xp, need: sm.lv >= G.Forge.SMITH_MAX_LV ? 0 : G.Forge.smithNeed(sm.lv), max: G.Forge.SMITH_MAX_LV }; };
+
+  // ---- 작업 선택: 제련/부착 광석을 고르면 '직접 하기(미니게임)' 또는 '대장장이에게 맡기기(확실히 성공, 비쌈)' ----
+  let wc = null;
+  function openWorkChoice(kind, oreId) {
+    const ore = G.Forge.ORE[oreId];
+    shop = null;
+    const base = kind === 'smelt' ? G.Forge.smeltFee(ore) : G.Forge.attachFee(ore);
+    wc = { kind, ore: oreId, oreName: ore.name, tier: ore.tier, base, smithFee: G.Forge.smithWorkFee(kind, ore.tier), msg: '', msgT: 0 };
+  }
+  function workChoiceDo(which) {
+    if (!wc) return;
+    if (which === 1) { const k = wc.kind, o = wc.ore; wc = null; if (k === 'smelt') startSmeltGame(o); else startAttachGame(o); return; }
+    const w = wallet();
+    const res = G.Forge.entrustWork(inv, wc.kind, wc.ore, w);
+    coins = w.coins;
+    if (res.ok) { applyEquipment(); G.Audio.play('treasure'); say(res.msg, 'rgba(255,225,120,A)'); wc = null; }
+    else { wc.msg = res.msg; wc.msgT = 2.5; G.Audio.play('deny'); }
+  }
+  function updateWorkChoice(dt) {
+    wc.msgT = Math.max(0, wc.msgT - dt);
+    if (input.wasPressed('Escape')) { wc = null; return; }
+    if (input.wasPressed('Digit1') || input.wasPressed('Numpad1') || input.wasPressed('Enter')) workChoiceDo(1);
+    else if (input.wasPressed('Digit2') || input.wasPressed('Numpad2')) workChoiceDo(2);
+  }
+
   function startAttachGame(oreId) {
     const ore = G.Forge.ORES.find((o) => o.id === oreId);
     shop = null;
@@ -1319,7 +1356,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       const res = G.Forge.attach(inv, ag.ore, w);
       coins = w.coins;
       applyEquipment();
-      ag.msg = res.ok ? res.msg : res.msg;
+      ag.msg = res.msg + smithGain(res.ok ? G.Forge.XP.attach(G.Forge.ORE[ag.ore]) : 0);
       ag.ok = res.ok;
       G.Audio.play(res.ok ? 'treasure' : 'deny');
     } else {
@@ -1359,7 +1396,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   // 광석이 희귀할수록 어렵다: 4단계가 최대(좁은 띠, 빨리 식고 불길이 거세며, 띠가 크게 움직이고, 굳는 벌이 크다), 1단계는 아주 쉽다
   function smeltDifficulty(tier) {
     const d = (tier - 1) / 3; // 0(쉬움) ~ 1(최대)
-    return {
+    const e = G.Forge.smithEase(inv); // 대장 레벨이 오를수록 쉬워진다
+    const raw = {
       hw: 18 - 13 * d,                       // 알맞은 온도 띠의 반폭
       heat: 30 + 10 * d, cool: 12 + 16 * d,  // 풀무질로 오르는 속도 / 식는 속도 (/초)
       wob: 1.5 + 6 * d,                      // 불길이 제멋대로 흔들리는 세기
@@ -1367,6 +1405,10 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       need: 8 + 12 * d,                      // 띠 안에서 버텨야 하는 시간(초)
       coldP: 0.8 + 1.4 * d, hotP: 2 + 5 * d, burnP: 4 + 10 * d, // 차가울 때 / 뜨거울 때 / 과열(92 이상) 때 굳는 속도
     };
+    return Object.assign(raw, {
+      hw: raw.hw * (1 + 0.5 * e), cool: raw.cool * (1 - 0.3 * e), wob: raw.wob * (1 - 0.5 * e), bandAmp: raw.bandAmp * (1 - 0.4 * e), need: raw.need * (1 - 0.25 * e),
+      coldP: raw.coldP * (1 - 0.4 * e), hotP: raw.hotP * (1 - 0.4 * e), burnP: raw.burnP * (1 - 0.4 * e),
+    });
   }
   function startSmeltGame(oreId) {
     const ore = G.Forge.ORES.find((o) => o.id === oreId);
@@ -1415,7 +1457,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       const w = wallet();
       const res = G.Forge.smelt(inv, sg.ore, w);
       coins = w.coins;
-      sg.msg = res.msg;
+      sg.msg = res.msg + smithGain(res.ok ? G.Forge.XP.smelt(G.Forge.ORE[sg.ore]) : 0);
       sg.ok = res.ok;
       G.Audio.play(res.ok ? 'treasure' : 'deny');
       effects.shake(6, 0.2);
@@ -1455,8 +1497,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (shop.mode === 'place') { placeItem(item); return; }
     const w = wallet();
     const res = G.Shop.buy(item, w);
-    if (res.ok && res.minigame === 'attach') { startAttachGame(res.ore); return; } // 부착: 미니게임으로
-    if (res.ok && res.minigame === 'smelt') { startSmeltGame(res.ore); return; } // 제련: 온도 맞추기 미니게임으로
+    if (res.ok && (res.minigame === 'attach' || res.minigame === 'smelt')) { openWorkChoice(res.minigame, res.ore); return; } // 제련/부착: 직접(미니게임) 또는 대장장이에게 맡기기
     if (res.ok && item.upgrade === 'stmax') stamina += C.STAMINA_MAX_STEP; // 늘어난 만큼 바로 채워 준다
     coins = w.coins;
     exp = w.exp;
@@ -2011,6 +2052,13 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   canvas.addEventListener('click', (ev) => {
     if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
+    if (wc) { // 작업 선택: 버튼 클릭
+      const g = G.Renderer.workChoiceGeometry(C.VIEW_W, C.VIEW_H);
+      if (inRect(p, g.self)) workChoiceDo(1);
+      else if (inRect(p, g.smith)) workChoiceDo(2);
+      else if (inRect(p, g.cancel)) wc = null;
+      return;
+    }
     if (ag) { ag.click = true; return; } // 부착 미니게임: 클릭 = 망치질
     if (sg) { if (sg.result) sg.click = true; return; } // 제련 미니게임: 결과 닫기 (풀무질은 마우스를 누르고 있는 동안)
     if (mini) { mini.click = p; mini.mouse = p; mini.useMouse = true; return; }
@@ -2405,6 +2453,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
     if (devUI) { // 메뉴가 열려 있는 동안 게임이 멈춘다
       updateDev(dt);
+      input.endFrame();
+      return;
+    }
+    if (wc) { // 작업 선택 창이 열려 있는 동안 멈춘다
+      updateWorkChoice(dt);
       input.endFrame();
       return;
     }
@@ -2858,7 +2911,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function drawFrame() {
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
-    const near = !shop && !equipUI && !devUI && !mini && !ag && !sg && !dialog && !won && !cutscene ? nearbyInteract() : null;
+    const near = !shop && !equipUI && !devUI && !mini && !ag && !sg && !wc && !dialog && !won && !cutscene ? nearbyInteract() : null;
     const PROMPTS = { talk: 'E: 대화', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
     const prompt = near ? (near.type === 'shop' ? (near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
@@ -2883,7 +2936,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: agPos(), cutoff: null }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand() }) : null, equip: equipView, boss: bossOn() ? boss : null,
+      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
     }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   requestAnimationFrame(frame);
@@ -2919,6 +2972,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get dev() { return devUI; },
     get settings() { return settingsUI; },
     get attachGame() { return ag; },
+    get workChoice() { return wc; },
     get smeltGame() { return sg; },
     get mini() { return mini; },
     get duelRun() { return duelRun; },

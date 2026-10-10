@@ -177,6 +177,25 @@
     ctx.fillRect(baseX + 20, baseY - 56, 5, 7);
   }
 
+  // 대장장이 머리 위에 둥실 떠 있는 표지: 망치 아이콘과 이름. 맡긴 합치기가 끝났으면 '완성!'으로 바뀐다
+  function drawSmithTag(ctx, x, y, time) {
+    const inv = G.state && G.state.inv;
+    const job = inv && G.Forge ? G.Forge.jobOf(inv) : null;
+    const done = !!(job && job.done);
+    const bob = Math.sin(time * 2.4 + x * 0.01) * 4;
+    const ty = y - 78 + bob;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(x - 33, ty - 10, 66, 20);
+    ctx.strokeStyle = done ? '#7dffa0' : '#e0b12f'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 33, ty - 10, 66, 20);
+    // 작은 꼬리
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.moveTo(x - 4, ty + 10); ctx.lineTo(x + 4, ty + 10); ctx.lineTo(x, ty + 16); ctx.closePath(); ctx.fill();
+    // 망치 아이콘
+    ctx.fillStyle = '#8f98a8'; ctx.fillRect(x - 28, ty - 6, 9, 5); ctx.fillStyle = '#7a5530'; ctx.fillRect(x - 25, ty - 2, 2, 8);
+    ctx.restore();
+    G.TextLayer.add(done ? '완성!' : '대장장이', x + 6, ty + 1, 'bold 12px sans-serif', done ? '#7dffa0' : '#ffe9a0');
+  }
+
   // 용광로: 돌로 쌓은 화로에 불이 이글거리고, 굴뚝에서 연기가 오른다 (광석을 녹여 주괴를 만든다)
   function drawFurnace(ctx, baseX, baseY, time) {
     const x = baseX - 46;
@@ -223,6 +242,7 @@
       ctx.beginPath(); ctx.arc(baseX + 26 + Math.sin(time + i * 2) * 8 + t * 16, baseY - 160 - t * 70, 7 + t * 12, 0, Math.PI * 2); ctx.fill();
     }
     G.Npc.draw(ctx, 'smith', baseX - 70, baseY - 16, 1, time); // 대장장이 아저씨
+    drawSmithTag(ctx, baseX - 70, baseY - 16, time);
     // 앞의 모루와 주괴 틀
     ctx.fillStyle = '#3a3a44'; ctx.fillRect(baseX + 50, baseY - 14, 26, 8); ctx.fillRect(baseX + 56, baseY - 6, 14, 6);
     ctx.fillStyle = '#d98a3a'; ctx.fillRect(baseX + 56, baseY - 18, 12, 4);
@@ -389,6 +409,7 @@
       }
     }
     // 주인
+    if (shop.kind === 'sword') drawSmithTag(ctx, baseX, baseY - 16, time);
     G.Npc.draw(ctx, { potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'smith', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'smith', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';

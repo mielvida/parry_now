@@ -24,16 +24,16 @@
   // bonus = 주괴를 붙였을 때: dmg 대미지, boss 보스 대미지, reach 범위(칸), cd 쿨다운(초), crit 치명타, coin 코인,
   //   hit 단단한 몬스터 깎는 횟수, gdmg 탄환 대미지, st 스태미나 증감, radius 폭발 범위(칸), pierce 관통
   const ORES = [
-    { id: 'iron', name: '철', cls: 'sword', tier: 1, weight: 10, look: ['#c9d2dc', '#6c7686'], bonus: { dmg: 1 } },
-    { id: 'copper', name: '구리', cls: 'sword', tier: 1, weight: 9, look: ['#e0925a', '#9a5a2a'], bonus: { dmg: 1, reach: 0.04, crit: 0.01 } },
+    { id: 'iron', name: '철', cls: 'sword', tier: 1, weight: 10, look: ['#c9d2dc', '#6c7686'], bonus: { dmg: 2 } },
+    { id: 'copper', name: '구리', cls: 'sword', tier: 1, weight: 9, look: ['#e0925a', '#9a5a2a'], bonus: { dmg: 2, reach: 0.04, crit: 0.01 } },
     { id: 'silver', name: '은', cls: 'sword', tier: 2, weight: 6, look: ['#e8eef8', '#9aa6bc'], bonus: { dmg: 4, crit: 0.04 } },
     { id: 'gold', name: '금', cls: 'sword', tier: 2, weight: 5, look: ['#ffe27a', '#d4a017'], bonus: { dmg: 3, coin: 0.12 } },
     { id: 'mythril', name: '미스릴', cls: 'sword', tier: 3, weight: 3, look: ['#9fe8ff', '#3a8fa8'], bonus: { dmg: 12, reach: 0.1, cd: -0.05 } },
     { id: 'obsidian', name: '흑요석', cls: 'sword', tier: 3, weight: 3, look: ['#6a4fb0', '#1a1030'], bonus: { dmg: 16, boss: 16 } },
     { id: 'starsteel', name: '별철', cls: 'sword', tier: 4, weight: 1.6, look: ['#fff2a8', '#7a8ae8'], bonus: { dmg: 40, hit: 1, crit: 0.03 } },
     { id: 'abyss', name: '심연석', cls: 'sword', tier: 4, weight: 1.4, look: ['#c07aff', '#2a1250'], bonus: { dmg: 30, boss: 60, hit: 1 } },
-    { id: 'saltpeter', name: '초석', cls: 'gun', tier: 1, weight: 9, look: ['#f0eadc', '#b8a98a'], bonus: { gdmg: 1 } },
-    { id: 'lead', name: '납', cls: 'gun', tier: 1, weight: 9, look: ['#8a93a3', '#4a5262'], bonus: { gdmg: 1, st: -1 } },
+    { id: 'saltpeter', name: '초석', cls: 'gun', tier: 1, weight: 9, look: ['#f0eadc', '#b8a98a'], bonus: { gdmg: 2 } },
+    { id: 'lead', name: '납', cls: 'gun', tier: 1, weight: 9, look: ['#8a93a3', '#4a5262'], bonus: { gdmg: 2, st: -1 } },
     { id: 'pyrite', name: '황철석', cls: 'gun', tier: 2, weight: 6, look: ['#f0d83a', '#a89010'], bonus: { gdmg: 3, crit: 0.03 } },
     { id: 'sulfur', name: '유황', cls: 'gun', tier: 2, weight: 5, look: ['#fff27a', '#c9a810'], bonus: { gdmg: 2, radius: 0.3 } },
     { id: 'titanium', name: '티타늄', cls: 'gun', tier: 3, weight: 3, look: ['#bfc9d8', '#5a6a82'], bonus: { gdmg: 8, st: -3 } },
@@ -166,6 +166,60 @@
     return { ok: true, msg: `${item.name} 3개가 합쳐졌다! ${nxt.name} 완성${nxt.tier >= MAX_TIER ? ' (최대 단계!)' : ''}` };
   }
 
+  // ---- 대장 숙련도: 제련·부착·합치기·크리스탈 합치기를 할 때마다 경험치가 쌓여 레벨이 오르고, 레벨이 오를수록 미니게임이 쉬워진다 ----
+  const SMITH_MAX_LV = 10;
+  const smithNeed = (lv) => 20 + 15 * (lv - 1); // 다음 레벨까지 필요한 경험치
+  const smithOf = (inv) => { if (!inv.smith) inv.smith = { lv: 1, xp: 0 }; return inv.smith; };
+  const smithEase = (inv) => (Math.min(SMITH_MAX_LV, smithOf(inv).lv) - 1) / (SMITH_MAX_LV - 1); // 0(처음) ~ 1(최고 레벨)
+  // 경험치를 더한다. 레벨이 올랐으면 새 레벨을 돌려준다 (아니면 0)
+  function addSmithXp(inv, n) {
+    const sm = smithOf(inv);
+    if (sm.lv >= SMITH_MAX_LV) return 0;
+    sm.xp += n;
+    let up = 0;
+    while (sm.lv < SMITH_MAX_LV && sm.xp >= smithNeed(sm.lv)) { sm.xp -= smithNeed(sm.lv); sm.lv += 1; up = sm.lv; }
+    if (sm.lv >= SMITH_MAX_LV) sm.xp = 0;
+    dirty = true;
+    return up;
+  }
+  const XP = { smelt: (o) => 5 * o.tier, attach: (o) => 8 * o.tier, crystal: 15, merge: (tier) => 12 * (tier + 1) };
+
+  // 대장장이에게 맡기기: 미니게임 없이 확실히 성공하지만, 광석 단계가 높을수록 비싸다 (재료 수수료와 별도)
+  const SMITH_WORK_FEE = { smelt: [60, 200, 700, 2500], attach: [100, 350, 1200, 4000] };
+  const smithWorkFee = (kind, tier) => SMITH_WORK_FEE[kind][tier - 1];
+  function entrustWork(inv, kind, oreId, wallet) {
+    const o = ORE[oreId];
+    const chk = kind === 'smelt' ? smeltCheck(inv, oreId, wallet) : attachCheck(inv, oreId, wallet);
+    if (!chk.ok) return chk;
+    const base = kind === 'smelt' ? smeltFee(o) : attachFee(o);
+    const fee = smithWorkFee(kind, o.tier);
+    if (wallet.coins < base + fee) return { ok: false, msg: `대장장이에게 맡기려면 ${base + fee} G가 필요해요.` };
+    wallet.coins -= fee;
+    const res = kind === 'smelt' ? smelt(inv, oreId, wallet) : attach(inv, oreId, wallet);
+    if (res.ok) res.msg = '대장장이가 뚝딱! ' + res.msg;
+    return res;
+  }
+
+  // 크리스탈 합치기: 같은 크리스탈 3개 -> 한 단계 위 1개 (어둠 -> 정화 -> 신성). 샘물과 제단을 돌지 않고도 만들 수 있지만 비싸다
+  const CRYSTAL_RECIPES = [
+    { from: 'darkcrystal', to: 'cleancrystal', fee: 300 },
+    { from: 'cleancrystal', to: 'holycrystal', fee: 800 },
+  ];
+  function crystalMerge(inv, from, wallet) {
+    ensure(inv);
+    const r = CRYSTAL_RECIPES.find((q) => q.from === from);
+    inv.materials = inv.materials || {};
+    const have = inv.materials[from] || 0;
+    if (have < 3) return { ok: false, msg: `${ITEMS[from].name}가 ${3 - have}개 더 필요해요.` };
+    if (wallet.coins < r.fee) return { ok: false, msg: '코인이 부족해요.' };
+    wallet.coins -= r.fee;
+    inv.materials[from] = have - 3;
+    inv.materials[r.to] = (inv.materials[r.to] || 0) + 1;
+    const up = addSmithXp(inv, XP.crystal);
+    dirty = true;
+    return { ok: true, msg: `${ITEMS[from].name} 3개가 합쳐져 ${ITEMS[r.to].name}이(가) 되었다!${up ? ` 대장 Lv ${up}!` : ''}` };
+  }
+
   // 합치기 작업: 같은 무기 3개를 작업대에 올리면 1분 뒤에 한 단계 위 무기가 된다.
   //  - 직접(무료): 용광로 곁에 있는 동안만 시간이 간다 (자리를 뜨면 멈춘다)
   //  - 대장장이에게 맡기기(70G): 어디에 있든 1분 뒤 완성. 그동안 다른 일을 할 수 있다
@@ -242,8 +296,9 @@
     for (const k of j.hot) if (inv.hotbar[k] === null) inv.hotbar[k] = nxt.id;
     if (j.equip) inv.equipped.weapon = nxt.id;
     inv.forgeJob = null;
+    const up = addSmithXp(inv, XP.merge(nxt.tier || 1));
     dirty = true;
-    return { ok: true, msg: `${nxt.name} 완성! 찾았다${nxt.tier >= MAX_TIER ? ' (최대 단계!)' : ''}`, item: nxt };
+    return { ok: true, msg: `${nxt.name} 완성! 찾았다${nxt.tier >= MAX_TIER ? ' (최대 단계!)' : ''}${up ? ` 대장 Lv ${up}!` : ''}`, item: nxt };
   }
 
   // 제련: 광석 3개 -> 주괴 1개
@@ -315,7 +370,7 @@
   let cache = null;        // 마지막으로 만든 탭
   let cacheSig = '';
   const sum = (o) => { let s = 0; for (const k in o) s += o[k] || 0; return s; };
-  const sigOf = (inv) => `${inv.equipped.weapon}|${inv.items.length}|${sum(inv.copies)}|${sum(inv.ores)}|${sum(inv.ingots)}|${(inv.attach[inv.equipped.weapon] || []).join(',')}|${inv.items.filter((i) => ITEMS[i] && ITEMS[i].pickaxe).length}`;
+  const sigOf = (inv) => `${sum(inv.materials)}|${inv.equipped.weapon}|${inv.items.length}|${sum(inv.copies)}|${sum(inv.ores)}|${sum(inv.ingots)}|${(inv.attach[inv.equipped.weapon] || []).join(',')}|${inv.items.filter((i) => ITEMS[i] && ITEMS[i].pickaxe).length}`;
 
   const card = (p) => Object.assign({ forge: true, look: ['#c9d2dc', '#6c7686'] }, p);
   const infoCard = (title, lines, icon) => card({ id: 'info', kind: 'info', icon, name: title, view: () => ({ name: title, desc: lines[0], note: lines[1] || '' }), label: () => '안내', afford: () => false, run: () => ({ ok: false, msg: lines[0] }) });
@@ -345,6 +400,16 @@
       label: (i) => ((i.ores[o.id] || 0) >= SMELT_NEED ? `${smeltFee(o)} G` : '재료 부족'),
       afford: (i, coins) => (i.ores[o.id] || 0) >= SMELT_NEED && coins >= smeltFee(o),
       run: (wallet) => { const c = smeltCheck(wallet.inv, o.id, wallet); return c.ok ? { ok: true, minigame: 'smelt', ore: o.id, msg: '' } : c; }, // 점검을 통과하면 온도 맞추기 미니게임을 연다
+    }));
+  }
+
+  function crystalCards(inv) {
+    return CRYSTAL_RECIPES.map((r) => card({
+      id: `crystal:${r.from}`, kind: 'crystal', icon: ITEMS[r.to],
+      view: (i) => { const n = (i.materials && i.materials[r.from]) || 0; return { name: `${ITEMS[r.from].name} ${Math.min(n, 99)}/3  →  ${ITEMS[r.to].name}`, desc: n >= 3 ? `3개를 합쳐 ${ITEMS[r.to].name} 1개 (수수료 ${r.fee} G)` : `${3 - n}개 더 있으면 합칠 수 있어요`, note: r.from === 'darkcrystal' ? '보스가 떨어뜨린 크리스탈 3개로 숲의 샘물 없이 정화' : '정화된 크리스탈 3개로 화산의 제단 없이 신성화' }; },
+      label: (i) => (((i.materials && i.materials[r.from]) || 0) >= 3 ? `${r.fee} G` : '재료 부족'),
+      afford: (i, coins) => ((i.materials && i.materials[r.from]) || 0) >= 3 && coins >= r.fee,
+      run: (wallet) => crystalMerge(wallet.inv, r.from, wallet),
     }));
   }
 
@@ -391,6 +456,7 @@
       { name: '제련', items: smeltCards(inv) },
       { name: '부착', items: attachCards(inv) },
       { name: '곡괭이', items: pickCards() },
+      { name: '크리스탈', items: crystalCards(inv) },
     ];
     cacheSig = sig;
     dirty = false;
@@ -403,7 +469,7 @@
   // 대장간(무기 상점): 무기 + 곡괭이. 합치기·제련·부착·신성 강화는 용광로에서 한다
   Object.defineProperty(Shop.SHOPS.sword, 'tabs', { get: () => (bound ? baseTabs.concat(forgeTabs(bound).filter((t) => t.name === '곡괭이')) : baseTabs), configurable: true, enumerable: true });
   Shop.SHOPS.furnace = { title: '용광로' };
-  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name !== '곡괭이').concat(holyTab) : holyTab), configurable: true, enumerable: true });
+  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name !== '곡괭이' && t.name !== '크리스탈').concat(holyTab, forgeTabs(bound).filter((t) => t.name === '크리스탈')) : holyTab), configurable: true, enumerable: true });
 
   function act(item, wallet) {
     const r = item.run(wallet);
@@ -450,6 +516,6 @@
     bind: (inv) => { bound = ensure(inv); dirty = true; },
     ensure, classOf, slotsOf, copiesOf, canMerge, nextOf, mergeFee, addCopy,
     attachBonus, bonusText, merge, smelt, attach, detach, act,
-    gridExtra, describeExtra, forgeTabs, JOB_TIME, ATTACH_TIME, SMELT_TIME, smeltCheck, smeltFee, SMITH_FEE, attachCheck, attachFee, jobOf, mergeCandidates, startMerge, tickJob, collectJob, bestPick, bestOwnedPick, autoEquipPick, togglePick, markDirty: () => { dirty = true; },
+    gridExtra, describeExtra, forgeTabs, JOB_TIME, SMITH_MAX_LV, smithNeed, smithOf, smithEase, addSmithXp, XP, smithWorkFee, entrustWork, crystalMerge, ATTACH_TIME, SMELT_TIME, smeltCheck, smeltFee, SMITH_FEE, attachCheck, attachFee, jobOf, mergeCandidates, startMerge, tickJob, collectJob, bestPick, bestOwnedPick, autoEquipPick, togglePick, markDirty: () => { dirty = true; },
   };
 })(window.Game);
