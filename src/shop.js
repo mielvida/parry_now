@@ -680,7 +680,7 @@
       return { ok: true, msg: `Lv ${wallet.inv.speedLevel}! 마을에서 이동 속도 ${fmtX(speedMult(wallet.inv.speedLevel))}배.` };
     }
     if (item.forge) return G.Forge.act(item, wallet); // 대장간: 합치기/제련/부착
-    const dupWeapon = item.slot === 'weapon' && G.Forge && G.Forge.canMerge(item); // 같은 무기를 더 사서 3개를 합칠 수 있다
+    const dupWeapon = !!(G.Forge && G.Forge.canMerge(item)); // 같은 무기·방어구를 더 사서 3개를 합칠 수 있다
     if ((item.slot || item.tool) && wallet.inv.items.includes(item.id) && !dupWeapon) return { ok: false, msg: '이미 가지고 있어요.' };
     if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
     wallet.coins -= item.price;
@@ -700,7 +700,7 @@
     }
     if (dupWeapon && wallet.inv.items.includes(item.id)) { // 이미 있는 무기: 한 자루 더
       const n = G.Forge.addCopy(wallet.inv, item.id);
-      return { ok: true, msg: `${item.name} 한 자루 더! (보유 ${n}개) 같은 무기 3개는 용광로에서 합칠 수 있어요.` };
+      return { ok: true, msg: `${item.name} 한 자루 더! (보유 ${n}개) 같은 것 3개는 용광로에서 합칠 수 있어요.` };
     }
     if (item.lens) { // 돋보기는 사도 장착하지 않는다 (인벤토리에서 직접 끼운다)
       wallet.inv.items.push(item.id);

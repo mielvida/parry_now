@@ -228,7 +228,11 @@
             const was = b.attacking;
             b.attacking = false;
             if (b.after === 'cling') this._cling(this.side);
-            else { // 착지: 충격과 함께 주저앉는다
+            else if (b.after === 'rollReady') { // 눈덩이를 굴리러 땅으로 내려왔다
+              b.state = 'rollPush';
+              b.st = 0;
+              this.ev.slamImpact(b.cx, this.groundY);
+            } else { // 착지: 충격과 함께 주저앉는다
               b.state = 'down';
               b.st = 0;
               b.hold = 0.55;
@@ -239,6 +243,11 @@
           }
           break;
         }
+        case 'rollPush': // 벽 옆 땅에 서서 눈덩이를 굴린다
+          b.cx = this.wallX(this.side);
+          b.cy = this.groundCy;
+          b.dir = -this.side;
+          break;
         case 'down':
           b.cy = this.groundCy;
           if (b.st >= (b.hold || 0.55)) b.state = 'idleGround';
@@ -333,18 +342,26 @@
           this.shards.push({ side, low, y: this.groundY - (low ? 24 : 92), h: low ? 24 : 34, st: 'warn', t: 0, x: side > 0 ? this.right : this.left });
         }
         finished = p.n >= 8 && this.shards.length === 0;
-      } else { // roll
-        b.dir = -this.side;
+      } else { // roll: 벽에서 땅으로 내려와 눈덩이를 직접 굴리고, 다 굴리면 다시 벽으로 올라간다
         b.arm = 0;
-        if (p.sub === 'start') { p.sub = 'push'; p.t0 = p.t; p.rolled = 0; }
-        if (p.sub === 'push') {
+        if (p.sub === 'start') { // 벽에서 내려간다
+          this._travel({ x: this.wallX(this.side), y: this.groundCy }, 0.6, 70, 'rollReady');
+          p.sub = 'descend';
+        } else if (p.sub === 'descend') {
+          if (b.state === 'rollPush') { p.sub = 'push'; p.t0 = p.t; p.rolled = 0; }
+        } else if (p.sub === 'push') {
           if (p.t - p.t0 >= 0.9) {
             this._spawnRoll();
             p.rolled += 1;
             if (p.rolled >= 2) { p.sub = 'wait'; p.tw = p.t; } else p.t0 = p.t + 0.5; // 두 번째 눈덩이
           }
-        } else {
-          finished = this.rolls.length === 0 && p.t > p.tw + 0.3;
+        } else if (p.sub === 'wait') {
+          if (this.rolls.length === 0 && p.t > p.tw + 0.3) { // 눈덩이가 다 굴러가면 다시 벽으로
+            this._travel({ x: this.wallX(this.side), y: this.clingY }, 0.7, 110, 'cling');
+            p.sub = 'return';
+          }
+        } else if (p.sub === 'return') {
+          finished = b.state === 'cling';
         }
       }
       if (finished) {
@@ -376,7 +393,7 @@
 
     _spawnRoll() {
       const dir = -this.side;
-      this.rolls.push({ x: this.side > 0 ? this.right - ROLL_R0 : this.left + ROLL_R0, dir, r: ROLL_R0, dist: 0, rot: 0, hit: false });
+      this.rolls.push({ x: this.body.cx + dir * (BW / 2 + ROLL_R0), dir, r: ROLL_R0, dist: 0, rot: 0, hit: false });
       this.ev.sound('spawn');
     }
 
@@ -614,10 +631,17 @@
     _drawPushBall(ctx, p) {
       const b = this.body;
       const u = clamp((p.t - p.t0) / 0.9, 0, 1);
-      const r = ROLL_R0 * (0.4 + 0.6 * u);
-      const x = this.side > 0 ? this.right - 40 : this.left + 40;
+      const r = ROLL_R0 * (0.4 + 0.6 * u); // 놓아 보내는 눈덩이(ROLL_R0)와 같은 크기까지 커진다
+      const x = b.cx + b.dir * (BW / 2 + r * 0.8 + 6 * Math.sin(this.time * 12)); // 팔 끝에서 밀리는 눈덩이
+      const y = this.groundY - r;
       ctx.fillStyle = '#f4f9ff';
-      ctx.beginPath(); ctx.arc(x, b.cy + 50, r, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#c6d9ec'; ctx.lineWidth = 2;
+      const rot = this.time * 5 * b.dir;
+      ctx.beginPath(); ctx.arc(x, y, r * 0.65, rot, rot + 2.2); ctx.stroke(); // 굴러가는 눈 결
+      ctx.beginPath(); ctx.arc(x, y, r * 0.35, rot + 3, rot + 5); ctx.stroke();
+      // 눈가루
+      for (let i = 0; i < 4; i++) { const k = (this.time * 2.2 + i * 0.25) % 1; ctx.fillStyle = 'rgba(240,248,255,' + (0.6 * (1 - k)) + ')'; ctx.fillRect(x - b.dir * (r * 0.8 + k * 26) - 2, this.groundY - 4 - k * 18 - i * 2, 4, 4); }
     }
 
     // 침팬지: 하얀 털의 큰 몸, 긴 팔, 푸른 회색 얼굴, 성난 붉은 눈, 송곳니, 뿔 두 개
@@ -638,8 +662,10 @@
       const air = b.state === 'air' && !clinging;
       const crouch = b.state === 'crouch';
       const sit = b.state === 'down' || b.state === 'stun' || b.state === 'stunFall' || b.state === 'idleGround';
+      const pushing = b.state === 'rollPush';
       if (crouch) ctx.scale(1.08, 0.86), ctx.translate(0, 8);
       if (sit) ctx.translate(0, 6);
+      if (pushing) { ctx.rotate(-0.16); ctx.translate(-4, 2 + Math.abs(Math.sin(this.time * 6)) * 2); } // 앞으로 기울여 힘껏 민다
       if (stunned) ctx.rotate(0.1);
       const lump = (x, y, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
 
@@ -649,6 +675,7 @@
         let hx; let hy;
         if (clinging) { hx = back ? 40 : 38; hy = back ? -44 : -4; if (!back && b.arm > 0) { hx = -26; hy = -62 - b.arm * 14; } }
         else if (air) { hx = back ? 20 : -26; hy = back ? -62 : -58; }
+        else if (pushing) { hx = back ? -34 : -46; hy = 24 + Math.sin(this.time * 12 + (back ? 1.6 : 0)) * 5; } // 두 팔을 앞으로 뻗어 눈덩이를 민다
         else if (crouch) { hx = back ? 10 : -20; hy = 40; }
         else if (sit) { hx = back ? 28 : -34; hy = 38; }
         else { hx = back ? 30 : -34; hy = 30 + Math.sin(this.time * 3) * 2; }

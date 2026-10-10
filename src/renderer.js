@@ -78,6 +78,7 @@
       const camX = Math.round((camera.x - sh.x) / px) * px; // 카메라도 버퍼 픽셀에 맞춘다
       const camY = Math.round((camera.y - sh.y) / px) * px;
       G.TextLayer.clear();
+      this._edgeTexts = []; // 화면 가장자리에서 잘리는 말은 아래 자막으로 옮겨 쓴다
 
       // ---- 1) 월드: 낮은 해상도 버퍼에 그린다 (좌표는 그대로 게임 단위) ----
       const ctx = this.bctx;
@@ -128,7 +129,7 @@
       main.save();
       main.translate(-camX, -camY);
       G.TextLayer.draw(main); // 월드 안의 간판 글자
-      if (extras.popups) this._drawPopups(main, extras.popups); // 데미지/코인 숫자
+      if (extras.popups) this._drawPopups(main, extras.popups, camX, camY); // 데미지/코인 숫자, 말풍선 글
       main.restore();
       if (effects) effects.drawOverlay(main, this.viewW, this.viewH);
       if (extras.cutscene) { // 컷신: 자막·확대 화면·암전. 게임 HUD는 숨긴다
@@ -143,6 +144,7 @@
       if (extras.events) extras.events.drawOverlay(main, this.viewW, this.viewH, { x: camX, y: camY }, time); // 층 이벤트(혈월, 안개 …) 효과와 안내
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
+      this._drawEdgeTexts(main, hud);
       const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
@@ -279,20 +281,39 @@
     }
 
     // 코인 획득 등 떠오르는 글자 (월드 좌표)
-    _drawPopups(ctx, popups) {
+    // camX/camY: 화면 가장자리에서 글이 잘리는지 알기 위한 카메라 위치. 잘리는 긴 말은 월드에 쓰지 않고 아래 자막(_drawEdgeTexts)으로 보낸다
+    _drawPopups(ctx, popups, camX = 0, camY = 0) {
       ctx.save();
       ctx.font = 'bold 18px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      for (const p of popups) {
+      for (let p of popups) {
         if (!G.Settings.dmgNum && /^(-\d+|치명타! \d+)$/.test(p.text)) continue; // 데미지 숫자 끄기
         const a = Math.min(1, p.t / 0.4);
+        const hw = ctx.measureText(p.text).width / 2;
+        const sx = p.x - camX;
+        const sy = p.y - camY;
+        if (sx - hw < 8 || sx + hw > this.viewW - 8 || sy < 16) {
+          if (p.text.length > 4) { this._edgeTexts.push({ text: p.text, a }); continue; } // 긴 말: 아래에 쓴다
+          p = Object.assign({}, p, { x: Math.max(camX + hw + 8, Math.min(camX + this.viewW - hw - 8, p.x)), y: Math.max(camY + 16, p.y) }); // 짧은 글(숫자): 화면 안으로 끌어 온다
+        }
         ctx.fillStyle = `rgba(0,0,0,${0.7 * a})`;
         ctx.fillText(p.text, p.x + 1, p.y + 1);
         ctx.fillStyle = p.color ? p.color.replace('A', a) : `rgba(255,213,74,${a})`;
         ctx.fillText(p.text, p.x, p.y);
       }
       ctx.restore();
+    }
+
+    // 화면 가장자리에서 잘릴 말: 아래 자막으로 (같은 글은 하나만, 최대 3줄, 이미 아래 자막이 있으면 그 위로)
+    _drawEdgeTexts(ctx, hud) {
+      const list = this._edgeTexts || [];
+      if (!list.length) return;
+      const seen = new Set();
+      const uniq = [];
+      for (let i = list.length - 1; i >= 0; i--) if (!seen.has(list[i].text)) { seen.add(list[i].text); uniq.push(list[i]); }
+      const base = hud && (hud.dialog || hud.prompt) ? 42 : 0;
+      uniq.slice(0, 3).forEach((e, k) => Renderer.drawCaption(ctx, this.viewW, this.viewH, e.text, e.a, base + k * 40));
     }
 
     // 집 안에서만: 놓은 장식품이 주는 보너스 (코인 획득량, 치명타 확률). 장식을 놓거나 치우면 바로 바뀐다
@@ -769,17 +790,23 @@
     }
 
     static forgePickGeometry(vw, vh) {
-      const w = 800, h = 470;
+      const w = 860, h = 520;
       const x = (vw - w) / 2, y = (vh - h) / 2;
+      const cell = 54, gap = 6, cols = 10, rows = 4;
+      const gx = x + (w - (cols * cell + (cols - 1) * gap)) / 2, gy = y + 130;
+      const cells = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push({ x: gx + c * (cell + gap), y: gy + r * (cell + gap), w: cell, h: cell });
       return {
         panel: { x, y, w, h },
-        cats: [0, 1, 2].map((i) => ({ x: x + 30 + i * 252, y: y + 100, w: 232, h: 270 })),
-        rows: [0, 1, 2, 3, 4, 5].map((i) => ({ x: x + 24, y: y + 96 + i * 52, w: w - 48, h: 46 })),
-        back: { x: x + 24, y: y + h - 52, w: 120, h: 34 }, close: { x: x + w - 144, y: y + h - 52, w: 120, h: 34 },
+        cats: [0, 1, 2, 3].map((i) => ({ x: x + 30 + i * 204, y: y + 100, w: 192, h: 290 })),
+        cells, cols, rows,
+        chip: (i, n) => { const cw = Math.min(84, (w - 56) / Math.max(1, n)); return { x: x + 28 + i * cw, y: y + 92, w: cw - 4, h: 28 }; }, // 종류 버튼 i번째 (모두 n개)
+        detail: { x: x + 28, y: y + h - 134, w: w - 56, h: 78 },
+        back: { x: x + 24, y: y + h - 46, w: 130, h: 32 }, close: { x: x + w - 154, y: y + h - 46, w: 130, h: 32 },
       };
     }
 
-    // 용광로 대상 고르기: 검 / 투척 무기 / 갑옷 → 가진 것 모두 보여 주고 강화할 것 하나를 고른다
+    // 용광로 대상 고르기: 검 / 투척 무기 / 갑옷 → 인벤토리처럼 종류 버튼과 네모 칸으로 가진 것을 모두 보여 주고 강화할 것 하나를 고른다
     _drawForgePick(ctx, f) {
       const g = Renderer.forgePickGeometry(this.viewW, this.viewH);
       const P = g.panel;
@@ -791,42 +818,75 @@
       ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 28px sans-serif'; ctx.fillStyle = '#ffd54a';
       ctx.fillText(f.step === 'cat' ? '용광로 — 무엇을 강화할까요?' : `용광로 — ${f.cats.find((c) => c.id === f.cat).name} 고르기`, P.x + 28, P.y + 38);
       ctx.font = '15px sans-serif'; ctx.fillStyle = '#b8c2dc';
-      ctx.fillText(f.step === 'cat' ? '먼저 종류를 고르세요. 그 종류로 가진 것을 모두 보여 줍니다.' : '강화할 것을 고르세요. 합치기 · 제련 · 부착을 이것에 합니다.', P.x + 28, P.y + 72);
+      ctx.fillText(f.step === 'cat' ? '강화할 종류를 고르면 가진 것을 모두 보여 줍니다. 광석만 녹이려면 4번 제련을 고르세요.' : `가진 것 ${f.all.length}개 — 강화할 것을 고르세요. 합치기 · 제련 · 부착을 이것에 합니다.`, P.x + 28, P.y + 70);
       if (f.step === 'cat') {
         f.cats.forEach((c, i) => {
           const r = g.cats[i];
           box(r, f.cur === i);
-          this._drawItemIcon(ctx, c.item, r.x + r.w / 2, r.y + 70, 1.35);
-          ctx.textAlign = 'center'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#fff';
-          ctx.fillText(`${i + 1}. ${c.name}`, r.x + r.w / 2, r.y + 140);
+          this._drawItemIcon(ctx, c.item, r.x + r.w / 2, r.y + 76, 1.4);
+          ctx.textAlign = 'center'; ctx.font = 'bold 24px sans-serif'; ctx.fillStyle = '#fff';
+          ctx.fillText(`${i + 1}. ${c.name}`, r.x + r.w / 2, r.y + 150);
           ctx.font = '14px sans-serif'; ctx.fillStyle = '#b8c2dc';
-          c.desc.split('\n').forEach((ln, k) => ctx.fillText(ln, r.x + r.w / 2, r.y + 176 + k * 20));
+          c.desc.split('\n').forEach((ln, k) => ctx.fillText(ln, r.x + r.w / 2, r.y + 188 + k * 20));
           ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = c.n ? '#ffd54a' : '#ff9a9a';
-          ctx.fillText(c.n ? `가진 것 ${c.n}개` : '가진 것 없음', r.x + r.w / 2, r.y + r.h - 28);
+          ctx.fillText(c.id === 'smelt' ? `광석 ${c.n}개` : c.n ? `가진 것 ${c.n}개` : '가진 것 없음', r.x + r.w / 2, r.y + r.h - 30);
         });
         ctx.textAlign = 'center'; ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = f.msgT > 0 ? '#ff8a8a' : 'rgba(0,0,0,0)';
-        ctx.fillText(f.msg, P.x + P.w / 2, P.y + P.h - 74);
+        ctx.fillText(f.msg, P.x + P.w / 2, P.y + P.h - 78);
       } else {
-        const top = Math.max(0, Math.min(f.cur - (f.rows - 1), f.items.length - f.rows));
-        for (let i = 0; i < f.rows; i++) {
-          const k = top + i;
-          if (k >= f.items.length) break;
-          const it = f.items[k];
-          const r = g.rows[i];
-          box(r, f.cur === k);
-          this._drawItemIcon(ctx, it.item, r.x + 30, r.y + r.h / 2 + 2, 0.55);
-          ctx.textAlign = 'left'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#fff';
-          ctx.fillText(it.item.name + (it.equipped ? '  (끼고 있음)' : ''), r.x + 64, r.y + r.h / 2);
-          ctx.textAlign = 'right'; ctx.font = '15px sans-serif'; ctx.fillStyle = '#9fe8a8';
-          const mergeable = it.item.slot === 'weapon' && G.Forge.nextOf(it.item);
-          ctx.fillText(`${mergeable ? `보유 ${it.copies}개 · ` : ''}붙인 칸 ${it.used}/${it.slots}${it.item.slot === 'weapon' && !it.item.lens ? ` · ${(it.item.tier || 0) + 1}레벨` : ''}`, r.x + r.w - 18, r.y + r.h / 2);
+        // 종류 버튼 (전체 / 검 / 대검 / 단검 …)
+        f.chips.forEach((c, i) => {
+          const r = g.chip(i, f.chips.length);
+          const on = c.id === f.sub;
+          ctx.fillStyle = on ? '#e0b12f' : 'rgba(255,255,255,0.1)'; ctx.fillRect(r.x, r.y, r.w, r.h);
+          ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = on ? '#1d2233' : '#b8c2dc';
+          ctx.fillText(`${c.name} ${c.n}`, r.x + r.w / 2, r.y + r.h / 2 + 1);
+        });
+        // 네모 칸 격자
+        const total = Math.max(g.cols * g.rows, Math.ceil(f.entries.length / g.cols) * g.cols);
+        for (let k = 0; k < g.cells.length; k++) {
+          const idx = (f.scroll || 0) * g.cols + k;
+          const r = g.cells[k];
+          const en = f.entries[idx];
+          const sel = idx === f.cur && !!en;
+          ctx.fillStyle = sel ? 'rgba(255,213,74,0.2)' : 'rgba(255,255,255,0.05)'; ctx.fillRect(r.x, r.y, r.w, r.h);
+          ctx.lineWidth = sel ? 3 : 1; ctx.strokeStyle = sel ? '#ffd54a' : (en && en.equipped ? '#7dffa0' : 'rgba(255,255,255,0.16)'); ctx.strokeRect(r.x, r.y, r.w, r.h);
+          if (!en) continue;
+          this._drawItemIcon(ctx, en.item, r.x + r.w / 2, r.y + r.h / 2 + 2, 0.56);
+          ctx.textAlign = 'right'; ctx.font = 'bold 12px sans-serif';
+          if (en.copies > 1) { ctx.fillStyle = '#ffd54a'; ctx.fillText(`x${en.copies}`, r.x + r.w - 4, r.y + r.h - 8); }
+          ctx.textAlign = 'left'; ctx.fillStyle = en.used >= en.slots ? '#ff9a9a' : '#9fe8a8';
+          ctx.fillText(`${en.used}/${en.slots}`, r.x + 4, r.y + 10); // 붙인 칸
+          if (en.equipped) { ctx.fillStyle = '#7dffa0'; ctx.textAlign = 'right'; ctx.fillText('E', r.x + r.w - 4, r.y + 10); }
         }
-        if (f.items.length > f.rows) { ctx.textAlign = 'center'; ctx.font = '13px sans-serif'; ctx.fillStyle = '#9fe0ff'; ctx.fillText(`${f.cur + 1} / ${f.items.length}  (↑↓ · 휠로 넘기기)`, P.x + P.w / 2, P.y + P.h - 70); }
+        if (total > g.cols * g.rows) { // 스크롤 표시
+          const rowsAll = total / g.cols, bar = g.cells[g.cells.length - 1];
+          const bx = P.x + P.w - 22, by = g.cells[0].y, bh = (g.rows * 60) - 6;
+          ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(bx, by, 6, bh);
+          ctx.fillStyle = '#9fe0ff'; ctx.fillRect(bx, by + bh * ((f.scroll || 0) / rowsAll), 6, bh * (g.rows / rowsAll));
+        }
+        // 고른 것 설명
+        const en = f.entries[f.cur];
+        const D = g.detail;
+        box(D, false);
+        if (en) {
+          this._drawItemIcon(ctx, en.item, D.x + 44, D.y + D.h / 2, 0.9);
+          ctx.textAlign = 'left'; ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#fff';
+          ctx.fillText(en.item.name + (en.equipped ? '  (끼고 있음)' : ''), D.x + 90, D.y + 22);
+          ctx.font = '14px sans-serif'; ctx.fillStyle = '#9fe8a8';
+          const mergeable = G.Forge.nextOf(en.item);
+          const lvText = G.Forge.canMerge(en.item) ? `${(en.item.tier || 0) + 1}레벨 · ` : '';
+          ctx.fillText(`${lvText}${mergeable ? `보유 ${en.copies}개 (3개면 합치기) · ` : ''}붙인 칸 ${en.used}/${en.slots}`, D.x + 90, D.y + 46);
+          ctx.fillStyle = '#b8c2dc';
+          ctx.fillText(en.attached.length ? `붙인 것: ${en.attached.join(', ')}` : '붙인 주괴가 없어요', D.x + 90, D.y + 66);
+          ctx.textAlign = 'right'; ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#ffd54a';
+          ctx.fillText('Enter / 클릭: 이것을 강화', D.x + D.w - 18, D.y + D.h / 2);
+        } else { ctx.textAlign = 'center'; ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0'; ctx.fillText('이 종류로 가진 것이 없어요', D.x + D.w / 2, D.y + D.h / 2); }
         box(g.back, false); ctx.textAlign = 'center'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#b8c2dc'; ctx.fillText('◀ 종류 다시', g.back.x + g.back.w / 2, g.back.y + g.back.h / 2);
       }
       box(g.close, false); ctx.textAlign = 'center'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#b8c2dc'; ctx.fillText('Esc 닫기', g.close.x + g.close.w / 2, g.close.y + g.close.h / 2);
       ctx.font = '14px sans-serif'; ctx.fillStyle = '#9aa4c0';
-      ctx.fillText(f.step === 'cat' ? '←→ / 1·2·3 / 클릭: 고르기     Enter: 결정' : '↑↓ / 휠: 고르기     Enter / 클릭: 이것을 강화     Backspace: 뒤로', P.x + P.w / 2, P.y + P.h - 35);
+      ctx.fillText(f.step === 'cat' ? '←→ / 1·2·3·4 / 클릭: 고르기     Enter: 결정' : '방향키 / 휠: 고르기     Tab: 종류 바꾸기     Enter / 클릭: 강화     Backspace: 뒤로', P.x + P.w / 2, P.y + P.h - 30);
       ctx.restore();
     }
 
@@ -861,7 +921,7 @@
         ctx.font = '13px sans-serif'; ctx.fillStyle = on ? '#9fe8a8' : '#667088'; ctx.fillText(l1, r.x + r.w / 2, r.y + 52);
         ctx.fillStyle = on ? c2 : '#667088'; ctx.fillText(l2, r.x + r.w / 2, r.y + 76);
       };
-      box(g.self, true, 1, '직접 하기', k.kind === 'smelt' ? '불 온도 맞추기 미니게임' : '두드려 붙이기 미니게임', `수수료 ${k.base} G · 경험치를 얻어요`, '#ffd54a');
+      box(g.self, true, 1, '직접 하기', k.mini || (k.kind === 'smelt' ? '불 온도 맞추기 미니게임' : '두드려 붙이기 미니게임'), `수수료 ${k.base} G · 경험치를 얻어요`, '#ffd54a');
       box(g.smith, canSmith, 2, '대장장이에게 맡기기', '확실히 성공 (경험치는 없어요)', `${total} G (재료 ${k.base} + 맡김 ${k.smithFee})`, '#ffd54a');
       ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(g.cancel.x, g.cancel.y, g.cancel.w, g.cancel.h);
       ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#b8c2dc'; ctx.fillText('Esc 취소', g.cancel.x + g.cancel.w / 2, g.cancel.y + g.cancel.h / 2);
@@ -960,8 +1020,245 @@
       ctx.restore();
     }
 
+    // 부착 미니게임 공통 틀: 어두운 배경, 판, 제목, 대장 레벨, 남은 시간, 진행 막대. 판 위치를 돌려준다
+    _attachFrame(ctx, a, title, barLabel) {
+      const W = this.viewW, H = this.viewH;
+      ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(0, 0, W, H);
+      const P = { x: 130, y: 36, w: W - 260, h: H - 72 };
+      ctx.fillStyle = '#1d2233'; ctx.fillRect(P.x, P.y, P.w, P.h);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#e0b12f'; ctx.strokeRect(P.x, P.y, P.w, P.h);
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffd54a';
+      ctx.fillText(title, P.x + 24, P.y + 32);
+      this._smithBadge(ctx, a.smith, P.x + P.w / 2, P.y + 32);
+      ctx.textAlign = 'right'; ctx.font = 'bold 24px sans-serif';
+      const sec = Math.ceil(a.t);
+      ctx.fillStyle = sec <= 20 ? '#ff8a8a' : '#fff';
+      ctx.fillText(`${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, P.x + P.w - 24, P.y + 32);
+      const pb = { x: P.x + 24, y: P.y + 62, w: P.w - 48, h: 20 };
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(pb.x, pb.y, pb.w, pb.h);
+      ctx.fillStyle = a.progress >= 100 ? '#7dffa0' : '#ffb347'; ctx.fillRect(pb.x + 2, pb.y + 2, (pb.w - 4) * (a.progress / 100), pb.h - 4);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
+      ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#fff';
+      ctx.fillText(barLabel, pb.x + pb.w / 2, pb.y + pb.h / 2 + 1);
+      return P;
+    }
+
+    _attachResult(ctx, a, P) {
+      if (!a.result) return;
+      const W = this.viewW;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(P.x + 40, P.y + 150, P.w - 80, 150);
+      ctx.textAlign = 'center'; ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = a.result === 'win' ? '#7dffa0' : '#ff8a8a';
+      ctx.fillText(a.result === 'win' ? (a.ok ? '부착 성공!' : '붙이지 못했어요') : '실패', W / 2, P.y + 198);
+      ctx.font = '17px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(a.msg, W / 2, P.y + 244);
+      if (a.resultT < 0) { ctx.font = '14px sans-serif'; ctx.fillStyle = '#9aa4c0'; ctx.fillText('Space로 닫기', W / 2, P.y + 278); }
+    }
+
+    // 아래 글줄(메시지 + 안내 두 줄)과 결과 화면: 새 미니게임들이 같이 쓴다
+    _attachTail(ctx, a, P, bad, line1, line2) {
+      const W = this.viewW;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = a.msgT > 0 ? (bad.test(a.msg) ? '#ff8a8a' : '#7dffa0') : 'rgba(0,0,0,0)';
+      ctx.fillText(a.msg, W / 2, P.y + P.h - 76);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(line1, W / 2, P.y + P.h - 48);
+      ctx.fillText(line2, W / 2, P.y + P.h - 24);
+      this._attachResult(ctx, a, P);
+    }
+
+    // 종류마다 다른 부착 미니게임 그림: 폭탄(fill) 활(aim) 석궁(crank) 산탄총(memory) 투구(balance) 장갑(react) 바지(catch) 신발(beat)
+    _drawAttachMini(ctx, a) {
+      const W = this.viewW;
+      const item = G.Shop.ITEMS[a.weaponId];
+      const lv = ['쉬움', '보통', '어려움', '최대'][a.tier - 1];
+      const names = { fill: ['화약 채우기', '누르고 있다가 초록 칸에서 떼세요'], aim: ['조준 사격', '십자선이 과녁 가운데에 올 때 쏘세요'], crank: ['시위 감기', '← → 를 번갈아 눌러 손잡이를 돌리세요'], memory: ['탄약 장전', '켜지는 탄환의 순서를 외우세요'], balance: ['균형 잡기', '← → 로 투구를 초록 칸에 붙들어 두세요'], react: ['바느질 반응', '초록 불에만 반응하세요'], catch: ['실 받기', '금실은 받고 빨간 얼룩은 피하세요'], beat: ['발맞추기', '박자에 맞춰 왼발·오른발을 번갈아'] }[a.mode];
+      const label = { fill: '화약 ' + a.round + ' / ' + a.rounds, aim: '명중 ' + a.hit + ' / ' + a.shots, crank: '시위 ' + Math.round(a.power || 0) + '%', memory: '탄환 ' + a.done + ' / ' + a.total, balance: '균형 ' + Math.round(a.progress) + '%', react: '바느질 ' + a.round + ' / ' + a.rounds, catch: '금실 ' + a.caught + ' / ' + a.need, beat: '연속 ' + a.combo + ' / ' + a.need }[a.mode];
+      ctx.save();
+      const P = this._attachFrame(ctx, a, '부착 — ' + names[0], label);
+      const cx = W / 2, top = P.y + 100;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const box = (x, y, w, h, fill, stroke, lw = 2) => { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.strokeRect(x, y, w, h); } };
+      const t = Date.now() / 1000;
+      let hint = '';
+      let bad = /틀|빗|못|걸|일렀|늦|가짜|놓|반대|아니|넘|모자|떨어|얼룩|펑/;
+      if (a.mode === 'fill') { // 세로 화약 통
+        const gx = cx - 36, gy = top + 10, gw = 72, gh = 210;
+        this._drawItemIcon(ctx, item, cx - 190, gy + gh / 2, 1.3);
+        box(gx, gy, gw, gh, 'rgba(0,0,0,0.55)', 'rgba(255,255,255,0.4)', 3);
+        const yOf = (v) => gy + gh - v * gh;
+        box(gx, yOf(a.center + a.hw), gw, a.hw * 2 * gh, 'rgba(90,230,140,0.5)', null);
+        box(gx - 10, yOf(a.center), gw + 20, 2, 'rgba(180,255,200,0.9)', null);
+        const lv0 = a.held ? a.level : a.shown;
+        box(gx + 4, yOf(lv0), gw - 8, lv0 * gh, a.level > 0.92 ? '#ff5a3a' : '#4a4a58', null);
+        for (let i = 0; i < 6; i++) { ctx.fillStyle = 'rgba(255,200,90,' + (0.4 + 0.3 * Math.sin(t * 8 + i)) + ')'; ctx.fillRect(gx + 8 + i * 10, yOf(lv0) - 3, 6, 3); }
+        for (let i = 0; i < a.rounds; i++) { ctx.fillStyle = i < a.round ? '#7dffa0' : 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(cx + 120 + (i % 4) * 26, gy + 40 + Math.floor(i / 4) * 30, 9, 0, Math.PI * 2); ctx.fill(); }
+        hint = 'Space / Enter / 마우스를 누르고 있다가 초록 칸에서 떼기';
+      } else if (a.mode === 'aim') { // 과녁
+        const S0 = 250, ax = cx - S0 / 2, ay = top;
+        box(ax, ay, S0, S0, 'rgba(0,0,0,0.5)', 'rgba(255,255,255,0.35)');
+        const R0 = a.r * S0;
+        for (const [k, c] of [[1, '#ff5a5a'], [0.66, '#ffffff'], [0.4, '#ff5a5a']]) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, ay + S0 / 2, R0 * k, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(cx, ay + S0 / 2, R0 * 0.16, 0, Math.PI * 2); ctx.fill();
+        const px = ax + a.cx * S0, py = ay + a.cy * S0;
+        ctx.strokeStyle = a.cool > 0 ? '#ffd54a' : '#7dffa0'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2); ctx.moveTo(px - 24, py); ctx.lineTo(px + 24, py); ctx.moveTo(px, py - 24); ctx.lineTo(px, py + 24); ctx.stroke();
+        this._drawItemIcon(ctx, item, ax - 90, ay + S0 / 2, 1.3);
+        for (let i = 0; i < a.shots; i++) { ctx.fillStyle = i < a.hit ? '#7dffa0' : 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(ax + S0 + 40, ay + 30 + i * 28, 9, 0, Math.PI * 2); ctx.fill(); }
+        hint = 'Space / Enter / 클릭: 발사 (빗나가면 맞힌 것이 하나 사라져요)';
+      } else if (a.mode === 'crank') { // 손잡이와 두 발판
+        const gy = top + 110;
+        this._drawItemIcon(ctx, item, cx, gy - 10, 1.8);
+        ctx.save(); ctx.translate(cx, gy + 60); ctx.rotate((a.spin || 0) * 0.6); ctx.strokeStyle = a.jam > 0 ? '#ff8a8a' : '#c9d2dc'; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(34, 0); ctx.moveTo(0, -34); ctx.lineTo(0, 34); ctx.stroke(); ctx.restore();
+        for (const [side, x, g] of [['L', cx - 170, '←'], ['R', cx + 110, '→']]) { const on = a.last === side; box(x, gy + 10, 60, 100, on ? 'rgba(255,213,74,0.25)' : 'rgba(255,255,255,0.06)', on ? '#ffd54a' : 'rgba(255,255,255,0.25)', 3); ctx.font = 'bold 36px sans-serif'; ctx.fillStyle = on ? '#ffd54a' : '#9aa4c0'; ctx.fillText(g, x + 30, gy + 60); }
+        hint = '← → 를 번갈아 빠르게 (같은 쪽 두 번은 걸려요) · 가만히 있으면 풀려요';
+      } else if (a.mode === 'memory') { // 4색 탄환
+        const cols = ['#ff5a5a', '#5aa0ff', '#5aff8a', '#ffd54a'];
+        const sx = cx - 4 * 62 + 16, sy = top + 74;
+        const litIdx = a.phase === 'show' && a.idx >= 0 && a.idx < a.len ? a.seq[a.idx] : (a.litT > 0 ? a.lit : -1);
+        for (let k = 0; k < 4; k++) {
+          const x = sx + k * 124, on = litIdx === k;
+          box(x, sy, 100, 100, on ? cols[k] : 'rgba(255,255,255,0.07)', on ? '#ffffff' : 'rgba(255,255,255,0.25)', on ? 4 : 2);
+          ctx.fillStyle = on ? '#10131c' : cols[k]; ctx.font = 'bold 38px sans-serif'; ctx.fillText(String(k + 1), x + 50, sy + 50);
+        }
+        this._drawItemIcon(ctx, item, cx, sy - 36, 0.9);
+        const py = sy + 140;
+        for (let i = 0; i < a.len; i++) { const x = cx - (a.len * 30) / 2 + i * 30 + 15; ctx.fillStyle = a.phase === 'input' && i < a.pos ? '#7dffa0' : 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.arc(x, py, 9, 0, Math.PI * 2); ctx.fill(); }
+        ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = a.phase === 'show' ? '#ffd54a' : '#9fe0ff'; ctx.fillText(a.phase === 'show' ? '외우세요… (' + Math.max(0, a.idx + 1) + '/' + a.len + ')  ·  ' + (a.round + 1) + '번째 줄' : '순서대로 누르세요!  ·  ' + (a.round + 1) + '번째 줄', cx, py + 34);
+        hint = '1 2 3 4 키로 켜진 순서대로 (틀리면 새 순서)';
+      } else if (a.mode === 'balance') { // 가로 막대 위의 투구
+        const tx = cx - 270, tw = 540, ty = top + 120;
+        box(tx, ty, tw, 26, 'rgba(0,0,0,0.55)', 'rgba(255,255,255,0.35)');
+        box(tx + tw / 2 - a.zw * tw / 2, ty, a.zw * tw, 26, 'rgba(90,230,140,0.45)', null);
+        const mx = tx + tw / 2 + a.x * tw / 2;
+        ctx.save(); ctx.translate(mx, ty - 28); ctx.rotate(a.v * 0.25); this._drawItemIcon(ctx, item, 0, 0, 0.95); ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(tx - 4, ty - 6, 4, 38); ctx.fillRect(tx + tw, ty - 6, 4, 38);
+        ctx.font = 'bold 30px sans-serif'; ctx.fillStyle = a.wind > 0.2 ? '#ffb347' : a.wind < -0.2 ? '#6fd0ff' : '#667088'; ctx.fillText(a.wind > 0.2 ? '→ → 바람' : a.wind < -0.2 ? '바람 ← ←' : '잔잔', cx, ty + 80);
+        hint = '← → 를 눌러 바람을 이겨요. 끝(양쪽 벽)에 부딪히면 -15';
+      } else if (a.mode === 'react') { // 신호등
+        const col = a.state === 'go' ? '#5aff8a' : a.state === 'decoy' ? '#ffd54a' : '#4a4f62';
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, top + 110, 74, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.stroke();
+        ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = a.state === 'wait' ? '#8a93a8' : '#10131c'; ctx.fillText(a.state === 'go' ? '지금!' : a.state === 'decoy' ? '가짜' : '기다려', cx, top + 110);
+        this._drawItemIcon(ctx, item, cx - 190, top + 110, 1.2);
+        for (let i = 0; i < a.rounds; i++) { ctx.fillStyle = i < a.round ? '#7dffa0' : 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(cx + 130, top + 30 + i * 26, 9, 0, Math.PI * 2); ctx.fill(); }
+        hint = '초록이 되면 Space (제한 ' + Math.round(a.win * 1000) + 'ms). 노란 불은 가짜!';
+      } else if (a.mode === 'catch') { // 떨어지는 실
+        const fw = 360, fh = 230, fx = cx - fw / 2, fy = top;
+        box(fx, fy, fw, fh, 'rgba(0,0,0,0.45)', 'rgba(255,255,255,0.35)');
+        for (const it of a.items) { const x = fx + it.x * fw, y = fy + it.y * fh; ctx.fillStyle = it.bad ? '#ff4a4a' : '#ffd54a'; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill(); if (it.bad) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4); ctx.stroke(); } }
+        const bx = fx + a.bx * fw, bw = a.bw * fw;
+        box(bx - bw / 2, fy + fh * 0.9, bw, 14, '#8a5a2b', '#c9a86a', 2);
+        this._drawItemIcon(ctx, item, bx, fy + fh * 0.9 - 12, 0.6);
+        this._drawItemIcon(ctx, item, fx - 70, fy + fh / 2, 1.1);
+        hint = '← → 로 바구니 이동: 금실(노랑)은 받고 얼룩(빨강)은 피해요';
+      } else if (a.mode === 'beat') { // 박자 링
+        const iv = a.iv, nb = a.start + a.k * iv, u = Math.max(0, Math.min(1, (nb - a.tt) / iv));
+        const ry = top + 100;
+        ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.arc(cx, ry, 36, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 5; ctx.strokeStyle = a.k % 2 === 0 ? '#6fd0ff' : '#ffb347'; ctx.beginPath(); ctx.arc(cx, ry, 36 + u * 70, 0, Math.PI * 2); ctx.stroke();
+        this._drawItemIcon(ctx, item, cx, ry, 0.9);
+        for (const [foot, x, g] of [[0, cx - 200, '← 왼발'], [1, cx + 90, '오른발 →']]) { const next = a.k % 2 === foot; box(x, ry - 36, 110, 72, next ? (foot ? 'rgba(255,179,71,0.25)' : 'rgba(111,208,255,0.25)') : 'rgba(255,255,255,0.05)', next ? (foot ? '#ffb347' : '#6fd0ff') : 'rgba(255,255,255,0.2)', 3); ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = next ? '#fff' : '#667088'; ctx.fillText(g, x + 55, ry); }
+        hint = '링이 가운데 원에 닿는 순간 다음 발을 누르세요 (왼발 → 오른발 → …)';
+      }
+      this._attachTail(ctx, a, P, bad, a.oreName + ' 주괴를 ' + item.name + '에 붙인다  ·  난이도 ' + lv + '  ·  좋음 ' + a.good + '  실수 ' + a.miss, hint + '     Esc: 포기 (잃는 것 없음)');
+      ctx.restore();
+    }
+
+    // [총·투척 무기] 조립 다이얼: 도는 바늘이 초록 칸(작동 홈)에 있을 때 Space로 핀을 맞춘다
+    _drawDialGame(ctx, a) {
+      const W = this.viewW;
+      const defs = G.Shop.ITEMS;
+      ctx.save();
+      const P = this._attachFrame(ctx, a, '부착 — 조립 다이얼', `핀 ${a.locked} / ${a.pins}`);
+      const cx = W / 2, cy = P.y + 235, Rr = 112;
+      const th = (f) => f * Math.PI * 2 - Math.PI / 2;
+      // 톱니 바퀴 장식 (천천히 돈다)
+      const gear = (x, y, r, n, ph, col) => { ctx.fillStyle = col; ctx.beginPath(); for (let i = 0; i < n * 2; i++) { const rr = i % 2 ? r * 0.82 : r; const ang = ph + (i / (n * 2)) * Math.PI * 2; ctx.lineTo(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr); } ctx.closePath(); ctx.fill(); ctx.fillStyle = '#1d2233'; ctx.beginPath(); ctx.arc(x, y, r * 0.35, 0, Math.PI * 2); ctx.fill(); };
+      const t = Date.now() / 1000;
+      gear(cx - 190, cy + 40, 46, 10, t * 0.5, '#3a3f52'); gear(cx + 190, cy + 40, 46, 10, -t * 0.5 + 0.2, '#3a3f52'); gear(cx - 150, cy - 70, 28, 8, -t * 0.8, '#2f3446'); gear(cx + 150, cy - 70, 28, 8, t * 0.8, '#2f3446');
+      // 고리
+      ctx.lineWidth = 16; ctx.strokeStyle = '#2a2f40'; ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, Math.PI * 2); ctx.stroke();
+      // 작동 홈 (초록 칸)
+      ctx.lineWidth = 16; ctx.strokeStyle = a.lockout > 0 ? 'rgba(255,90,90,0.8)' : 'rgba(90,230,140,0.9)';
+      ctx.beginPath(); ctx.arc(cx, cy, Rr, th(a.tgt - a.arc / 2), th(a.tgt + a.arc / 2)); ctx.stroke();
+      // 눈금
+      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      for (let i = 0; i < 24; i++) { const an = th(i / 24); ctx.beginPath(); ctx.moveTo(cx + Math.cos(an) * (Rr + 14), cy + Math.sin(an) * (Rr + 14)); ctx.lineTo(cx + Math.cos(an) * (Rr + 22), cy + Math.sin(an) * (Rr + 22)); ctx.stroke(); }
+      // 바늘
+      const pa = th(a.ang);
+      ctx.lineWidth = 5; ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(pa) * (Rr + 6), cy + Math.sin(pa) * (Rr + 6)); ctx.stroke();
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(cx + Math.cos(pa) * (Rr + 6), cy + Math.sin(pa) * (Rr + 6), 8, 0, Math.PI * 2); ctx.fill();
+      // 가운데: 조립 중인 무기
+      const weapon = defs[a.weaponId];
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(-0.35 + (a.flash > 0 ? Math.sin(t * 40) * 0.05 : 0)); this._drawItemIcon(ctx, weapon, 0, 0, 1.2); ctx.restore();
+      if (a.flash > 0) { ctx.fillStyle = `rgba(255,240,180,${0.25 * a.flash})`; ctx.beginPath(); ctx.arc(cx, cy, Rr - 10, 0, Math.PI * 2); ctx.fill(); }
+      // 핀 램프
+      for (let i = 0; i < a.pins; i++) { const lx = cx - ((a.pins - 1) * 30) / 2 + i * 30; ctx.fillStyle = i < a.locked ? '#7dffa0' : 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(lx, cy + Rr + 52, 10, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5; ctx.stroke(); }
+      for (const p of a.sparks) { ctx.fillStyle = `rgba(255,${180 + Math.random() * 60},90,${Math.min(1, p.life * 2.5)})`; ctx.fillRect(cx + (p.x - 0.5) * 300, cy + (p.y - 0.5) * 300, 3, 3); }
+      ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = a.msgT > 0 ? (/헛/.test(a.msg) ? '#ff8a8a' : '#7dffa0') : 'rgba(0,0,0,0)';
+      ctx.fillText(a.msg, W / 2, P.y + P.h - 76);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(`${a.oreName} 주괴를 ${weapon.name}에 조립한다  ·  난이도 ${['쉬움', '보통', '어려움', '최대'][a.tier - 1]}  ·  맞춤 ${a.good}  헛돎 ${a.miss}`, W / 2, P.y + P.h - 48);
+      ctx.fillText('Space / Enter / 클릭: 핀 맞추기 (틀리면 핀 하나가 풀려요)     Esc: 포기 (잃는 것 없음)     제한 시간 2분', W / 2, P.y + P.h - 24);
+      this._attachResult(ctx, a, P);
+      ctx.restore();
+    }
+
+    // [갑옷] 리벳 박기: 나온 화살표를 순서대로 누른다. 틀리거나 늦으면 그 줄을 새로
+    _drawSeqGame(ctx, a) {
+      const W = this.viewW;
+      const defs = G.Shop.ITEMS;
+      ctx.save();
+      const P = this._attachFrame(ctx, a, '부착 — 리벳 박기', `리벳 ${a.done} / ${a.total}`);
+      const armor = defs[a.weaponId];
+      const cx = W / 2;
+      // 갑옷과 리벳 (박힌 만큼 반짝인다)
+      const ay = P.y + 190;
+      ctx.fillStyle = 'rgba(255,200,100,' + (0.08 + 0.2 * a.flash) + ')'; ctx.beginPath(); ctx.ellipse(cx, ay + 6, 150, 62, 0, 0, Math.PI * 2); ctx.fill();
+      this._drawItemIcon(ctx, armor, cx, ay, 1.6);
+      for (let i = 0; i < a.total; i++) {
+        const an = (i / a.total) * Math.PI * 2 - Math.PI / 2;
+        const rx = cx + Math.cos(an) * 128, ry = ay + 4 + Math.sin(an) * 52;
+        ctx.fillStyle = i < a.done ? '#ffe9a0' : 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(rx, ry, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+      }
+      // 화살표 줄
+      const GL = { U: '↑', D: '↓', L: '←', R: '→' };
+      const bw = 58, gap = 10;
+      const rowW = a.len * bw + (a.len - 1) * gap;
+      const rx0 = cx - rowW / 2, ry0 = P.y + 300;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      a.seq.forEach((k, i) => {
+        const x = rx0 + i * (bw + gap);
+        const done = i < a.pos, cur = i === a.pos;
+        ctx.fillStyle = done ? 'rgba(125,255,160,0.25)' : cur ? 'rgba(255,213,74,0.22)' : 'rgba(255,255,255,0.06)';
+        ctx.fillRect(x, ry0, bw, bw);
+        ctx.lineWidth = cur ? 3 : 1.5; ctx.strokeStyle = done ? '#7dffa0' : cur ? '#ffd54a' : 'rgba(255,255,255,0.2)'; ctx.strokeRect(x, ry0, bw, bw);
+        ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = done ? '#7dffa0' : cur ? '#fff' : '#8a93a8';
+        ctx.fillText(GL[k], x + bw / 2, ry0 + bw / 2 + 1);
+      });
+      // 이 글쇠의 남은 시간
+      const kb = { x: rx0, y: ry0 + bw + 14, w: rowW, h: 8 };
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(kb.x, kb.y, kb.w, kb.h);
+      const kk = Math.max(0, Math.min(1, a.keyT / a.keyTime));
+      ctx.fillStyle = kk > 0.35 ? '#9fe0ff' : '#ff8a4a'; ctx.fillRect(kb.x, kb.y, kb.w * kk, kb.h);
+      ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#b8c2dc';
+      ctx.fillText(`${Math.min(a.rounds, a.round + 1)}번째 줄 / ${a.rounds}`, cx, ry0 - 18);
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = a.msgT > 0 ? (/틀|늦/.test(a.msg) ? '#ff8a8a' : '#7dffa0') : 'rgba(0,0,0,0)';
+      ctx.fillText(a.msg, W / 2, P.y + P.h - 76);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(`${a.oreName} 주괴로 ${armor.name}에 리벳을 박는다  ·  난이도 ${['쉬움', '보통', '어려움', '최대'][a.tier - 1]}  ·  틀림 ${a.miss}`, W / 2, P.y + P.h - 48);
+      ctx.fillText('방향키(또는 WASD): 보이는 화살표를 순서대로     틀리거나 늦으면 그 줄을 새로     Esc: 포기 (잃는 것 없음)', W / 2, P.y + P.h - 24);
+      this._attachResult(ctx, a, P);
+      ctx.restore();
+    }
+
     // 부착 미니게임: 모루 위의 무기에 주괴를 망치로 두드려 붙인다
     _drawAttachGame(ctx, a) {
+      if (a.mode === 'dial') { this._drawDialGame(ctx, a); return; }
+      if (a.mode === 'seq') { this._drawSeqGame(ctx, a); return; }
+      if (a.mode && a.mode !== 'hammer') { this._drawAttachMini(ctx, a); return; }
       const W = this.viewW, H = this.viewH;
       const defs = G.Shop.ITEMS;
       const weapon = defs[a.weaponId];
@@ -1080,7 +1377,7 @@
         const maxed = G.Shop.upMaxed(it, s.inv);
         const placing = s.mode === 'place'; // 꾸미기 창: 가격 대신 놓기/치우기
         const lives_here = !!it.house && s.inv.home.type === it.id;
-        const owned = !it.forge && (maxed || lives_here || (!!(it.slot || it.tool) && s.inv.items.includes(it.id) && !(it.slot === 'weapon' && G.Forge && G.Forge.canMerge(it))));
+        const owned = !it.forge && (maxed || lives_here || (!!(it.slot || it.tool) && s.inv.items.includes(it.id) && !(G.Forge && G.Forge.canMerge(it))));
         const afford = it.forge ? it.afford(s.inv, s.coins) : it.upgrade === 'holy' ? (s.inv.materials.holycrystal || 0) >= 1 : (it.expCost ? s.exp : s.coins) >= price;
         const hover = s.hover === i;
         ctx.fillStyle = hover ? 'rgba(255,213,74,0.16)' : 'rgba(255,255,255,0.07)';
@@ -1136,6 +1433,7 @@
       ctx.font = 'bold 18px sans-serif';
       ctx.fillStyle = s.msgT > 0 ? (s.ok ? '#7dffa0' : '#ff8a8a') : 'rgba(0,0,0,0)';
       ctx.fillText(s.msg, x + w / 2, y + h - 54);
+      if (s.kind === 'furnace' && s.smeltOnly && s.msgT <= 0) { ctx.fillStyle = '#ffd9a0'; ctx.font = 'bold 16px sans-serif'; ctx.fillText('제련 전용 (대상 없이 모든 광석)   Backspace: 뒤로', x + w / 2, y + h - 54); }
       if (s.kind === 'furnace' && s.target && s.msgT <= 0 && G.Shop.ITEMS[s.target]) { const ti = G.Shop.ITEMS[s.target]; ctx.fillStyle = '#ffd9a0'; ctx.font = 'bold 16px sans-serif'; ctx.fillText(`강화 대상: ${ti.name}  (붙인 칸 ${((s.inv.attach && s.inv.attach[s.target]) || []).length}/${G.Forge.slotsOf(ti)})   Backspace: 대상 바꾸기`, x + w / 2, y + h - 54); }
       ctx.font = '16px sans-serif';
       ctx.fillStyle = '#9aa4c0';

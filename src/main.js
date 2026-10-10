@@ -1298,10 +1298,10 @@
     const d = (tier - 1) / 3; // 0(쉬움) ~ 1(최대)
     const e = G.Forge.smithEase(inv); // 대장 레벨이 오를수록 쉬워진다 (최고 레벨 e=1)
     const raw = {
-      goodW: 0.18 - 0.09 * d, perfW: 0.07 - 0.038 * d,
-      spd0: 2.0 + 1.2 * d, spdP: 0.01 + 0.005 * d, // 눈금 속도(rad/s) = spd0 + 진행 × spdP
-      decay: 0.4 * d, driftAmp: 0.1 * d, harm: tier >= 4 ? 0.3 : 0, // 진행이 식는 속도, 칸이 흔들리는 정도, 눈금 속도의 들쭉날쭉함
-      gainP: Math.round(15 - 3 * d), gainG: Math.round(9 - 3 * d), lossM: Math.round(3 + 5 * d),
+      goodW: 0.15 - 0.075 * d, perfW: 0.058 - 0.032 * d,
+      spd0: 2.3 + 1.4 * d, spdP: 0.012 + 0.006 * d, // 눈금 속도(rad/s) = spd0 + 진행 × spdP
+      decay: 0.3 + 0.5 * d, driftAmp: 0.05 + 0.12 * d, harm: tier >= 3 ? 0.3 : 0, // 진행이 식는 속도, 칸이 흔들리는 정도, 눈금 속도의 들쭉날쭉함
+      gainP: Math.round(14 - 3 * d), gainG: Math.round(8 - 3 * d), lossM: Math.round(4 + 6 * d),
     };
     return Object.assign(raw, {
       goodW: raw.goodW * (1 + 0.5 * e), perfW: raw.perfW * (1 + 0.4 * e), spd0: raw.spd0 * (1 - 0.25 * e), spdP: raw.spdP * (1 - 0.25 * e),
@@ -1322,14 +1322,43 @@
     { id: 'sword', name: '검', desc: '근접 무기\n(검 · 대검 · 단검 · 창 · 도끼 …)', icon: 'sword0' },
     { id: 'gun', name: '투척 무기', desc: '쏘고 던지는 무기\n(총 · 활 · 석궁 · 폭탄 …)', icon: 'gun1' },
     { id: 'armor', name: '갑옷', desc: '방어구\n(갑옷 · 투구 · 장갑 · 바지 · 신발)', icon: 'armor1' },
+    { id: 'smelt', name: '제련', desc: '광석을 녹여 주괴로 · 모든 광석', icon: 'ore_iron' },
   ];
+  const FP_COLS = 10; // 인벤토리처럼 네모 칸 격자 (10칸 x 보이는 4줄)
+  const FP_ROWS = 4;
   const fpItemsOf = (cat) => inv.items.filter((id, i, arr) => { const it = G.Shop.ITEMS[id]; return it && it.slot && !it.lens && arr.indexOf(id) === i && G.Forge.classOf(it) === cat; });
-  function openForgePick() { fp = { step: 'cat', cat: null, cur: 0, list: [], msg: '', msgT: 0 }; G.Audio.play('pickup'); }
+  const fpKindOf = (it) => (it.slot === 'weapon' ? it.type : it.slot); // 무기는 종류(검/대검/단검 …), 방어구는 칸(갑옷/투구 …)
+  const FP_ARMOR_ORDER = ['armor', 'helmet', 'gloves', 'pants', 'boots'];
+  // 종류 버튼: 전체 + 가진 종류별 (인벤토리 창의 종류 버튼처럼)
+  function fpChips() {
+    const I = G.Shop.ITEMS;
+    const order = fp.cat === 'armor' ? FP_ARMOR_ORDER : Object.keys(G.Shop.TYPE_NAMES);
+    const names = fp.cat === 'armor' ? G.Shop.SLOT_NAMES : G.Shop.TYPE_NAMES;
+    const out = [{ id: 'all', name: '전체', n: fp.all.length }];
+    for (const k of order) { const n = fp.all.filter((id) => fpKindOf(I[id]) === k).length; if (n) out.push({ id: k, name: names[k], n }); }
+    return out;
+  }
+  function fpApply() { // 고른 종류로 걸러 목록을 다시 만든다
+    const I = G.Shop.ITEMS;
+    fp.list = fp.sub === 'all' ? fp.all.slice() : fp.all.filter((id) => fpKindOf(I[id]) === fp.sub);
+    fp.cur = Math.max(0, Math.min(fp.list.length - 1, fp.cur));
+    fpScroll();
+  }
+  function fpScroll() { const row = Math.floor(fp.cur / FP_COLS); fp.scroll = Math.max(0, Math.min(row, fp.scroll || 0)); if (row >= fp.scroll + FP_ROWS) fp.scroll = row - FP_ROWS + 1; }
+  function fpSetSub(id) { fp.sub = id; fp.cur = 0; fpApply(); G.Audio.play('catch'); }
+  function openForgePick() { fp = { step: 'cat', cat: null, cur: 0, list: [], all: [], sub: 'all', scroll: 0, msg: '', msgT: 0 }; G.Audio.play('pickup'); }
   function fpChoose(i) {
     const c = FP_CATS[i];
+    if (c.id === 'smelt') { // 제련은 대상 없이 따로: 모든 광석을 녹이는 용광로
+      G.Forge.setSmeltOnly(true);
+      fp = null;
+      shop = { kind: 'furnace', def: G.Shop.SHOPS.furnace, tab: 0, hover: -1, msg: '', msgT: 0, ok: true, target: null, smeltOnly: true };
+      G.Audio.play('pickup');
+      return;
+    }
     const list = fpItemsOf(c.id);
     if (!list.length) { fp.msg = `가진 ${c.name}이(가) 없어요.`; fp.msgT = 2; G.Audio.play('deny'); return; }
-    fp.step = 'item'; fp.cat = c.id; fp.list = list; fp.cur = Math.max(0, list.indexOf(inv.equipped.weapon)); G.Audio.play('catch');
+    fp.step = 'item'; fp.cat = c.id; fp.all = list; fp.sub = 'all'; fp.list = list.slice(); fp.cur = Math.max(0, list.indexOf(inv.equipped.weapon)); fp.scroll = 0; fpScroll(); G.Audio.play('catch');
   }
   function fpPick(id) {
     G.Forge.setTarget(id);
@@ -1337,32 +1366,40 @@
     shop = { kind: 'furnace', def: G.Shop.SHOPS.furnace, tab: 0, hover: -1, msg: '', msgT: 0, ok: true, target: id };
     G.Audio.play('pickup');
   }
-  const FP_ROWS = 6;
-  const fpMove = (d) => { fp.cur = Math.max(0, Math.min(fp.list.length - 1, fp.cur + d)); };
+  const fpMove = (d) => { fp.cur = Math.max(0, Math.min(fp.list.length - 1, fp.cur + d)); fpScroll(); };
   function updateForgePick(dt) {
     fp.msgT = Math.max(0, fp.msgT - dt);
     const pressed = (...c) => c.some((k) => input.wasPressed(k));
     if (fp.step === 'cat') {
       if (pressed('Escape')) { fp = null; return; }
-      if (pressed('ArrowLeft', 'KeyA')) fp.cur = (fp.cur + 2) % 3;
-      if (pressed('ArrowRight', 'KeyD')) fp.cur = (fp.cur + 1) % 3;
-      for (let i = 0; i < 3; i++) if (pressed('Digit' + (i + 1), 'Numpad' + (i + 1))) { fp.cur = i; fpChoose(i); return; }
+      if (pressed('ArrowLeft', 'KeyA')) fp.cur = (fp.cur + FP_CATS.length - 1) % FP_CATS.length;
+      if (pressed('ArrowRight', 'KeyD')) fp.cur = (fp.cur + 1) % FP_CATS.length;
+      for (let i = 0; i < FP_CATS.length; i++) if (pressed('Digit' + (i + 1), 'Numpad' + (i + 1))) { fp.cur = i; fpChoose(i); return; }
       if (pressed('Enter', 'Space')) fpChoose(fp.cur);
     } else {
       if (pressed('Escape', 'Backspace')) { fp.step = 'cat'; fp.cur = FP_CATS.findIndex((c) => c.id === fp.cat); return; }
-      if (pressed('ArrowUp', 'KeyW')) fpMove(-1);
-      if (pressed('ArrowDown', 'KeyS')) fpMove(1);
-      if (pressed('PageUp')) fpMove(-FP_ROWS);
-      if (pressed('PageDown')) fpMove(FP_ROWS);
-      if (pressed('Enter', 'Space')) fpPick(fp.list[fp.cur]);
+      if (pressed('ArrowLeft', 'KeyA')) fpMove(-1);
+      if (pressed('ArrowRight', 'KeyD')) fpMove(1);
+      if (pressed('ArrowUp', 'KeyW')) fpMove(-FP_COLS);
+      if (pressed('ArrowDown', 'KeyS')) fpMove(FP_COLS);
+      if (pressed('PageUp')) fpMove(-FP_COLS * FP_ROWS);
+      if (pressed('PageDown')) fpMove(FP_COLS * FP_ROWS);
+      if (pressed('Tab')) { // 종류 버튼 돌리기 (Shift = 거꾸로)
+        const chips = fpChips();
+        const i = chips.findIndex((c) => c.id === fp.sub);
+        const back = input.down.has('ShiftLeft') || input.down.has('ShiftRight');
+        fpSetSub(chips[(i + (back ? chips.length - 1 : 1)) % chips.length].id);
+      }
+      if (pressed('Enter', 'Space') && fp.list.length) fpPick(fp.list[fp.cur]);
     }
   }
   const fpView = () => {
     const I = G.Shop.ITEMS;
     return Object.assign({}, fp, {
-      cats: FP_CATS.map((c) => Object.assign({ item: I[c.icon], n: fpItemsOf(c.id).length }, c)),
-      items: fp.step === 'item' ? fp.list.map((id) => ({ item: I[id], copies: G.Forge.copiesOf(inv, id), used: (inv.attach[id] || []).length, slots: G.Forge.slotsOf(I[id]), equipped: Object.values(inv.equipped).includes(id) })) : [],
-      rows: FP_ROWS,
+      cats: FP_CATS.map((c) => Object.assign({ item: I[c.icon], n: c.id === 'smelt' ? Object.values(inv.ores || {}).reduce((a, b) => a + b, 0) : fpItemsOf(c.id).length }, c)),
+      chips: fp.step === 'item' ? fpChips() : [],
+      entries: fp.step === 'item' ? fp.list.map((id) => ({ item: I[id], copies: G.Forge.copiesOf(inv, id), used: (inv.attach[id] || []).length, slots: G.Forge.slotsOf(I[id]), equipped: Object.values(inv.equipped).includes(id), attached: (inv.attach[id] || []).map((o) => G.Forge.ORE[o].name) })) : [],
+      cols: FP_COLS, rows: FP_ROWS,
     });
   };
 
@@ -1372,7 +1409,7 @@
     const ore = G.Forge.ORE[oreId];
     shop = null;
     const base = kind === 'smelt' ? G.Forge.smeltFee(ore) : G.Forge.attachFee(ore);
-    wc = { kind, ore: oreId, oreName: ore.name, tier: ore.tier, base, smithFee: G.Forge.smithWorkFee(kind, ore.tier), msg: '', msgT: 0 };
+    wc = { kind, ore: oreId, oreName: ore.name, tier: ore.tier, base, smithFee: G.Forge.smithWorkFee(kind, ore.tier), mini: kind === 'smelt' ? '불 온도 맞추기 미니게임' : attachMiniName(), msg: '', msgT: 0 };
   }
   function workChoiceDo(which) {
     if (!wc) return;
@@ -1390,12 +1427,310 @@
     else if (input.wasPressed('Digit2') || input.wasPressed('Numpad2')) workChoiceDo(2);
   }
 
-  function startAttachGame(oreId) {
+  function startHammerGame(oreId) {
     const ore = G.Forge.ORES.find((o) => o.id === oreId);
     shop = null;
-    ag = { ore: oreId, oreName: ore.name, weaponId: G.Forge.targetId(inv), t: G.Forge.ATTACH_TIME, progress: 0, tier: ore.tier, ...attachDifficulty(ore.tier), drift: 0, phase: 0, zone: 0.3 + Math.random() * 0.4, perfect: 0, good: 0, miss: 0, msg: '두드려서 붙이자! 눈금이 초록 칸에 올 때 Space', msgT: 3, swing: 0, flash: 0, result: null, resultT: 0, sparks: [] };
+    ag = { mode: 'hammer', ore: oreId, oreName: ore.name, weaponId: G.Forge.targetId(inv), t: G.Forge.ATTACH_TIME, progress: 0, tier: ore.tier, ...attachDifficulty(ore.tier), drift: 0, phase: 0, zone: 0.3 + Math.random() * 0.4, perfect: 0, good: 0, miss: 0, msg: '두드려서 붙이자! 눈금이 초록 칸에 올 때 Space', msgT: 3, swing: 0, flash: 0, result: null, resultT: 0, sparks: [] };
     G.Audio.play('pickup');
   }
+  // ---- 부착 미니게임은 대상 종류마다 다르다: 검 = 망치로 두드려 붙이기(타이밍 막대), 투척 무기(총·활·폭탄) = 조립 다이얼, 갑옷 = 리벳 박기(화살표 순서) ----
+  // 아이템 종류 -> 미니게임: 검류(근접 무기 모두) 두드리기 / 총 다이얼 / 산탄총 탄 기억 / 활 조준 / 석궁 시위 감기 / 폭탄 화약 채우기 /
+  //                        갑옷 리벳 / 투구 균형 / 장갑 반응 / 바지 실 받기 / 신발 발맞추기. 서로 하는 방식이 모두 다르다
+  const ATTACH_MODE_OF = { gun: 'dial', shotgun: 'memory', bow: 'aim', crossbow: 'crank', bomb: 'fill', armor: 'seq', helmet: 'balance', gloves: 'react', pants: 'catch', boots: 'beat' };
+  const ATTACH_NAME = { hammer: '두드려 붙이기', dial: '조립 다이얼', memory: '탄약 장전 기억', aim: '조준 사격', crank: '시위 감기', fill: '화약 채우기', seq: '리벳 박기', balance: '균형 잡기', react: '바느질 반응', catch: '실 받기', beat: '발맞추기' };
+  const attachModeOf = (it) => ATTACH_MODE_OF[it.slot === 'weapon' ? it.type : it.slot] || 'hammer';
+  function startAttachGame(oreId) {
+    const mode = attachModeOf(G.Forge.targetItem(inv));
+    const start = { hammer: startHammerGame, dial: startDialGame, seq: startSeqGame, fill: startFillGame, aim: startAimGame, crank: startCrankGame, memory: startMemoryGame, balance: startBalanceGame, react: startReactGame, catch: startCatchGame, beat: startBeatGame }[mode];
+    start(oreId);
+  }
+  const attachMiniName = () => ATTACH_NAME[attachModeOf(G.Forge.targetItem(inv))] + ' 미니게임';
+  const attachBase = (oreId, mode, msg) => {
+    const ore = G.Forge.ORES.find((o) => o.id === oreId);
+    shop = null;
+    G.Audio.play('pickup');
+    return { mode, ore: oreId, oreName: ore.name, weaponId: G.Forge.targetId(inv), t: G.Forge.ATTACH_TIME, progress: 0, tier: ore.tier, perfect: 0, good: 0, miss: 0, msg, msgT: 4, swing: 0, flash: 0, result: null, resultT: 0, sparks: [], click: false };
+  };
+  // [총] 조립 다이얼: 빙글 도는 바늘이 초록 칸(작동 홈)에 있을 때 Space. 핀을 차례로 모두 맞춘다. 틀리면 핀 하나가 풀린다
+  function startDialGame(oreId) {
+    const ore = G.Forge.ORES.find((o) => o.id === oreId);
+    const e = G.Forge.smithEase(inv);
+    ag = Object.assign(attachBase(oreId, 'dial', '다이얼을 돌려 핀을 맞추자! 바늘이 초록 칸에 올 때 Space'), {
+      pins: 3 + ore.tier, arc: 0.8 * (0.17 - 0.025 * (ore.tier - 1)) * (1 + 0.5 * e), speed: 1.2 * (0.55 + 0.1 * (ore.tier - 1)) * (1 - 0.25 * e),
+      ang: Math.random(), dir: 1, tgt: Math.random(), locked: 0, lockout: 0,
+    });
+  }
+  const dialDist = (a, b) => { const d = Math.abs(a - b) % 1; return d > 0.5 ? 1 - d : d; };
+  function updateDial(dt) {
+    ag.ang = (ag.ang + ag.dir * ag.speed * dt + 1) % 1;
+    ag.lockout = Math.max(0, ag.lockout - dt);
+    ag.flash = Math.max(0, ag.flash - dt * 3);
+    ag.msgT = Math.max(0, ag.msgT - dt);
+    for (const p of ag.sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 2.2 * dt; p.life -= dt; }
+    ag.sparks = ag.sparks.filter((p) => p.life > 0);
+    const press = input.wasPressed('Space') || input.wasPressed('Enter') || ag.click;
+    ag.click = false;
+    if (!press || ag.lockout > 0) return;
+    if (dialDist(ag.ang, ag.tgt) <= ag.arc / 2) { // 딸깍: 핀이 맞았다
+      ag.locked += 1;
+      ag.progress = (ag.locked / ag.pins) * 100;
+      ag.msg = `딸깍! 핀 ${ag.locked}/${ag.pins}`; ag.msgT = 1.2; ag.flash = 1; ag.good += 1;
+      G.Audio.play('clack'); effects.shake(2, 0.08);
+      for (let i = 0; i < 10; i++) ag.sparks.push({ x: 0.5 + (Math.random() - 0.5) * 0.1, y: 0.5, vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 0.9, life: 0.4 + Math.random() * 0.3 });
+      if (ag.locked >= ag.pins) { agFinish(true); return; }
+      ag.dir = -ag.dir; // 다음 핀은 반대로 돈다
+      do { ag.tgt = Math.random(); } while (dialDist(ag.tgt, ag.ang) < 0.18);
+    } else { // 헛돌았다: 핀이 하나 풀리고 잠깐 걸린다
+      ag.miss += 1;
+      ag.locked = Math.max(0, ag.locked - 1);
+      ag.progress = (ag.locked / ag.pins) * 100;
+      ag.lockout = 0.4;
+      ag.msg = '헛돌았어요! 핀이 풀렸다'; ag.msgT = 1.2;
+      G.Audio.play('deny');
+    }
+  }
+  // [갑옷] 리벳 박기: 화면에 나온 화살표를 순서대로 눌러 리벳을 박는다. 틀리거나 늦으면 그 줄을 처음부터 새로
+  function startSeqGame(oreId) {
+    const ore = G.Forge.ORES.find((o) => o.id === oreId);
+    const e = G.Forge.smithEase(inv);
+    ag = Object.assign(attachBase(oreId, 'seq', '화살표를 순서대로 눌러 리벳을 박자! (방향키 또는 WASD)'), {
+      len: 4 + ore.tier, rounds: 3, keyTime: 0.85 * (2.0 - 0.25 * (ore.tier - 1)) * (1 + 0.4 * e),
+      round: 0, pos: 0, done: 0, seq: [], keyT: 0,
+    });
+    ag.total = ag.len * ag.rounds;
+    seqNew();
+  }
+  const SEQ_KEYS = { ArrowUp: 'U', KeyW: 'U', ArrowDown: 'D', KeyS: 'D', ArrowLeft: 'L', KeyA: 'L', ArrowRight: 'R', KeyD: 'R' };
+  function seqNew() { ag.seq = []; for (let i = 0; i < ag.len; i++) ag.seq.push('UDLR'[Math.floor(Math.random() * 4)]); ag.pos = 0; ag.keyT = ag.keyTime * 1.5; }
+  function seqMistake(why) {
+    ag.miss += 1;
+    ag.done = Math.max(0, ag.done - ag.pos);
+    ag.progress = (ag.done / ag.total) * 100;
+    ag.msg = why; ag.msgT = 1.2; ag.flash = 0;
+    G.Audio.play('deny'); effects.shake(2, 0.08);
+    seqNew();
+  }
+  function updateSeq(dt) {
+    ag.msgT = Math.max(0, ag.msgT - dt);
+    ag.flash = Math.max(0, ag.flash - dt * 3);
+    ag.keyT -= dt;
+    if (ag.keyT <= 0) { seqMistake('늦었어요! 이 줄을 다시'); return; }
+    let key = null;
+    for (const c of Object.keys(SEQ_KEYS)) if (input.wasPressed(c)) { key = SEQ_KEYS[c]; break; }
+    if (!key) return;
+    if (key !== ag.seq[ag.pos]) { seqMistake('틀렸어요! 이 줄을 다시'); return; }
+    ag.pos += 1; ag.done += 1; ag.good += 1; ag.keyT = ag.keyTime;
+    ag.progress = (ag.done / ag.total) * 100;
+    G.Audio.play('clack'); effects.shake(1.5, 0.06);
+    if (ag.pos >= ag.len) { // 한 줄 완성
+      ag.round += 1; ag.perfect += 1; ag.flash = 1;
+      if (ag.round >= ag.rounds) { agFinish(true); return; }
+      ag.msg = `한 줄 완성! (${ag.round}/${ag.rounds})`; ag.msgT = 1.2; G.Audio.play('crit');
+      seqNew();
+    }
+  }
+
+  // ---- 새 미니게임들 (모두 제한 시간 2분, 희귀한 광석일수록 어렵고 대장 레벨이 높을수록 쉽다) ----
+  const adv = (oreId) => { const o = G.Forge.ORES.find((q) => q.id === oreId); return { tier: o.tier, d: (o.tier - 1) / 3, e: G.Forge.smithEase(inv) }; };
+  const pressedKey = (...c) => c.some((k) => input.wasPressed(k));
+  const tapPressed = () => { const r = pressedKey('Space', 'Enter') || ag.click; ag.click = false; return r; };
+  const agMiss = (msg) => { ag.miss += 1; ag.msg = msg; ag.msgT = 1.2; G.Audio.play('deny'); effects.shake(2, 0.08); };
+  const agGood = (msg, snd) => { ag.good += 1; ag.msg = msg; ag.msgT = 1.2; ag.flash = 1; G.Audio.play(snd || 'clack'); effects.shake(1.5, 0.06); };
+  const agTick = (dt) => { ag.msgT = Math.max(0, ag.msgT - dt); ag.flash = Math.max(0, ag.flash - dt * 3); };
+  const agSetProg = (v) => { ag.progress = Math.max(0, Math.min(100, v)); if (ag.progress >= 100) agFinish(true); };
+
+  // [폭탄] 화약 채우기: 누르고 있는 동안 화약이 차오른다. 초록 칸에서 떼야 한다 (넘치면 펑!)
+  function startFillGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'fill', 'Space를 누르고 있으면 화약이 차올라요. 초록 칸에서 떼세요!'), {
+      rounds: 3 + tier, round: 0, level: 0, hw: (0.075 - 0.011 * (tier - 1)) * (1 + 0.5 * e), rate: (0.55 + 0.12 * tier) * (1 - 0.2 * e),
+      center: 0.4 + Math.random() * 0.45, held: false, mouse: false, cool: 0, shown: 0,
+    });
+  }
+  function updateFill(dt) {
+    agTick(dt);
+    ag.cool = Math.max(0, ag.cool - dt);
+    if (ag.cool > 0) { ag.shown = Math.max(0, ag.shown - dt * 2.5); return; }
+    const held = input.down.has('Space') || input.down.has('Enter') || ag.mouse;
+    if (held) {
+      ag.held = true;
+      ag.level += ag.rate * dt;
+      ag.shown = ag.level;
+      if (ag.level >= 1) { // 넘쳤다
+        agMiss('펑! 넘쳤어요'); ag.level = 0; ag.held = false; ag.cool = 0.7; ag.center = 0.4 + Math.random() * 0.45; effects.shake(5, 0.2);
+      }
+    } else if (ag.held) { // 뗐다: 초록 칸이면 성공
+      ag.held = false;
+      const ok = Math.abs(ag.level - ag.center) <= ag.hw;
+      ag.shown = ag.level;
+      if (ok) {
+        ag.round += 1;
+        agGood('딸깍! 화약 ' + ag.round + '/' + ag.rounds, 'clack');
+        ag.center = 0.4 + Math.random() * 0.45;
+      } else if (ag.level > 0.04) agMiss(ag.level < ag.center ? '모자라요!' : '넘쳤어요!');
+      ag.level = 0; ag.cool = 0.5;
+      agSetProg((ag.round / ag.rounds) * 100);
+    }
+  }
+  // [활] 조준 사격: 움직이는 십자선이 과녁 가운데에 올 때 쏜다
+  function startAimGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'aim', '십자선이 과녁 가운데에 올 때 Space!'), {
+      shots: 3 + tier, hit: 0, r: (0.09 - 0.011 * (tier - 1)) * (1 + 0.5 * e), tt: 0, cx: 0.5, cy: 0.5, cool: 0, k: 1 - 0.2 * e, tierMul: tier,
+    });
+    aimNew();
+  }
+  function aimNew() { ag.fx = (1.3 + 0.4 * ag.tierMul + Math.random() * 0.6) * ag.k; ag.fy = (1.7 + 0.35 * ag.tierMul + Math.random() * 0.6) * ag.k; ag.p1 = Math.random() * 6; ag.p2 = Math.random() * 6; }
+  function updateAim(dt) {
+    agTick(dt);
+    ag.tt += dt;
+    ag.cool = Math.max(0, ag.cool - dt);
+    ag.cx = 0.5 + 0.42 * Math.sin(ag.fx * ag.tt + ag.p1);
+    ag.cy = 0.5 + 0.38 * Math.sin(ag.fy * ag.tt + ag.p2);
+    if (!tapPressed() || ag.cool > 0) return;
+    ag.cool = 0.3;
+    const dist = Math.hypot(ag.cx - 0.5, ag.cy - 0.5);
+    if (dist <= ag.r) {
+      ag.hit += 1;
+      if (dist <= ag.r * 0.4) { ag.perfect += 1; agGood('명중! 정중앙! ' + ag.hit + '/' + ag.shots, 'crit'); } else agGood('명중! ' + ag.hit + '/' + ag.shots, 'clack');
+      aimNew();
+    } else { ag.hit = Math.max(0, ag.hit - 1); agMiss('빗나갔다! 맞힌 것 하나가 사라졌다'); }
+    agSetProg((ag.hit / ag.shots) * 100);
+  }
+  // [석궁] 시위 감기: ← → 를 번갈아 눌러 손잡이를 돌린다. 같은 쪽을 두 번 누르면 걸린다
+  function startCrankGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'crank', '← → 를 번갈아 빠르게 눌러 시위를 감자!'), { power: 0, last: null, decay: (11 + 3.5 * tier) * (1 - 0.3 * e), spin: 0, jam: 0 });
+  }
+  function updateCrank(dt) {
+    agTick(dt);
+    ag.jam = Math.max(0, ag.jam - dt);
+    ag.power = Math.max(0, ag.power - ag.decay * dt);
+    for (const code of ['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD']) {
+      if (!input.wasPressed(code)) continue;
+      const side = code === 'ArrowLeft' || code === 'KeyA' ? 'L' : 'R';
+      if (side !== ag.last) { ag.power += 6; ag.spin += 1; ag.last = side; ag.flash = 0.5; if (ag.spin % 4 === 0) G.Audio.play('clack'); }
+      else { ag.power = Math.max(0, ag.power - 8); ag.jam = 0.3; agMiss('걸렸어요! 번갈아 눌러요'); }
+    }
+    agSetProg(ag.power);
+  }
+  // [산탄총] 탄약 장전 기억: 보여 주는 색 탄환의 순서를 외웠다가 1~4 키로 그대로 누른다
+  function startMemoryGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'memory', '탄환이 켜지는 순서를 외우세요!'), { len: 3 + tier, rounds: 2, round: 0, showT: (0.7 - 0.07 * (tier - 1)) * (1 + 0.4 * e), phase: 'show', idx: 0, tm: 0.9, pos: 0, done: 0, seq: [] });
+    ag.total = ag.len * ag.rounds;
+    memNew();
+  }
+  function memNew() { ag.seq = []; for (let i = 0; i < ag.len; i++) ag.seq.push(Math.floor(Math.random() * 4)); ag.phase = 'show'; ag.idx = -1; ag.tm = 0.9; ag.pos = 0; }
+  function updateMemory(dt) {
+    agTick(dt);
+    if (ag.phase === 'show') {
+      ag.tm -= dt;
+      if (ag.tm <= 0) { ag.idx += 1; ag.tm = ag.showT; if (ag.idx >= ag.len) { ag.phase = 'input'; ag.pos = 0; ag.msg = '이제 같은 순서로 누르세요! (1 2 3 4)'; ag.msgT = 2; } else G.Audio.play('clack'); }
+      return;
+    }
+    for (let k = 0; k < 4; k++) {
+      if (!pressedKey('Digit' + (k + 1), 'Numpad' + (k + 1))) continue;
+      ag.lit = k; ag.litT = 0.25;
+      if (k === ag.seq[ag.pos]) {
+        ag.pos += 1; ag.done += 1; ag.good += 1; G.Audio.play('clack');
+        if (ag.pos >= ag.len) { ag.round += 1; ag.flash = 1; if (ag.round < ag.rounds) { ag.msg = '맞았어요! 다음 줄'; ag.msgT = 1.2; memNew(); } }
+      } else { ag.done = Math.max(0, ag.done - ag.pos); agMiss('틀렸어요! 다시 보여 줄게요'); memNew(); }
+      agSetProg((ag.done / ag.total) * 100);
+      break;
+    }
+    ag.litT = Math.max(0, (ag.litT || 0) - dt);
+  }
+  // [투구] 균형 잡기: 바람에 밀리는 투구를 ← → 로 가운데 초록 칸에 붙들어 둔다
+  function startBalanceGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'balance', '← → 로 투구를 초록 칸에 붙들어 두세요!'), { x: 0, v: 0, wind: 0, windTo: 0, windT: 0.5, zw: (0.3 - 0.045 * (tier - 1)) * (1 + 0.5 * e), need: 11 + 3 * tier, drift: (1.0 + 0.4 * tier) * (1 - 0.3 * e) });
+  }
+  function updateBalance(dt) {
+    agTick(dt);
+    ag.windT -= dt;
+    if (ag.windT <= 0) { ag.windTo = (Math.random() * 2 - 1) * ag.drift; ag.windT = 0.6 + Math.random() * 0.9; }
+    ag.wind += (ag.windTo - ag.wind) * Math.min(1, 2 * dt);
+    const push = (input.down.has('ArrowRight') || input.down.has('KeyD') ? 1 : 0) - (input.down.has('ArrowLeft') || input.down.has('KeyA') ? 1 : 0);
+    ag.v += (ag.wind + push * 2.6) * dt;
+    ag.v *= Math.exp(-0.9 * dt);
+    ag.x += ag.v * dt;
+    if (Math.abs(ag.x) > 1) { ag.x = Math.sign(ag.x); ag.v = -ag.v * 0.3; ag.progress = Math.max(0, ag.progress - 15); agMiss('굴러 떨어질 뻔했어요! -15'); }
+    if (Math.abs(ag.x) <= ag.zw) agSetProg(ag.progress + dt * (100 / ag.need));
+    else ag.progress = Math.max(0, ag.progress - 3 * dt);
+  }
+  // [장갑] 바느질 반응: 불이 초록으로 바뀌는 순간 Space. 미리 누르거나 늦거나 노란 가짜 불에 속으면 안 된다
+  function startReactGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'react', '불이 초록이 될 때 Space! 미리 누르면 안 돼요'), { rounds: 4 + tier, round: 0, win: (0.5 - 0.06 * (tier - 1)) * (1 + 0.5 * e), decoy: 0.1 * (tier - 1), state: 'wait', timer: 1 + Math.random() * 1.5 });
+  }
+  function updateReact(dt) {
+    agTick(dt);
+    const press = tapPressed();
+    ag.timer -= dt;
+    if (ag.state === 'wait') {
+      if (press) { agMiss('너무 일렀어요!'); ag.timer = 1 + Math.random() * 1.5; return; }
+      if (ag.timer <= 0) { if (Math.random() < ag.decoy) { ag.state = 'decoy'; ag.timer = 0.45; } else { ag.state = 'go'; ag.timer = ag.win; G.Audio.play('pickup'); } }
+    } else if (ag.state === 'decoy') {
+      if (press) { agMiss('가짜 불이에요!'); ag.state = 'wait'; ag.timer = 1 + Math.random() * 1.5; return; }
+      if (ag.timer <= 0) { ag.state = 'wait'; ag.timer = 0.8 + Math.random() * 1.6; }
+    } else if (ag.state === 'go') {
+      if (press) {
+        ag.round += 1; agGood('좋아요! ' + ag.round + '/' + ag.rounds + ' (' + Math.round((ag.win - ag.timer) * 1000) + 'ms)', 'clack');
+        ag.state = 'wait'; ag.timer = 0.9 + Math.random() * 1.8;
+        agSetProg((ag.round / ag.rounds) * 100);
+      } else if (ag.timer <= 0) { agMiss('늦었어요!'); ag.state = 'wait'; ag.timer = 1 + Math.random() * 1.5; }
+    }
+  }
+  // [바지] 실 받기: ← → 로 바구니를 움직여 금실은 받고 빨간 얼룩은 피한다
+  function startCatchGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'catch', '← → 로 바구니를 움직여 금실만 받으세요!'), { need: 6 + 2 * tier, caught: 0, bx: 0.5, items: [], spawnT: 0.4, speed: (0.34 + 0.07 * tier) * (1 - 0.2 * e), badP: 0.2 + 0.08 * tier, bw: (0.17 - 0.013 * (tier - 1)) * (1 + 0.4 * e) });
+  }
+  function updateCatch(dt) {
+    agTick(dt);
+    const dir = (input.down.has('ArrowRight') || input.down.has('KeyD') ? 1 : 0) - (input.down.has('ArrowLeft') || input.down.has('KeyA') ? 1 : 0);
+    ag.bx = Math.max(0.06, Math.min(0.94, ag.bx + dir * 1.15 * dt));
+    ag.spawnT -= dt;
+    if (ag.spawnT <= 0) { ag.items.push({ x: 0.08 + Math.random() * 0.84, y: -0.05, bad: Math.random() < ag.badP }); ag.spawnT = Math.max(0.35, 0.8 - 0.04 * ag.tier) * (0.7 + Math.random() * 0.6); }
+    for (const it of ag.items) it.y += ag.speed * dt;
+    for (const it of ag.items) {
+      if (it.y < 0.9 || it.done) continue;
+      if (Math.abs(it.x - ag.bx) <= ag.bw / 2) {
+        it.done = true;
+        if (it.bad) { ag.caught = Math.max(0, ag.caught - 2); agMiss('얼룩이에요! -2'); } else { ag.caught += 1; agGood('받았다! ' + ag.caught + '/' + ag.need, 'coin'); }
+        agSetProg((ag.caught / ag.need) * 100);
+      }
+    }
+    ag.items = ag.items.filter((it) => !it.done && it.y < 1.05);
+  }
+  // [신발] 발맞추기: 박자에 맞춰 왼발(←/A)과 오른발(→/D)을 번갈아 내딛는다
+  function startBeatGame(oreId) {
+    const { tier, e } = adv(oreId);
+    ag = Object.assign(attachBase(oreId, 'beat', '박자에 맞춰 ← → 를 번갈아 눌러요!'), { iv: (0.85 - 0.05 * (tier - 1)) * (1 + 0.1 * e), tol: (0.13 - 0.014 * (tier - 1)) * (1 + 0.5 * e), need: 8 + 2 * tier, combo: 0, tt: 0, k: 0, start: 1.2, used: {} });
+  }
+  function updateBeat(dt) {
+    agTick(dt);
+    ag.tt += dt;
+    const bt = (k) => ag.start + k * ag.iv;
+    // 지나간 박자
+    while (ag.tt > bt(ag.k) + ag.tol) {
+      if (!ag.used[ag.k]) { ag.combo = Math.max(0, ag.combo - 2); agMiss('박자를 놓쳤어요!'); }
+      delete ag.used[ag.k]; ag.k += 1;
+    }
+    for (const code of ['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD']) {
+      if (!input.wasPressed(code)) continue;
+      const foot = code === 'ArrowLeft' || code === 'KeyA' ? 0 : 1;
+      let hit = -1;
+      for (const k of [ag.k, ag.k + 1]) if (Math.abs(ag.tt - bt(k)) <= ag.tol && !ag.used[k]) { hit = k; break; }
+      if (hit >= 0 && hit % 2 === foot) { ag.used[hit] = true; ag.combo += 1; agGood('좋아요! 연속 ' + ag.combo, 'clack'); }
+      else { if (hit >= 0) ag.used[hit] = true; ag.combo = Math.max(0, ag.combo - 3); agMiss(hit >= 0 ? '발이 반대예요!' : '박자가 아니에요!'); }
+      agSetProg((ag.combo / ag.need) * 100);
+    }
+    agSetProg((ag.combo / ag.need) * 100);
+  }
+  const ATTACH_UPDATE = { dial: updateDial, seq: updateSeq, fill: updateFill, aim: updateAim, crank: updateCrank, memory: updateMemory, balance: updateBalance, react: updateReact, catch: updateCatch, beat: updateBeat };
+
   // 눈금 위치: 3단계 이상 광석은 속도가 들쭉날쭉해서 타이밍을 읽기 어렵다
 const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase * 1.7));
   function agHit() {
@@ -1412,6 +1747,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (ag.progress >= 100) agFinish(true);
   }
   function agFinish(win) {
+    if (ag.result) return; // 이미 끝났다 (같은 갱신에서 두 번 부르지 않게)
     ag.result = win ? 'win' : 'fail';
     ag.resultT = 2;
     if (win) {
@@ -1438,6 +1774,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
     if (input.wasPressed('Escape')) { ag = null; return; } // 중도 포기: 아무것도 잃지 않는다
     ag.t = Math.max(0, ag.t - dt);
+    if (ATTACH_UPDATE[ag.mode]) { // 두드리기 말고는 종류마다 다른 미니게임
+      ATTACH_UPDATE[ag.mode](dt);
+      if (ag && !ag.result && ag.t <= 0) agFinish(false);
+      return;
+    }
     ag.phase += (ag.spd0 + ag.progress * ag.spdP) * dt; // 눈금: 광석 단계가 높고 진행될수록 빨라진다 (대략 4~8 rad/s)
     ag.progress = Math.max(0, ag.progress - ag.decay * dt); // 식어서 조금씩 되돌아간다: 멈추면 안 붙는다
     if (ag.progress > 25 && ag.driftAmp > 0) { ag.drift += dt; ag.zone = Math.max(0.14, Math.min(0.86, ag.zone + Math.sin(ag.drift * (1.1 + 0.2 * ag.tier)) * ag.driftAmp * dt)); } // 초록 칸이 천천히 흔들린다
@@ -1945,7 +2286,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { head: '장비' },
       { label: '모든 무기 받기', hint: '합성 무기 제외', run: give('모든 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon' && !it.tier); devUI.msg = `무기 ${n}개를 받았다`; }) },
       { label: '합성 무기 모두 받기', hint: '강화된 · 최강의', run: give('합성 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon' && !!it.tier); devUI.msg = `합성 무기 ${n}개를 받았다`; }) },
-      { label: '모든 방어구 받기', hint: '갑옷 · 투구 · 장갑 · 바지 · 신발', run: give('모든 방어구를 받았다', () => { const n = giveItems((it) => it.slot !== 'weapon'); devUI.msg = `방어구 ${n}개를 받았다`; }) },
+      { label: '모든 방어구 받기', hint: '갑옷 · 투구 · 장갑 · 바지 · 신발', run: give('모든 방어구를 받았다', () => { const n = giveItems((it) => it.slot !== 'weapon' && !it.tier); devUI.msg = `방어구 ${n}개를 받았다`; }) },
       { label: '방어구 최고 장착', hint: '가진 것 중 제일 좋은 것으로', run: give('방어구를 최고로 맞췄다', () => { const c = equipBestCore(); devUI.msg = c.length ? `${c.length}곳을 바꿨다` : '이미 가장 좋은 옷차림'; }) },
       { label: '기본 검 3자루 받기', hint: '합치기 연습', run: give('기본 검 3자루', () => { G.Forge.addCopy(inv, 'sword0', 3); }) },
       { label: '시작 장비로 되돌리기', hint: '목검 + 허름한 옷', run: give('시작 장비로 되돌렸다', () => { const f = G.Shop.newInventory(); inv.items = f.items; inv.copies = f.copies; inv.attach = f.attach; inv.hotbar = f.hotbar; inv.equipped = f.equipped; inv.wlevel = {}; inv.holy = {}; G.Forge.markDirty(); applyEquipment(); }) },
@@ -2075,14 +2416,14 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       equipUI.msgT = 0;
     }
   });
-  canvas.addEventListener('mousedown', () => { if (sg && !sg.result) sg.mouse = true; }); // 제련 미니게임: 누르는 동안 풀무질
-  window.addEventListener('mouseup', () => { if (sg) sg.mouse = false; });
+  canvas.addEventListener('mousedown', () => { if (sg && !sg.result) sg.mouse = true; if (ag && ag.mode === 'fill' && !ag.result) ag.mouse = true; }); // 제련: 누르는 동안 풀무질 / 폭탄 화약 채우기
+  window.addEventListener('mouseup', () => { if (sg) sg.mouse = false; if (ag) ag.mouse = false; });
   canvas.addEventListener('mousemove', (ev) => {
     const p = canvasPoint(ev);
     if (fp) { // 대상 고르기: 올려 놓으면 선택
       const g = G.Renderer.forgePickGeometry(C.VIEW_W, C.VIEW_H);
       if (fp.step === 'cat') { const i = g.cats.findIndex((r) => inRect(p, r)); if (i >= 0) fp.cur = i; }
-      else { const top = Math.max(0, Math.min(fp.cur - (FP_ROWS - 1), fp.list.length - FP_ROWS)); const i = g.rows.findIndex((r) => inRect(p, r)); if (i >= 0 && top + i < fp.list.length) fp.cur = top + i; }
+      else { const k = g.cells.findIndex((r) => inRect(p, r)); const idx = (fp.scroll || 0) * FP_COLS + k; if (k >= 0 && idx < fp.list.length) fp.cur = idx; }
     }
     if (mini) { mini.mouse = p; mini.useMouse = true; } // 놀이마당: 마우스로 조준/선택
     if (equipUI && equipUI.drag) {
@@ -2103,7 +2444,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
   });
   canvas.addEventListener('wheel', (ev) => { // 휠: 인벤토리/개발 메뉴 스크롤
-    if (fp && fp.step === 'item') { ev.preventDefault(); fpMove(ev.deltaY > 0 ? 1 : -1); return; }
+    if (fp && fp.step === 'item') { ev.preventDefault(); fpMove(ev.deltaY > 0 ? FP_COLS : -FP_COLS); return; }
     if (devUI) {
       ev.preventDefault();
       const L = devLayout();
@@ -2123,16 +2464,19 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   canvas.addEventListener('click', (ev) => {
     if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
-    if (fp) { // 대상 고르기: 종류 버튼 / 아이템 줄 / 뒤로
+    if (fp) { // 대상 고르기: 종류 버튼 / 종류 필터 / 네모 칸 / 뒤로
       const g = G.Renderer.forgePickGeometry(C.VIEW_W, C.VIEW_H);
       if (fp.step === 'cat') {
         const i = g.cats.findIndex((r) => inRect(p, r));
         if (i >= 0) { fp.cur = i; fpChoose(i); } else if (inRect(p, g.close)) fp = null;
       } else {
         if (inRect(p, g.back)) { fp.step = 'cat'; fp.cur = FP_CATS.findIndex((c) => c.id === fp.cat); return; }
-        const top = Math.max(0, Math.min(fp.cur - (FP_ROWS - 1), fp.list.length - FP_ROWS));
-        const i = g.rows.findIndex((r) => inRect(p, r));
-        if (i >= 0 && top + i < fp.list.length) fpPick(fp.list[top + i]);
+        const chips = fpChips();
+        const ci = chips.findIndex((c, i) => inRect(p, g.chip(i, chips.length)));
+        if (ci >= 0) { fpSetSub(chips[ci].id); return; }
+        const k = g.cells.findIndex((r) => inRect(p, r));
+        const idx = (fp.scroll || 0) * FP_COLS + k;
+        if (k >= 0 && idx < fp.list.length) fpPick(fp.list[idx]);
       }
       return;
     }
@@ -3036,7 +3380,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
+      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
     }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   requestAnimationFrame(frame);
@@ -3058,7 +3402,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get cutscene() { return cutscene; },
     get stamina() { return stamina; },
     set stamina(v) { stamina = v; },
-    story, pickups, enemyShots, dungeonEvents, oreNodes, spawnDungeonMonster,
+    story, pickups, enemyShots, dungeonEvents, oreNodes, popups, spawnDungeonMonster,
     get darkFloor() { return darkFloor; },
     set darkFloor(v) { darkFloor = v; },
     get darkBest() { return darkBest; },

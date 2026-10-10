@@ -135,24 +135,48 @@
     }
   }
 
+  // 방어구도 같은 것 3개를 합치면 한 단계 위가 된다. 최대 피(갑옷·바지) / 무적(투구) / 패링 여유(장갑) / 속도(신발)가 단계마다 늘고, 붙일 수 있는 주괴 칸도 1 → 3 → 5로 늘어난다
+  const isBaseArmor = (it) => it && it.slot && it.slot !== 'weapon' && !it.tier && it.id !== 'rags';
+  for (const base of Object.values(ITEMS).filter(isBaseArmor)) {
+    for (let tier = 1; tier <= MAX_TIER; tier++) {
+      const t = Object.assign({}, base, {
+        id: `${base.id}_t${tier}`,
+        baseId: base.id,
+        tier,
+        name: `${tier === 1 ? '강화된' : '최강의'} ${base.name}`,
+        price: (base.price || 0) * (tier === 1 ? 3 : 9),
+        look: base.look.map((c) => lighten(c, tier === 1 ? 0.22 : 0.42)),
+        glow: base.look[0],
+        note: `${base.note ? base.note + ' · ' : ''}합성 ${tier === 1 ? '1단계' : '최대(2단계)'}`,
+      });
+      if (base.slot === 'armor' || base.slot === 'pants') t.hearts = (base.hearts || 0) + tier;
+      else if (base.slot === 'helmet') t.invuln = Math.round(((base.invuln || 0) + 0.2 * tier) * 100) / 100;
+      else if (base.slot === 'gloves') t.window = Math.round(((base.window || 0) + 0.05 * tier) * 100) / 100;
+      else if (base.slot === 'boots') t.speed = Math.round(((base.speed || 0) + 0.05 * tier) * 100) / 100;
+      ITEMS[t.id] = t;
+    }
+  }
+
   // ======================= 인벤토리 규칙 =======================
   const ensure = (inv) => { inv.copies = inv.copies || {}; inv.ores = inv.ores || {}; inv.ingots = inv.ingots || {}; inv.attach = inv.attach || {}; return inv; };
   const classOf = (w) => (w && w.slot && w.slot !== 'weapon' ? 'armor' : w && w.shot ? 'gun' : 'sword');
-  // 붙일 수 있는 주괴 칸: 무기는 기본 1칸 → 합쳐서 2레벨 3칸 → 3레벨(최대) 5칸. 방어구는 값어치에 따라 1/3/5칸
+  // 붙일 수 있는 주괴 칸: 무기도 방어구도 기본 1칸 → 합쳐서 2레벨 3칸 → 3레벨(최대) 5칸
   const slotsOf = (w) => {
     if (!w) return 1;
-    if (w.slot && w.slot !== 'weapon') return w.price < 600 ? 1 : w.price < 2500 ? 3 : 5;
     return [1, 3, 5][Math.min(2, w.tier || 0)];
   };
   // 용광로에서 고른 강화 대상 (null이면 지금 든 무기). 합치기·부착·제련 탭이 이 아이템을 기준으로 한다
   let target = null;
   const targetItem = (inv) => ITEMS[target && inv.items.includes(target) ? target : inv.equipped.weapon];
   const targetId = (inv) => targetItem(inv).id;
-  const setTarget = (id) => { target = id; dirty = true; };
+  let smeltOnly = false; // 제련 전용으로 열었는가 (대상 없이 모든 광석을 녹인다)
+  const setTarget = (id) => { target = id; smeltOnly = false; dirty = true; };
+  const setSmeltOnly = (b) => { smeltOnly = !!b; if (b) target = null; dirty = true; };
+  const isSmeltOnly = () => smeltOnly;
   const hasTarget = () => !!target;
   const copiesOf = (inv, id) => (inv.items.includes(id) ? (inv.copies && inv.copies[id]) || 1 : 0);
-  const canMerge = (item) => !!item && item.slot === 'weapon' && item.id !== 'wood0' && !item.lens;
-  const nextOf = (item) => (item && item.slot === 'weapon' && item.id !== 'wood0' && !item.lens && (item.tier || 0) < MAX_TIER ? ITEMS[`${item.baseId || item.id}_t${(item.tier || 0) + 1}`] : null);
+  const canMerge = (item) => !!item && !!item.slot && item.id !== 'wood0' && item.id !== 'rags' && !item.lens;
+  const nextOf = (item) => (canMerge(item) && (item.tier || 0) < MAX_TIER ? ITEMS[`${item.baseId || item.id}_t${(item.tier || 0) + 1}`] : null);
   const baseOf = (item) => (item.baseId ? ITEMS[item.baseId] : item);
   const mergeFee = (item) => ((item.tier || 0) === 0 ? Math.round(baseOf(item).price * 0.4) + 60 : Math.round(baseOf(item).price * 1.2) + 200);
 
@@ -307,10 +331,13 @@
       if (inv.holy) delete inv.holy[id];
       delete inv.attach[id];
       for (let k = 0; k < inv.hotbar.length; k++) if (inv.hotbar[k] === id) { inv.hotbar[k] = null; job.hot.push(k); }
-      if (inv.equipped.weapon === id) {
+      if (item.slot === 'weapon' && inv.equipped.weapon === id) {
         job.equip = true;
         if (!inv.items.includes('wood0')) inv.items.push('wood0');
         inv.equipped.weapon = 'wood0';
+      } else if (item.slot !== 'weapon' && inv.equipped[item.slot] === id) { // 입고 있던 방어구: 합치는 동안은 벗는다 (갑옷은 허름한 옷)
+        job.equip = true;
+        if (item.slot === 'armor') { if (!inv.items.includes('rags')) inv.items.push('rags'); inv.equipped.armor = 'rags'; } else inv.equipped[item.slot] = null;
       }
     }
     inv.forgeJob = job;
@@ -341,7 +368,7 @@
       if (j.carry.attach && !(inv.attach[nxt.id] && inv.attach[nxt.id].length)) inv.attach[nxt.id] = j.carry.attach;
     }
     for (const k of j.hot) if (inv.hotbar[k] === null) inv.hotbar[k] = nxt.id;
-    if (j.equip) inv.equipped.weapon = nxt.id;
+    if (j.equip) inv.equipped[nxt.slot] = nxt.id;
     inv.forgeJob = null;
     const up = addSmithXp(inv, XP.merge(nxt.tier || 1));
     dirty = true;
@@ -417,7 +444,7 @@
   let cache = null;        // 마지막으로 만든 탭
   let cacheSig = '';
   const sum = (o) => { let s = 0; for (const k in o) s += o[k] || 0; return s; };
-  const sigOf = (inv) => `${sum(inv.materials)}|${target}|${inv.equipped.weapon}|${(inv.attach[targetId(inv)] || []).join(',')}|${inv.items.length}|${sum(inv.copies)}|${sum(inv.ores)}|${sum(inv.ingots)}|${(inv.attach[inv.equipped.weapon] || []).join(',')}|${inv.items.filter((i) => ITEMS[i] && ITEMS[i].pickaxe).length}`;
+  const sigOf = (inv) => `${sum(inv.materials)}|${target}|${smeltOnly}|${inv.equipped.weapon}|${(inv.attach[targetId(inv)] || []).join(',')}|${inv.items.length}|${sum(inv.copies)}|${sum(inv.ores)}|${sum(inv.ingots)}|${(inv.attach[inv.equipped.weapon] || []).join(',')}|${inv.items.filter((i) => ITEMS[i] && ITEMS[i].pickaxe).length}`;
 
   const card = (p) => Object.assign({ forge: true, look: ['#c9d2dc', '#6c7686'] }, p);
   const infoCard = (title, lines, icon) => card({ id: 'info', kind: 'info', icon, name: title, view: () => ({ name: title, desc: lines[0], note: lines[1] || '' }), label: () => '안내', afford: () => false, run: () => ({ ok: false, msg: lines[0] }) });
@@ -500,7 +527,7 @@
     if (cache && sig === cacheSig && !dirty) return cache;
     ensure(inv);
     cache = [
-      ...(hasTarget() && classOf(targetItem(inv)) === 'armor' ? [] : [{ name: '합치기', custom: 'merge', items: [] }]),
+      ...(smeltOnly ? [] : [{ name: '합치기', custom: 'merge', items: [] }]),
       { name: '제련', items: smeltCards(inv) },
       { name: '부착', items: attachCards(inv) },
       { name: '곡괭이', items: pickCards() },
@@ -517,7 +544,7 @@
   // 대장간(무기 상점): 무기 + 곡괭이. 합치기·제련·부착·신성 강화는 용광로에서 한다
   Object.defineProperty(Shop.SHOPS.sword, 'tabs', { get: () => (bound ? baseTabs.concat(forgeTabs(bound).filter((t) => t.name === '곡괭이')) : baseTabs), configurable: true, enumerable: true });
   Shop.SHOPS.furnace = { title: '용광로' };
-  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound ? forgeTabs(bound).filter((t) => t.name !== '곡괭이' && t.name !== '크리스탈').concat(!hasTarget() || classOf(targetItem(bound)) === 'sword' ? holyTab : [], forgeTabs(bound).filter((t) => t.name === '크리스탈')) : holyTab), configurable: true, enumerable: true });
+  Object.defineProperty(Shop.SHOPS.furnace, 'tabs', { get: () => (bound && smeltOnly ? forgeTabs(bound).filter((t) => t.name === '제련' || t.name === '크리스탈') : bound ? forgeTabs(bound).filter((t) => t.name !== '곡괭이' && t.name !== '크리스탈').concat(!hasTarget() || classOf(targetItem(bound)) === 'sword' ? holyTab : [], forgeTabs(bound).filter((t) => t.name === '크리스탈')) : holyTab), configurable: true, enumerable: true });
 
   function act(item, wallet) {
     const r = item.run(wallet);
@@ -564,6 +591,6 @@
     bind: (inv) => { bound = ensure(inv); dirty = true; },
     ensure, classOf, slotsOf, copiesOf, canMerge, nextOf, mergeFee, addCopy,
     attachBonus, bonusText, merge, smelt, attach, detach, act,
-    gridExtra, describeExtra, forgeTabs, JOB_TIME, setTarget, targetItem, targetId, hasTarget, classOf, slotsOf, PERK_NAME, SMITH_MAX_LV, smithNeed, smithOf, smithEase, addSmithXp, XP, smithWorkFee, entrustWork, crystalMerge, ATTACH_TIME, SMELT_TIME, smeltCheck, smeltFee, SMITH_FEE, attachCheck, attachFee, jobOf, mergeCandidates, startMerge, tickJob, collectJob, bestPick, bestOwnedPick, autoEquipPick, togglePick, markDirty: () => { dirty = true; },
+    gridExtra, describeExtra, forgeTabs, JOB_TIME, setTarget, setSmeltOnly, isSmeltOnly, targetItem, targetId, hasTarget, classOf, slotsOf, PERK_NAME, SMITH_MAX_LV, smithNeed, smithOf, smithEase, addSmithXp, XP, smithWorkFee, entrustWork, crystalMerge, ATTACH_TIME, SMELT_TIME, smeltCheck, smeltFee, SMITH_FEE, attachCheck, attachFee, jobOf, mergeCandidates, startMerge, tickJob, collectJob, bestPick, bestOwnedPick, autoEquipPick, togglePick, markDirty: () => { dirty = true; },
   };
 })(window.Game);
