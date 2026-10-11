@@ -30,7 +30,7 @@
       this.vx = 0; this.vy = 0;
       this.inv = 0; this.flash = 0;
     }
-    damage(n) { this.rival.damageBody(n); }
+    damage(n) { this.rival.damageBody(1); } // 마법·총·활도 한 번에 1: 놀이마당은 서로 같은 공격력
     applyPoison() { this.rival.damageBody(1); }
   }
 
@@ -40,14 +40,14 @@
       this.name = `${cfg.name} (등급 ${cfg.lv})`;
       this.defeatText = '결투에서 이겼다!';
       this.weak = null;
-      this.hurtDmg = cfg.lv >= 5 ? 2 : 1;
+      this.hurtDmg = 1; // 상대의 공격은 한 번에 1 (나와 같다)
       this.left = left;
       this.right = left + width;
       this.camLeft = left;
       this.groundY = groundY;
       this.ev = ev;
       this.cfg = cfg;
-      this.lv = cfg.lv;
+      this.lv = cfg.lv + 2; // 실제 솜씨는 표시된 등급보다 두 단계 위 (반응이 더 빠르고 더 자주 막는다)
       this.mode = cfg.mode;
       this.body = new RivalBody(this, cfg.hp);
       this.heads = [this.body];
@@ -95,7 +95,7 @@
       b.flash = 0.25;
       b.inv = 1.0; // 플레이어처럼 맞은 뒤 잠깐 무적
       b.vx = -this.facing * 190;
-      this.stagger = Math.max(this.stagger, 0.22);
+      this.stagger = Math.max(this.stagger, 0.1); // 맞아도 금방 자세를 잡는다
       if (b.hp <= 0) {
         b.alive = false;
         this.phase = 'dead';
@@ -110,7 +110,7 @@
       if (!b.alive || b.inv > 0 || this.phase === 'intro') return [];
       if (rect.x < b.x + b.w + 6 && rect.x + rect.w > b.x - 6 && rect.y < b.y + b.h && rect.y + rect.h > b.y) {
         const before = b.hp;
-        this.damageBody(dmg);
+        this.damageBody(1); // 내 공격도 한 번에 1
         if (b.hp < before) return [b];
       }
       return [];
@@ -199,22 +199,22 @@
       const swinging = player.swing >= 0 && player.swing < 12;
       // 막기: 내가 휘두르는 순간 가끔 막는다 (막는 동안 맞아도 피해가 없고, 막은 뒤엔 바로 반격한다)
       if (swinging && !this._sawSwing && dist < 190 && this.guardCd === 0 && this.state !== 'strike') {
-        if (Math.random() < 0.35 + 0.1 * lv) { this.guard = 0.5; this.guardCd = Math.max(0.5, 1.5 - 0.15 * lv); this.state = 'move'; b.vx = 0; this.cd = Math.min(this.cd, 0.15); }
-        else if (this.dashCd === 0 && Math.random() < 0.3) { this.dashT = 0.2; this.dashCd = 1.6; b.vx = -Math.sign(dx || 1) * 560; this.state = 'move'; }
+        if (Math.random() < 0.6 + 0.08 * lv) { this.guard = 0.6; this.guardCd = Math.max(0.3, 0.9 - 0.12 * lv); this.state = 'move'; b.vx = 0; this.cd = Math.min(this.cd, 0.15); }
+        else if (this.dashCd === 0 && Math.random() < 0.55) { this.dashT = 0.2; this.dashCd = 1.0; b.vx = -Math.sign(dx || 1) * 560; this.state = 'move'; }
       }
       this._sawSwing = swinging;
       if (this.dashT > 0) { b.inv = Math.max(b.inv, 0.05); return; }
       if (this.state === 'move') {
         const gap = wp.reach * 0.8;
         const want = dist > gap + 20 ? this.facing : dist < gap - 40 ? -this.facing : 0;
-        b.vx += (want * (150 + 26 * lv) - b.vx) * Math.min(1, 9 * dt);
+        b.vx += (want * (180 + 34 * lv) - b.vx) * Math.min(1, 10 * dt);
         if (this.cd === 0 && dist < wp.reach && Math.abs(this.playerY - b.cy) < 64) { this.state = 'wind'; this.st = 0; b.vx = 0; this.ev.sound('vanish'); }
         if (b.onGround && dist < 190 && Math.random() < dt * 0.22 * lv) b.vy = -560; // 가끔 뛴다
         if (this.dashCd === 0 && dist > 260 && Math.random() < dt * 0.5) { this.dashT = 0.18; this.dashCd = 1.8; b.vx = this.facing * 520; } // 멀면 대시로 파고든다
       } else if (this.state === 'wind') { // 칼을 치켜든다: 막거나 피할 기회
         this.st += dt;
         b.vx *= Math.max(0, 1 - 8 * dt);
-        if (this.st >= Math.max(0.12, wp.wind - 0.05 * lv)) { this.state = 'strike'; this.st = 0; this.swingT = 0.3; this.hitDone = false; this.ev.sound('shatter'); }
+        if (this.st >= Math.max(0.1, wp.wind - 0.075 * lv)) { this.state = 'strike'; this.st = 0; this.swingT = 0.3; this.hitDone = false; this.ev.sound('shatter'); }
       } else if (this.state === 'strike') {
         this.st += dt;
         if (!this.hitDone && this.st >= 0.08) {
@@ -232,8 +232,8 @@
         }
         if (this.st >= 0.3) {
           this.state = 'move';
-          this.cd = Math.max(0.15, wp.cd - 0.12 * lv) + rnd(0, 0.3);
-          if (Math.random() < 0.35 + 0.08 * lv) this.cd = 0.1; // 이어서 한 번 더
+          this.cd = Math.max(0.1, wp.cd - 0.16 * lv) + rnd(0, 0.18);
+          if (Math.random() < 0.55 + 0.08 * lv) this.cd = 0.06; // 이어서 한 번 더
           if (Math.random() < 0.3) this._pickWeapon(); // 무기를 바꿔 든다
         }
       }
@@ -253,8 +253,8 @@
         this.st += dt;
         b.vx *= Math.max(0, 1 - 8 * dt);
         this.aimX = this.playerX; this.aimY = this.playerY;
-        if (this.st >= Math.max(0.28, 0.7 - 0.08 * lv)) {
-          this.burst = lv >= 4 ? 3 : lv >= 2 ? 2 : 1;
+        if (this.st >= Math.max(0.2, 0.55 - 0.09 * lv)) {
+          this.burst = lv >= 4 ? 4 : lv >= 2 ? 3 : 2;
           this.burstT = 0;
           this.state = 'fire';
           this.st = 0;
@@ -267,12 +267,12 @@
           const sx = b.cx + this.facing * 16;
           const sy = b.cy - 4;
           const ang = Math.atan2(this.playerY - sy, this.playerX - sx);
-          const sp = 520 + 45 * lv;
+          const sp = 620 + 60 * lv;
           this.shots.push({ x: sx, y: sy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 2.6, reflected: false });
           this.muzzle = 0.1;
           this.ev.sound('gun');
         }
-        if (this.burst <= 0 && this.burstT <= -0.1) { this.state = 'move'; this.cd = Math.max(0.5, 1.6 - 0.2 * lv) + rnd(0, 0.5); }
+        if (this.burst <= 0 && this.burstT <= -0.1) { this.state = 'move'; this.cd = Math.max(0.3, 1.0 - 0.14 * lv) + rnd(0, 0.3); }
       }
     }
 
@@ -285,7 +285,7 @@
         s.life -= dt;
         if (s.life <= 0 || s.x < this.left || s.x > this.right || s.y > this.groundY || s.y < this.groundY - 520) { s.dead = true; continue; }
         if (s.reflected) { // 되돌아간 총알은 상대에게 맞는다
-          if (s.x > b.x && s.x < b.x + b.w && s.y > b.y && s.y < b.y + b.h) { s.dead = true; b.inv = 0; this.damageBody(3); this.ev.fx('burst', s.x, s.y); }
+          if (s.x > b.x && s.x < b.x + b.w && s.y > b.y && s.y < b.y + b.h) { s.dead = true; b.inv = 0; this.damageBody(2); this.ev.fx('burst', s.x, s.y); }
         } else if (player.invuln === 0 && !player.dashing && player.overlaps({ x: s.x - 6, y: s.y - 6, w: 12, h: 12 })) {
           s.dead = true;
           this.ev.hurt(this.hurtDmg);
@@ -315,7 +315,7 @@
         ctx.fillStyle = '#e0b12f'; ctx.fillRect(x - 9, gy - 196, 18, 10);
       }
       if (this.state === 'aim' && this.phase === 'fight' && b.alive) { // 총 겨누기: 붉은 조준선
-        const u = Math.min(1, this.st / Math.max(0.28, 0.7 - 0.08 * this.lv));
+        const u = Math.min(1, this.st / Math.max(0.2, 0.55 - 0.09 * this.lv));
         ctx.strokeStyle = `rgba(255,70,70,${0.25 + 0.6 * u})`; ctx.lineWidth = 2 + 2 * u;
         ctx.beginPath(); ctx.moveTo(b.cx + this.facing * 16, b.cy - 4); ctx.lineTo(this.aimX, this.aimY); ctx.stroke();
       }

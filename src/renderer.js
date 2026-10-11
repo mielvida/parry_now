@@ -153,7 +153,7 @@
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
       this._drawEdgeTexts(main, hud);
-      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex));
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
@@ -237,6 +237,66 @@
     }
 
     // 설정 창 (O 키): 음악 음량 + 효과 끄기. 행 위치는 settingsRows 와 같아야 한다
+    // ---- 뽑기 창 ----
+    static gachaGeometry(vw, vh) {
+      const cs = 38, gap = 3;
+      const x0 = 90, y0 = 80;
+      const cells = [];
+      for (let i = 0; i < 100; i++) cells.push({ x: x0 + (i % 10) * (cs + gap), y: y0 + Math.floor(i / 10) * (cs + gap), w: cs, h: cs });
+      return { cells, x0, y0 };
+    }
+    _drawGacha(ctx, g) {
+      const W = this.viewW, H = this.viewH;
+      const geo = Renderer.gachaGeometry(W, H);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#1d1a2e'; ctx.fillRect(20, 16, W - 40, H - 32);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#ffb02e'; ctx.strokeRect(20, 16, W - 40, H - 32);
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.font = 'bold 28px sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.fillText('뽑기', 44, 46);
+      const left = Math.max(0, Math.ceil(((g.board ? g.board.until : 0) - Date.now()) / 1000));
+      ctx.font = '14px sans-serif'; ctx.fillStyle = '#c8d0e8';
+      ctx.fillText(`번호를 하나 고르세요 (1~100)  ·  한 번에 ${G.Gacha.PRICE} G  ·  판이 바뀌기까지 ${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`, 120, 48);
+      ctx.textAlign = 'right'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(`보유 ${g.coins} G`, W - 44, 46);
+      const b = g.board;
+      geo.cells.forEach((c, i) => {
+        const picked = b && b.picked[i];
+        const on = i === g.cur;
+        ctx.fillStyle = picked ? 'rgba(255,255,255,0.05)' : on ? 'rgba(255,176,46,0.35)' : 'rgba(255,255,255,0.1)';
+        ctx.beginPath(); ctx.arc(c.x + c.w / 2, c.y + c.h / 2, c.w / 2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = on ? '#ffd54a' : 'rgba(255,255,255,0.2)'; ctx.lineWidth = on ? 3 : 1; ctx.stroke();
+        ctx.textAlign = 'center';
+        if (picked) {
+          const id = b.prizes[i];
+          if (id) this._drawItemIcon(ctx, G.Shop.ITEMS[id], c.x + c.w / 2, c.y + c.h / 2 + 1, 0.55);
+          else { ctx.font = '14px sans-serif'; ctx.fillStyle = '#7a8398'; ctx.fillText('꽝', c.x + c.w / 2, c.y + c.h / 2); }
+        } else { ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = on ? '#fff' : '#d8dcf0'; ctx.fillText(i + 1, c.x + c.w / 2, c.y + c.h / 2); }
+      });
+      // 오른쪽: 방금 뽑은 것
+      const rx = 600, ry = 84;
+      ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(rx, ry, W - rx - 40, 250);
+      ctx.textAlign = 'center';
+      const res = g.res;
+      if (res) {
+        const open = Math.min(1, res.t / 0.9);
+        ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#c8d0e8'; ctx.fillText(`${res.n}번`, rx + (W - rx - 40) / 2, ry + 26);
+        const cx = rx + (W - rx - 40) / 2, cy = ry + 100;
+        if (open < 1) { // 캡슐이 열리는 연출
+          ctx.fillStyle = '#ff6a4a'; ctx.beginPath(); ctx.arc(cx, cy - 6 * open, 34, Math.PI, 0); ctx.fill();
+          ctx.fillStyle = '#f4f1e8'; ctx.beginPath(); ctx.arc(cx, cy + 6 * open, 34, 0, Math.PI); ctx.fill();
+        } else if (res.id) {
+          const it = G.Shop.ITEMS[res.id];
+          this._drawItemIcon(ctx, it, cx, cy, 1.5);
+          ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.fillText(it.name, cx, ry + 160);
+          ctx.font = '13px sans-serif'; ctx.fillStyle = res.dup ? '#ffb4a0' : '#7dffa0'; ctx.fillText(res.dup ? `이미 있어서 ${res.refund} G로 돌려받았어요` : '인벤토리에 들어갔어요!', cx, ry + 188);
+        } else { ctx.font = 'bold 30px sans-serif'; ctx.fillStyle = '#9aa4c0'; ctx.fillText('꽝…', cx, cy); ctx.font = '13px sans-serif'; ctx.fillText(`위로금 ${res.refund} G`, cx, ry + 160); }
+      } else { ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0'; ctx.fillText('번호를 골라 Enter / 클릭', rx + (W - rx - 40) / 2, ry + 120); }
+      if (g.msgT > 0) { ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#ff9a9a'; ctx.fillText(g.msg, rx + (W - rx - 40) / 2, ry + 226); }
+      ctx.textAlign = 'center'; ctx.font = '13px sans-serif'; ctx.fillStyle = '#8a93a8';
+      ctx.fillText('방향키: 번호 고르기   Enter 또는 클릭: 뽑기   E / Esc: 닫기   (마을 대장간의 검류와 갑옷 가게의 장비가 걸려 있어요)', W / 2, H - 22);
+      ctx.restore();
+    }
+
     // ---- 처음 화면: 저장 칸 세 개 ----
     static titleCards(vw, vh) {
       const cw = 270, ch = 360, gap = 26;
@@ -646,7 +706,11 @@
       ctx.translate(cx, cy);
       ctx.scale(s, s);
       const L = item.look || [];
-      if (item.catch) { // 잡은 물고기 / 곤충
+      if (item.townmap) { // 마을 지도: 두루마리 지도
+        ctx.fillStyle = L[0]; ctx.fillRect(-20, -14, 40, 28); ctx.strokeStyle = L[1]; ctx.lineWidth = 3; ctx.strokeRect(-20, -14, 40, 28);
+        ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-18, 6); ctx.lineTo(-8, -4); ctx.lineTo(2, 4); ctx.lineTo(16, -8); ctx.stroke();
+        ctx.fillStyle = '#d02a2a'; ctx.beginPath(); ctx.arc(16, -8, 3, 0, Math.PI * 2); ctx.fill();
+      } else if (item.catch) { // 잡은 물고기 / 곤충
         G.Fishing.drawCatchIcon(ctx, item, 1.6);
       } else if (item.slot === 'weapon' && item.type === 'rod') { // 낚싯대
         ctx.rotate(-0.75);
@@ -3694,12 +3758,14 @@
       if (hud.dev) this._drawDev(ctx, hud.dev);
       if (hud.fishing) G.Fishing.drawFishing(ctx, this.viewW, this.viewH, hud.fishing);
       if (hud.dex) G.Dex.draw(ctx, this.viewW, this.viewH, hud.dex);
+      if (hud.gacha) this._drawGacha(ctx, hud.gacha);
+      if (hud.map) G.TownMap.draw(ctx, this.viewW, this.viewH, hud.map.terrain, hud.map.markers, hud.map.player, hud.map.title, performance.now() / 1000);
       if (hud.admin) G.Admin.draw(ctx, this.viewW, this.viewH, hud.admin, hud.admin.me);
       if (hud.mini) this._drawMini(ctx, hud.mini);
       if (hud.settings) this._drawSettings(ctx, hud.settings);
       if (hud.pw) this._drawPassword(ctx, hud.pw);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

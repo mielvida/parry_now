@@ -233,7 +233,8 @@
   DECOR.forEach((d) => add(Object.assign({ decor: true }, d, { price: d.price * 4 }))); // 가구 하나가 코인 +8%라서 값이 비싸다 (원래의 4배)
   const placedCount = (inv, id) => ['floor', 'wall'].reduce((n, k) => n + inv.home.placed[k].filter((x) => x === id).length, 0);
   // 집에 놓은 장식품 수에 따른 보너스: 놓을 때마다 코인 획득량과 치명타 확률이 오른다
-  const placedTotal = (inv) => inv.home.placed.floor.filter(Boolean).length + inv.home.placed.wall.filter(Boolean).length;
+  const placedOf = (h) => h.placed.floor.filter(Boolean).length + h.placed.wall.filter(Boolean).length;
+  const placedTotal = (inv) => (inv.homes ? Object.values(inv.homes).reduce((a, h) => a + placedOf(h), 0) : placedOf(inv.home)); // 마을 집과 왕국 집의 장식을 모두 센다
   // 지금 든 무기에 붙인 주괴가 주는 보너스 (대장간 forge.js). 없으면 모두 0
   const NO_ATTACH = { dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false, crack: false, elems: [], elemLv: {}, hp: 0, inv: 0, spd: 0, perkList: [] };
   const attachOf = (inv, w) => (G.Forge && w ? G.Forge.attachBonus(inv, w) : NO_ATTACH);
@@ -369,6 +370,7 @@
       const desc = lv >= t.max ? `최고 레벨! ${t.per(lv)}` : `${t.per(lv)} -> ${t.per(lv + 1)}`;
       return { name: `${item.name}  Lv ${lv}/${t.max}`, desc, slotName: '훈련', note: `레벨마다 ${t.unit} (영구)` };
     }
+    if (item.townmap) return { name: item.name, desc: item.desc, slotName: '지도', note: 'N 키로 펼친다' };
     if (item.service) return { name: item.name, desc: item.desc, slotName: '서비스', note: item.note || '' };
     if (item.catch) return { name: item.name, desc: item.desc, slotName: item.catch === 'fish' ? '물고기' : '곤충', note: `${item.tier}등급 · ${item.catch === 'fish' ? '생선 가게' : '곤충 채집가'}에 팔자` };
     if (item.upgrade === 'stmax') {
@@ -606,7 +608,8 @@
       holy: {}, // 칼마다 붙인 신성 크리스탈 개수
       materials: { darkshard: 0, darkcrystal: 0, cleancrystal: 0, holycrystal: 0 }, // 보스가 떨어뜨리는 소중한 물건의 개수 (쌓인다)
       consumables: { st70: 0, st30: 0, icebomb: 0 }, // 다크월드 소모품 개수
-      home: { type: null, owned: {}, placed: { floor: [], wall: [] } }, // 우리 집: 산 집 종류, 가진 장식품 개수, 방에 놓은 장식품
+      home: { type: null, owned: {}, placed: { floor: [], wall: [] } }, // 지금 도시의 우리 집 (마을/왕국의 집 중 하나를 가리킨다): 산 집 종류, 가진 장식품 개수, 방에 놓은 장식품
+      homes: null, // {village, kingdom}: 마을과 왕국은 집이 따로 있다 (main이 만든다)
       abyssLevel: 1, // 심연 동굴 보상 업그레이드 레벨 (끝이 없다)
       mineLevel: 1, // 동굴 보상 업그레이드 레벨 (동굴 보물 상자 코인)
       speedLevel: 0, // 마을 달리기 업그레이드 레벨 (마을에서의 이동 속도)
@@ -776,6 +779,10 @@
       wallet.inv.items.push(item.id);
       G.Forge.autoEquipPick(wallet.inv);
       return { ok: true, msg: `${item.name} 구매! 인벤토리에서 장착하면 광물 동굴에서 ${item.pickaxe}단계 광석까지 캘 수 있다.` };
+    }
+    if (item.townmap) { // 마을 지도
+      wallet.inv.items.push(item.id);
+      return { ok: true, msg: `${item.name} 구매! 그 도시에서 N 키를 누르면 한눈에 보인다.` };
     }
     if (item.tool) { // 도구는 인벤토리에 들어간다
       wallet.inv.items.push(item.id);

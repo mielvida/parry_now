@@ -275,12 +275,13 @@
     const train = shop.kind === 'train';
     const tackle = shop.kind === 'tackle';
     const dexhall = shop.kind === 'dexhall';
+    const gacha = shop.kind === 'gacha';
     const fishmonger = shop.kind === 'fishmonger';
     const collector = shop.kind === 'collector';
     const inn = shop.kind === 'inn';
     const w = 140;
     const x = baseX - w / 2;
-    const stripeA = dexhall ? '#6a4a9a' : tackle ? '#2a8a9a' : fishmonger ? '#3a6ab0' : collector ? '#5a9a3a' : train ? '#b03a2a' : inn ? '#5a7ac0' : food ? '#e0803a' : potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
+    const stripeA = gacha ? '#e0503a' : dexhall ? '#6a4a9a' : tackle ? '#2a8a9a' : fishmonger ? '#3a6ab0' : collector ? '#5a9a3a' : train ? '#b03a2a' : inn ? '#5a7ac0' : food ? '#e0803a' : potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
     ctx.fillStyle = 'rgba(0,0,0,0.14)';
     ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒤쪽 벽 + 기둥
@@ -300,6 +301,12 @@
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(bx + 2, baseY - 82, 5, 6);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(bx + 2, baseY - 84, 5, 3);
       });
+    } else if (gacha) { // 알록달록한 캡슐이 가득한 유리 뽑기 기계
+      ctx.fillStyle = '#c0392b'; ctx.fillRect(x + 22, baseY - 56, 56, 24);
+      ctx.fillStyle = 'rgba(200,235,255,0.55)'; ctx.beginPath(); ctx.arc(x + 50, baseY - 72, 26, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#e8f4ff'; ctx.lineWidth = 2; ctx.stroke();
+      ['#ff6a4a', '#ffd54a', '#6fd0ff', '#7dffa0', '#ff9ec0', '#b08aff', '#ffd54a', '#6fd0ff'].forEach((c, i) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 38 + (i % 4) * 8 + (Math.floor(i / 4) ? 4 : 0), baseY - 82 + Math.floor(i / 4) * 12, 6, 0, Math.PI * 2); ctx.fill(); });
+      ctx.fillStyle = '#ffd54a'; ctx.fillRect(x + 44, baseY - 44, 12, 8);
+      ctx.fillStyle = '#ffd54a'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('?', x + 104, baseY - 60);
     } else if (dexhall) { // 책장 가득한 도감과 돋보기
       ctx.fillStyle = '#5a3d17'; ctx.fillRect(x + 10, baseY - 92, w - 20, 52);
       for (let r = 0; r < 2; r++) for (let i = 0; i < 9; i++) { ctx.fillStyle = ['#c0392b', '#2a6ab0', '#d4a017', '#3f9a6a', '#8a4fb8'][(i + r * 2) % 5]; ctx.fillRect(x + 14 + i * 12, baseY - 88 + r * 24, 9, 20 + (i % 3) * 2); }
@@ -449,7 +456,7 @@
       }
     }
     // 주인
-    if (!closed) G.Npc.draw(ctx, { dexhall: 'curator', tackle: 'angler', fishmonger: 'fishmonger', collector: 'collector', train: 'trainer', inn: 'innkeeper', food: 'chef', potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
+    if (!closed) G.Npc.draw(ctx, { gacha: 'gambler', dexhall: 'curator', tackle: 'angler', fishmonger: 'fishmonger', collector: 'collector', train: 'trainer', inn: 'innkeeper', food: 'chef', potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);
@@ -533,7 +540,7 @@
       ctx.fillStyle = '#e8d8a8'; ctx.fillRect(x + w / 2 - 34, baseY - 62, 68, 22);
       G.TextLayer.add('문 닫음', baseX, baseY - 51, 'bold 14px sans-serif', '#7a2a1a');
     }
-    G.TextLayer.add(dexhall ? '도감관' : tackle ? '낚시·채집' : fishmonger ? '생선 가게' : collector ? '곤충 채집가' : train ? '훈련소' : inn ? '여관' : food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    G.TextLayer.add(gacha ? '뽑기' : dexhall ? '도감관' : tackle ? '낚시·채집' : fishmonger ? '생선 가게' : collector ? '곤충 채집가' : train ? '훈련소' : inn ? '여관' : food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
