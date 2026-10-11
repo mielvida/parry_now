@@ -290,6 +290,7 @@
   //  mine  동굴 보상: 마을 동굴 보물 상자의 코인 (1레벨 100 G -> 15레벨 450 G). 처음부터 1레벨
   //  speed 마을 달리기: 마을에서만 이동 속도가 빨라진다 (0레벨 1배 -> 5레벨 5배). 처음엔 0레벨
   add({ id: 'mineup', name: '동굴 보상 업그레이드', upgrade: 'mine', look: ['#ffd54a', '#b8860b'] });
+  add({ id: 'abyssup', name: '심연 동굴 보상 업그레이드', upgrade: 'abyss', look: ['#ff6a4a', '#7a1a1a'] });
   add({ id: 'speedup', name: '마을 달리기 업그레이드', upgrade: 'speed', look: ['#7dffd0', '#2fa88a'] });
   //  crit  치명타: 치명타가 터지면 이 대미지를 준다 (0레벨 10 -> 20레벨 30). 치명타 확률은 집에 장식품을 놓을수록 오른다
   add({ id: 'trn_str', name: '근력 훈련', upgrade: 'train', trainKey: 'str', look: ['#ff8a5a', '#a8301a'] });
@@ -325,8 +326,9 @@
   const mineReward = (level) => C.MINE_COINS + C.MINE_COINS_PER_LEVEL * (Math.min(level, C.MINE_MAX_LEVEL) - 1);
   const speedMult = (level) => 1 + ((C.VILLAGE_SPEED_MAX - 1) * Math.min(level, C.VILLAGE_SPEED_LEVELS)) / C.VILLAGE_SPEED_LEVELS;
   const critDamage = (inv) => C.CRIT_BASE_DAMAGE + Math.min(inv.critLevel, C.CRIT_MAX_LEVEL);
-  const levelOf = (item, inv) => (item.upgrade === 'train' ? trainLv(inv, item.trainKey) : item.upgrade === 'stmax' ? inv.stMaxLevel || 0 : item.upgrade === 'stregen' ? inv.stRegenLevel || 0 : item.upgrade === 'holy' ? holyLevel(inv) : item.upgrade === 'weapon' ? weaponLevel(inv) : item.upgrade === 'armor' ? inv.armorLevel || 0 : item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
-  const maxLevelOf = (item) => (item.upgrade === 'train' ? TRAIN[item.trainKey].max : item.upgrade === 'stmax' ? C.STAMINA_MAX_LEVELS : item.upgrade === 'stregen' ? C.STAMINA_REGEN_LEVELS : item.upgrade === 'holy' ? HOLY_MAX : item.upgrade === 'weapon' ? WUP_MAX : item.upgrade === 'armor' ? AUP_MAX : item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
+  const abyssReward = (lv) => 2000 + 800 * (lv - 1); // 심연 동굴 상자 코인: 보상 상점에서 올릴수록 늘어난다 (최대 레벨이 없다)
+  const levelOf = (item, inv) => (item.upgrade === 'abyss' ? inv.abyssLevel || 1 : item.upgrade === 'train' ? trainLv(inv, item.trainKey) : item.upgrade === 'stmax' ? inv.stMaxLevel || 0 : item.upgrade === 'stregen' ? inv.stRegenLevel || 0 : item.upgrade === 'holy' ? holyLevel(inv) : item.upgrade === 'weapon' ? weaponLevel(inv) : item.upgrade === 'armor' ? inv.armorLevel || 0 : item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
+  const maxLevelOf = (item) => (item.upgrade === 'abyss' ? Infinity : item.upgrade === 'train' ? TRAIN[item.trainKey].max : item.upgrade === 'stmax' ? C.STAMINA_MAX_LEVELS : item.upgrade === 'stregen' ? C.STAMINA_REGEN_LEVELS : item.upgrade === 'holy' ? HOLY_MAX : item.upgrade === 'weapon' ? WUP_MAX : item.upgrade === 'armor' ? AUP_MAX : item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
   // 훈련소 (왕국): 코인으로 산 훈련은 영구히 강해진다
   const TRAIN = {
     str: { max: 15, base: 600, step: 350, unit: '근접·원거리 대미지 +1', per: (lv) => `대미지 +${lv}` },
@@ -340,6 +342,7 @@
   function priceOf(item, inv) {
     if (!item.upgrade) return item.price;
     if (upMaxed(item, inv)) return 0;
+    if (item.upgrade === 'abyss') return 4000 + 2500 * ((inv.abyssLevel || 1) - 1);
     if (item.upgrade === 'train') { const t = TRAIN[item.trainKey]; return t.base + t.step * trainLv(inv, item.trainKey); }
     if (item.upgrade === 'stmax') return C.STAMINA_MAX_PRICE + C.STAMINA_MAX_PRICE_STEP * (inv.stMaxLevel || 0);
     if (item.upgrade === 'stregen') return C.STAMINA_REGEN_PRICE + C.STAMINA_REGEN_PRICE_STEP * (inv.stRegenLevel || 0);
@@ -356,6 +359,10 @@
   // 아이템 한 개의 이름/설명 (상점과 인벤토리 창이 보여준다)
   function describe(item, inv) {
     if (item.forge) return item.view(inv); // 대장간의 합치기/제련/부착 카드
+    if (item.upgrade === 'abyss') { // 심연 동굴 보상 (왕국의 보상 상점)
+      const lv = inv ? inv.abyssLevel || 1 : 1;
+      return { name: `${item.name}  Lv ${lv}`, desc: `심연 동굴 상자 ${abyssReward(lv)} G -> ${abyssReward(lv + 1)} G`, slotName: '업그레이드', note: '레벨마다 상자 코인 +800 G (끝없이 올릴 수 있다)' };
+    }
     if (item.upgrade === 'train') { // 훈련소
       const t = TRAIN[item.trainKey];
       const lv = inv ? trainLv(inv, item.trainKey) : 0;
@@ -567,7 +574,7 @@
     },
     mine: {
       title: '동굴 보상 상점',
-      tabs: [{ name: '업그레이드', items: ids('mineup', 'speedup', 'critup', 'stmaxup', 'stregenup') }],
+      tabs: [{ name: '업그레이드', items: ids('mineup', 'abyssup', 'speedup', 'critup', 'stmaxup', 'stregenup') }],
     },
     armor: {
       title: '갑옷 가게',
@@ -600,6 +607,7 @@
       materials: { darkshard: 0, darkcrystal: 0, cleancrystal: 0, holycrystal: 0 }, // 보스가 떨어뜨리는 소중한 물건의 개수 (쌓인다)
       consumables: { st70: 0, st30: 0, icebomb: 0 }, // 다크월드 소모품 개수
       home: { type: null, owned: {}, placed: { floor: [], wall: [] } }, // 우리 집: 산 집 종류, 가진 장식품 개수, 방에 놓은 장식품
+      abyssLevel: 1, // 심연 동굴 보상 업그레이드 레벨 (끝이 없다)
       mineLevel: 1, // 동굴 보상 업그레이드 레벨 (동굴 보물 상자 코인)
       speedLevel: 0, // 마을 달리기 업그레이드 레벨 (마을에서의 이동 속도)
       critLevel: 0, // 치명타 업그레이드 레벨 (치명타 대미지 = 10 + 레벨)
@@ -686,6 +694,13 @@
       wallet.inv.materials.holycrystal -= 1;
       wallet.inv.holy[wd.id] = (wallet.inv.holy[wd.id] || 0) + 1;
       return { ok: true, msg: `${wd.name}에 신성 크리스탈을 붙였다! 탑의 보스에게 대미지 x${wallet.inv.holy[wd.id] + 1}` };
+    }
+    if (item.upgrade === 'abyss') { // 심연 동굴 보상 업그레이드: 최대가 없다
+      const cost = priceOf(item, wallet.inv);
+      if (wallet.coins < cost) return { ok: false, msg: '코인이 부족해요.' };
+      wallet.coins -= cost;
+      wallet.inv.abyssLevel = (wallet.inv.abyssLevel || 1) + 1;
+      return { ok: true, msg: `Lv ${wallet.inv.abyssLevel}! 심연 동굴 상자가 이제 ${abyssReward(wallet.inv.abyssLevel)} G를 줍니다.` };
     }
     if (item.upgrade === 'train') { // 훈련소: 코인으로 영구 훈련
       if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
@@ -881,5 +896,5 @@
   // 마을 물가: 코인으로 사는 물건(가게 값)은 모두 PRICE_MULT배로 비싸다 (경험치/레벨로 정해지는 강화 값은 그대로)
   for (const it of Object.values(ITEMS)) if (it.price > 0 && !it.upgrade && !it.noMult && !it.catch) it.price = Math.round((it.price * (C.PRICE_MULT || 1)) / 10) * 10;
 
-  G.Shop = { subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
+  G.Shop = { abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
 })(window.Game);

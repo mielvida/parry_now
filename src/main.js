@@ -23,7 +23,7 @@
   // 심연 동굴(왕국): 아주 길고 구덩이와 몬스터가 빽빽하다. 몬스터는 빠르고 단단하고 한 방에 목숨 두 칸. 대신 상자의 보상이 크다
   let abyssRun = 0;
   let abyssLevel = null;
-  const abyssCoins = () => Math.round((3000 + 1200 * Math.min(abyssRun, 10)) * (1 + G.Shop.homeBonuses(inv).coin));
+  const abyssCoins = () => Math.round(G.Shop.abyssReward(inv.abyssLevel || 1) * (1 + G.Shop.homeBonuses(inv).coin)); // 왕국의 보상 상점에서 업그레이드한 레벨로 정해진다
   function makeAbyss(run) {
     const length = Math.min(420, 220 + 30 * run);
     return G.MineGen.generate(run, Math.random, { length, weights: { flat: 0.2, bump: 0.14, up: 0.12, down: 0.1, pit: 0.3, wide: 0.14 }, floatChance: 0.5, slimes: Math.floor(length / 8), bats: Math.floor(length / 14), crabs: Math.floor(length / 20) });
@@ -3019,6 +3019,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       s.extraHits = Math.max(0, s.extraHits - equipStats.hitPower); // 무기를 강화할수록 단단한 몬스터를 더 많이 깎는다
       s.hitGrace = C.HIT_GRACE;
       if (s.hurt) s.hurt(away);
+      if (s.alive && s.stagger && !s.dummy) { s.stagger(away); s.staggered = Math.max(s.staggered, 1.1); } // 금이 갔다: 뒤로 밀려나 잠깐 기절한다 (닿아도 해롭지 않아 지나갈 수 있다)
       effects.parryHit(s.x + s.w / 2, s.y + s.h / 2);
       popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: s.extraHits > 0 ? `단단하다! (${s.extraHits})` : '금이 갔다!', t: 0.9, color: 'rgba(200,170,255,A)' });
       return;

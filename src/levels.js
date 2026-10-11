@@ -205,7 +205,7 @@ Game.Levels.kingdom = (function () {
 
 // 왕궁 안: 붉은 융단이 깔린 알현실. 왼쪽 문(X)으로 나가고, 오른쪽 끝 옥좌('o')에 왕이 앉아 있다
 Game.Levels.palace = (function () {
-  const W = 27;
+  const W = 32; // 옥좌 뒤는 돌벽으로 가득 채워서, 화면 끝까지 벽이 보인다
   const rows = [];
   for (let r = 0; r < 18; r++) rows.push(new Array(W).fill(r >= 16 ? '#' : '.'));
   rows[15][3] = 'X'; rows[15][6] = 'P'; rows[15][20] = 'o'; // 왕은 입구에서 가깝고, 옥좌 뒤는 조금만 남는다
