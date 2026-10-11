@@ -77,6 +77,7 @@
           if (ch === 'Q') this.shops.push({ col: c, row: r, kind: 'decor' });
           if (ch === 'Y') this.homeLots.push({ col: c, row: r });
           if (ch === 'b') this.ponds.push({ col: c, row: r });
+          if (ch === '1') this.shops.push({ col: c, row: r, kind: 'dexhall' }); // 왕국의 도감관
           if (ch === 's') this.shops.push({ col: c, row: r, kind: 'tackle' }); // 낚시·채집 용품점
           if (ch === 'x') this.shops.push({ col: c, row: r, kind: 'fishmonger' }); // 생선 가게 (물고기를 산다)
           if (ch === 'l') this.shops.push({ col: c, row: r, kind: 'collector' }); // 곤충 채집가 (곤충을 산다)

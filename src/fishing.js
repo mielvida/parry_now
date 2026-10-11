@@ -38,7 +38,7 @@
     ['오로라 나비', '용 잠자리', '불꽃 사마귀', '번개 장수풍뎅이', '유령 나방', '별빛 반딧불이'],
     ['전설의 황금 나비', '심연의 왕 사슴벌레', '태양 잠자리', '월광 비단벌레', '무지개 장수풍뎅이', '신목의 요정 나비'],
   ];
-  const FISH_VALUE = [60, 140, 300, 650, 1400, 3000, 6500, 15000];
+  const FISH_VALUE = [180, 420, 900, 1950, 4200, 9000, 19500, 45000]; // 물고기는 곤충보다 훨씬 비싸게 팔린다
   const BUG_VALUE = [40, 100, 220, 480, 1000, 2200, 4800, 11000];
   const FISH_SIZE = [[6, 14], [18, 45], [25, 70], [40, 90], [60, 130], [80, 180], [120, 260], [200, 520]]; // cm
   const BUG_SIZE = [[0.4, 1.5], [1, 4], [2, 6], [3, 9], [4, 12], [6, 16], [8, 20], [10, 28]];
@@ -64,6 +64,24 @@
     ITEMS[sp.id] = { id: sp.id, name, catch: 'bug', tier, shape: sp.shape, price: sp.value, look: sp.look, desc: `${tier}등급 곤충. 곤충 채집가에게 가져가면 약 ${sp.value} G` };
   }));
 
+  // ---------- 약재 벌레: 속성 광석(화염석, 서리석, 독석, 대지석, 번개석, 그림자석)을 붙인 잠자리채로만 잡힌다 ----------
+  const ELEM_NAME = { fire: '불꽃', ice: '얼음', poison: '독', quake: '대지', light: '번개', shadow: '그림자' };
+  const ELEM_HUE = { fire: 15, ice: 195, poison: 110, quake: 35, light: 55, shadow: 270 };
+  const HERB_DATA = [
+    ['fire', '불나방', 3, 'butterfly'], ['fire', '화염 사마귀', 5, 'cricket'], ['fire', '용암 풍뎅이', 6, 'beetle'],
+    ['ice', '서리 나비', 3, 'butterfly'], ['ice', '얼음 매미', 5, 'cicada'], ['ice', '빙하 잠자리', 6, 'dragonfly'],
+    ['poison', '독나방', 3, 'butterfly'], ['poison', '맹독 말벌', 5, 'bee'], ['poison', '독 사마귀', 6, 'cricket'],
+    ['quake', '땅강아지', 3, 'cricket'], ['quake', '바위 풍뎅이', 5, 'beetle'], ['quake', '대지 사슴벌레', 6, 'beetle'],
+    ['light', '번갯불 반딧불이', 3, 'firefly'], ['light', '뇌전 나비', 5, 'butterfly'], ['light', '천둥 잠자리', 6, 'dragonfly'],
+    ['shadow', '그림자 나방', 3, 'butterfly'], ['shadow', '어둠 사슴벌레', 5, 'beetle'], ['shadow', '밤 반딧불이', 6, 'firefly'],
+  ];
+  const HERBS = HERB_DATA.map(([elem, name, tier, shape], i) => {
+    const h = ELEM_HUE[elem];
+    const sp = { id: 'herb_' + i, name, tier, kind: 'bug', herb: true, elem, shape, value: Math.round(BUG_VALUE[tier - 1] * 2.5), size: BUG_SIZE[tier - 1], look: [hsl(h, 80, 62), hsl(h, 70, 32)] };
+    ITEMS[sp.id] = { id: sp.id, name, catch: 'bug', herb: true, elem, tier, shape, price: sp.value, look: sp.look, desc: `${ELEM_NAME[elem]} 속성 약재 벌레 (${tier}등급). ${ELEM_NAME[elem]} 광석을 붙인 잠자리채로만 잡힌다. 곤충 채집가에게 약재 값으로 비싸게 팔린다` };
+    return sp;
+  });
+
   // ---------- 낚싯대 / 잠자리채 (등급 8단계, 아주 비싸다) ----------
   const ROD_NAMES = ['대나무 낚싯대', '철 낚싯대', '강철 낚싯대', '은빛 낚싯대', '황금 낚싯대', '수정 낚싯대', '용뼈 낚싯대', '전설의 낚싯대'];
   const NET_NAMES = ['나무 잠자리채', '대나무 잠자리채', '철 잠자리채', '은실 잠자리채', '황금 잠자리채', '수정 잠자리채', '미스릴 잠자리채', '전설의 잠자리채'];
@@ -85,28 +103,38 @@
 
   // 등급 g의 도구로 만나는 종 (낮은 등급이 흔하다. 도구 등급 + 1까지 나온다)
   const WEIGHT = [40, 26, 16, 10, 5, 2.2, 0.9, 0.3];
-  function roll(list, maxTier) {
+  // luck = (도구 등급 - 1) + 0.3 x 강화 레벨. 높을수록 높은 등급(희귀한 종)이 훨씬 자주 나온다
+  function roll(list, maxTier, luck = 0) {
     const pool = list.filter((s) => s.tier <= maxTier);
+    const f = 1 + 0.18 * Math.max(0, luck);
+    const wt = (s) => WEIGHT[s.tier - 1] * Math.pow(f, s.tier - 1);
     let sum = 0;
-    for (const s of pool) sum += WEIGHT[s.tier - 1];
+    for (const s of pool) sum += wt(s);
     let r = Math.random() * sum;
-    for (const s of pool) { r -= WEIGHT[s.tier - 1]; if (r <= 0) return s; }
+    for (const s of pool) { r -= wt(s); if (r <= 0) return s; }
     return pool[0];
   }
-  const sizeOf = (sp) => { const u = Math.pow(Math.random(), 1.4); return { u, cm: Math.round((sp.size[0] + (sp.size[1] - sp.size[0]) * u) * 10) / 10, value: Math.round(sp.value * (0.75 + 0.75 * u)) }; };
+  const sizeOf = (sp, luck = 0) => { const u = Math.pow(Math.random(), 1.4 / (1 + 0.1 * Math.max(0, luck))); return { u, cm: Math.round((sp.size[0] + (sp.size[1] - sp.size[0]) * u) * 10) / 10, value: Math.round(sp.value * (0.75 + 0.75 * u)) }; };
 
   // ---------- 곤충 (성 밖 숲에 날아다닌다) ----------
-  function newBug(terrain, avoidX) {
-    const sp = roll(BUGS, 8);
+  const state = { luck: 0, elems: [] }; // 가진 가장 좋은 잠자리채의 행운 / 지금 든 잠자리채에 붙은 속성들 (main이 정해 준다)
+  function newBug(terrain, avoidX, herbSp) {
+    const sp = herbSp || roll(BUGS, 8, state.luck);
     const groundY = 16 * TILE;
     let x = rnd(8 * TILE, terrain.width - 8 * TILE);
     if (avoidX !== undefined && Math.abs(x - avoidX) < 400) x = (x + 900) % (terrain.width - 16 * TILE) + 8 * TILE;
     return { sp, hx: x, hy: groundY - rnd(24, 150), x, y: groundY - 60, t: rnd(0, 20), a: rnd(0.5, 1.4), b: rnd(0.6, 1.5), rx: rnd(50, 140), ry: rnd(10, 40), dodge: 0, vis: 1 };
   }
-  function setupBugs(terrain, n = 44) { const list = []; for (let i = 0; i < n; i++) list.push(newBug(terrain)); return list; }
+  function setupBugs(terrain, n = Math.max(10, Math.floor(terrain.cols / 55))) { // 곤충은 가끔 보일 만큼만 있다
+    const list = [];
+    for (let i = 0; i < n; i++) list.push(newBug(terrain));
+    for (const h of HERBS) for (let k = 0; k < Math.max(1, Math.floor(terrain.cols / 450)); k++) list.push(newBug(terrain, undefined, h)); // 약재 벌레: 종마다 몇 마리씩
+    return list;
+  }
   function updateBugs(bugs, dt, terrain) {
     const groundY = 16 * TILE;
     for (const b of bugs) {
+      if (b.wait > 0) { b.wait -= dt; continue; } // 잡힌 자리는 한동안 비어 있다
       b.t += dt;
       b.dodge = Math.max(0, b.dodge - dt);
       const sp = 1 + (b.sp.tier - 1) * 0.12; // 높은 등급일수록 날쌔다
@@ -124,12 +152,14 @@
     const box = { x: x0, y: player.y - 46, w: reach + 14, h: player.h + 78 };
     const out = { caught: [], missed: [] };
     for (const b of bugs) {
+      if (b.wait > 0) continue;
       if (b.x < box.x || b.x > box.x + box.w || b.y < box.y || b.y > box.y + box.h) continue;
+      if (b.sp.herb && !state.elems.includes(b.sp.elem)) { b.dodge = 0.8; b.fleeDir = player.facing; out.needElem = b.sp; continue; } // 속성 광석이 없으면 못 잡는다
       if (b.sp.tier <= grade) out.caught.push(b); else { b.dodge = 1.2; b.fleeDir = player.facing; out.missed.push(b); }
     }
     return out;
   }
-  function respawnBug(bugs, bug, terrain, avoidX) { const nb = newBug(terrain, avoidX); const i = bugs.indexOf(bug); if (i >= 0) bugs[i] = nb; }
+  function respawnBug(bugs, bug, terrain, avoidX) { const nb = newBug(terrain, avoidX, bug.sp.herb ? bug.sp : undefined); nb.wait = rnd(25, 60); const i = bugs.indexOf(bug); if (i >= 0) bugs[i] = nb; } // 한참 뒤 다른 곳에 새 곤충이 나온다
 
   function drawBug(ctx, b, time) {
     const sp = b.sp;
@@ -140,6 +170,7 @@
     ctx.save();
     ctx.translate(Math.round(b.x), Math.round(b.y));
     ctx.scale(dir * s, s);
+    if (sp.herb) { const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 24); g.addColorStop(0, sp.look[0] + 'cc'); g.addColorStop(1, sp.look[0] + '00'); ctx.fillStyle = g; ctx.fillRect(-26, -26, 52, 52); }
     if (sp.tier >= 5) { const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 16 + sp.tier); g.addColorStop(0, 'rgba(255,255,200,0.35)'); g.addColorStop(1, 'rgba(255,255,200,0)'); ctx.fillStyle = g; ctx.fillRect(-26, -26, 52, 52); }
     switch (sp.shape) {
       case 'butterfly': {
@@ -183,15 +214,15 @@
     ctx.restore();
   }
   function drawBugs(ctx, bugs, camera, time) {
-    for (const b of bugs) if (b.x > camera.x - 40 && b.x < camera.x + camera.viewW + 40) drawBug(ctx, b, time);
+    for (const b of bugs) if (!(b.wait > 0) && b.x > camera.x - 40 && b.x < camera.x + camera.viewW + 40) drawBug(ctx, b, time);
   }
 
   // ---------- 낚시 미니게임 ----------
   // 단계: wait(찌를 던지고 기다린다) -> bite(입질! 이때 눌러야 한다) -> reel(줄다리기: 물고기가 칸 안에 머물게) -> done
-  function startFishing(rod, pondIdx) {
+  function startFishing(rod, pondIdx, luck = 0) {
     const grade = rod.grade;
-    const maxTier = Math.min(8, grade + (pondIdx % 2)); // 깊은 연못(두 번째)은 한 단계 위까지 나온다
-    return { phase: 'wait', t: 0, waitT: rnd(1.4, 4.2), grade, maxTier, species: null, fish: 0.5, fv: 0, bar: 0.5, bv: 0, prog: 0.3, size: null, msg: '', done: false, caught: false, time: 0, shake: 0 };
+    const maxTier = Math.min(8, grade + (pondIdx % 4)); // 더 깊은 연못일수록 높은 등급까지 나온다 (0~3단계 위)
+    return { phase: 'wait', t: 0, waitT: rnd(1.4, 4.2), grade, maxTier, luck, species: null, fish: 0.5, fv: 0, bar: 0.5, bv: 0, prog: 0.3, size: null, msg: '', done: false, caught: false, time: 0, shake: 0 };
   }
   function updateFishing(f, dt, input) {
     f.time += dt;
@@ -201,7 +232,7 @@
     if (input.wasPressed('Escape')) { f.done = true; f.msg = '낚시를 그만뒀다'; return; }
     if (f.phase === 'wait') {
       if (hookPressed) { f.done = true; f.caught = false; f.msg = '너무 일찍 당겼다! 물고기가 놀라 도망갔다'; return; }
-      if (f.t >= f.waitT) { f.phase = 'bite'; f.t = 0; f.species = roll(FISH, f.maxTier); f.shake = 1; }
+      if (f.t >= f.waitT) { f.phase = 'bite'; f.t = 0; f.species = roll(FISH, f.maxTier, f.luck); f.shake = 1; }
     } else if (f.phase === 'bite') {
       f.shake = Math.max(0, f.shake - dt);
       if (hookPressed) { f.phase = 'reel'; f.t = 0; f.fish = 0.5; f.bar = 0.5; f.prog = 0.3; f.fvt = 0; f.msg = '걸렸다! 누르고 있으면 칸이 올라간다. 물고기를 칸 안에 두자!'; return; }
@@ -220,7 +251,7 @@
       f.size = Math.max(0.08, size);
       f.prog += (inside ? 0.26 : -(0.13 + 0.03 * tier)) * dt;
       f.prog = Math.min(1, f.prog);
-      if (f.prog >= 1) { f.done = true; f.caught = true; f.result = sizeOf(f.species); f.msg = ''; }
+      if (f.prog >= 1) { f.done = true; f.caught = true; f.result = sizeOf(f.species, f.luck); f.msg = ''; }
       else if (f.prog <= 0) { f.done = true; f.caught = false; f.msg = '줄이 끊어졌다… 물고기가 도망갔다'; }
       else if (f.t > 40) { f.done = true; f.caught = false; f.msg = '시간이 너무 걸려 놓쳤다'; }
     }
@@ -336,11 +367,11 @@
         for (const dx of [-2.3, 0.4, 2.2]) { ctx.beginPath(); ctx.ellipse((p.col + dx) * TILE + 16, gy + 6, 11, 3.5, 0, 0, Math.PI * 2); ctx.fill(); }
         ctx.fillStyle = '#ff9ec0'; ctx.beginPath(); ctx.arc((p.col + 0.4) * TILE + 16, gy + 3, 3, 0, Math.PI * 2); ctx.fill();
         for (const x of [x0 - 6, x1 + 4]) { ctx.strokeStyle = '#4a8a3a'; ctx.lineWidth = 3; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x + i * 5, gy); ctx.quadraticCurveTo(x + i * 5 + 6, gy - 24 - i * 3, x + i * 5 + 2, gy - 38 - i * 4); ctx.stroke(); } }
-        if (G.TextLayer && !terrain.fishingActive) G.TextLayer.add(p.col === terrain.ponds[0].col ? '얕은 연못' : '깊은 연못', (p.col + 0.5) * TILE, gy - 70, 'bold 13px sans-serif', '#ffffff');
+        if (G.TextLayer && !terrain.fishingActive) G.TextLayer.add(['얕은 연못', '연못', '깊은 연못', '아주 깊은 연못'][terrain.ponds.indexOf(p) % 4], (p.col + 0.5) * TILE, gy - 70, 'bold 13px sans-serif', '#ffffff');
       }
     },
   });
   G.MeadowTheme = Meadow;
 
-  G.Fishing = { FISH, BUGS, RODS, NETS, roll, sizeOf, setupBugs, updateBugs, swingNet, respawnBug, drawBugs, drawBug, startFishing, updateFishing, drawFishing, drawFishShape, drawCatchIcon, FISH_VALUE, BUG_VALUE };
+  G.Fishing = { state, HERBS, ELEM_NAME, FISH, BUGS, RODS, NETS, roll, sizeOf, setupBugs, updateBugs, swingNet, respawnBug, drawBugs, drawBug, startFishing, updateFishing, drawFishing, drawFishShape, drawCatchIcon, FISH_VALUE, BUG_VALUE };
 })(window.Game);

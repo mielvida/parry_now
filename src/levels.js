@@ -197,6 +197,7 @@ Game.Levels.kingdom = (function () {
   for (const ch of Object.keys(shops)) put(15, shops[ch], ch);
   for (const c of [70, 78, 250, 258, 274, 290]) put(15, c, 'H'); // 성 주변 집들 (오른쪽 거리에도)
   put(15, 224, 'Y'); // 내 집 터 (부동산에서 집을 사면 여기에 지어진다)
+  put(15, 217, '1'); // 도감관: 도감을 보고, 새로 만난 것을 등록하면 보상을 받는다
   put(15, 297, 'y'); // 심연 동굴 입구: 훨씬 위험하지만 보상이 두둑하다
   for (let c = 126; c <= 174; c++) put(15, c, '#'); // 성이 놓인 단
   put(14, 150, 'e'); put(14, 150, 'e');
@@ -215,14 +216,23 @@ Game.Levels.palace = (function () {
 
 // 성 밖 숲: 왕국 왼쪽의 문으로 나간다. 풀밭 위를 곤충이 날아다니고, 두 연못에서 낚시를 한다 ('b' = 연못 가운데, 9칸 폭)
 Game.Levels.meadow = (function () {
-  const W = 170;
+  const W = 1300; // 아주 넓은 숲: 끝없이 걸어도 계속 이어진다
   const rows = [];
   for (let r = 0; r < 18; r++) rows.push(new Array(W).fill(r >= 16 ? '#' : '.'));
   rows[15][2] = 'X'; rows[15][5] = 'P';
-  for (const pc of [48, 122]) { // 연못: 한 칸 깊이로 판다
+  const ponds = [];
+  for (let pc = 48; pc < W - 40; pc += 130) ponds.push(pc); // 연못: 130칸마다 하나, 갈수록 깊다 (한 칸 깊이로 판다)
+  for (const pc of ponds) {
     for (let c = pc - 4; c <= pc + 4; c++) rows[16][c] = '.';
     rows[15][pc] = 'b';
   }
-  for (const [c0, n] of [[70, 3], [92, 2], [150, 4]]) for (let c = c0; c < c0 + n; c++) rows[15][c] = '#'; // 낮은 둔덕
+  let seed = 12345; // 둔덕은 매번 같은 자리에 (결정적인 무작위)
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let c = 14; c < W - 10; c += 3 + Math.floor(rnd() * 9)) {
+    if (ponds.some((pc) => Math.abs(c - pc) < 9)) continue;
+    const n = 2 + Math.floor(rnd() * 4);
+    for (let k = 0; k < n; k++) rows[15][c + k] = '#'; // 낮은 둔덕 (한 칸)
+    if (rnd() < 0.25) for (let k = 1; k < n - 1; k++) rows[14][c + k] = '#'; // 가끔 두 칸 높이
+  }
   return rows.map((r) => r.join(''));
 })();

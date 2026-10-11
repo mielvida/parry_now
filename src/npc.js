@@ -17,6 +17,7 @@
     designer: { robe: '#d4608a', trim: '#ffc0d8', hat: '#8a2a5a', beard: null, hair: '#6b4423', skin: '#e8b98a' },
     gambler: { robe: '#2a2a3a', trim: '#d4a017', hat: '#1a1a1a', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
     thrower: { robe: '#c0392b', trim: '#ffd0c0', hat: '#f4f1e8', beard: null, hair: '#6b4423', skin: '#e8b98a' },
+    curator: { robe: '#6a4a8a', trim: '#e8d8ff', hat: '#2a1a4a', beard: '#c9c0d8', hair: '#c9c0d8', skin: '#e8b98a' },
     angler: { robe: '#3a7a8a', trim: '#a8e0e8', hat: '#e8d8a8', beard: null, hair: '#6b4423', skin: '#e8b98a' },
     fishmonger: { robe: '#5a8aa8', trim: '#f4f1e8', hat: '#f4f1e8', beard: '#c9c0b0', hair: '#6a5a4a', skin: '#e0a878', apron: '#e8f1ff' },
     collector: { robe: '#5a8a3a', trim: '#d8f0a8', hat: '#f4e8c0', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
