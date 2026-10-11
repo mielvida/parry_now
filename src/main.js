@@ -29,6 +29,7 @@
     return G.MineGen.generate(run, Math.random, { length, weights: { flat: 0.2, bump: 0.14, up: 0.12, down: 0.1, pit: 0.3, wide: 0.14 }, floatChance: 0.5, slimes: Math.floor(length / 8), bats: Math.floor(length / 14), crabs: Math.floor(length / 20) });
   }
   function enterMine() {
+    story.mineFrom = stageName === 'kingdom' ? 'kingdom' : 'village'; // 어느 도시의 동굴인지 (나올 때 그곳으로 돌아간다)
     mineRun += 1;
     mineLevel = G.MineGen.generate(mineRun);
     loadStage('mine', true);
@@ -96,13 +97,13 @@
       banner: { title: '우리 집', sub: '마을에 정착!', dur: 3, caption: '…이제 여기가 내 집이다. 가게에서 산 장식으로 꾸며 보자.' },
     },
     mine: {
-      music: 'cave', returnNear: 'D',
+      music: 'cave', returnNear: 'D', get exitTo() { return story.mineFrom || 'village'; },
       get level() { return mineLevel; },
       theme: G.Cave, summon: true, repeatChest: true, // 상자는 들어갈 때마다 다시 나온다
       get goal() { return `목표: 동굴 맨 끝의 보물 상자 (+${mineCoins()} G). 돌아가려면 입구의 출구에서 E`; },
-      chest: { mode: 'mine', get coins() { return mineCoins(); }, next: 'village', near: 'D' },
+      chest: { mode: 'mine', get coins() { return mineCoins(); }, get next() { return story.mineFrom || 'village'; }, near: 'D' },
       get banner() {
-        return { title: '마을 동굴', sub: `${mineRun}번째 탐험 · 길이 ${mineLevel[0].length}칸`, dur: 3.5, caption: '…동굴 안은 어둡고, 슬라임과 박쥐의 기척이 느껴진다.' };
+        return { title: story.mineFrom === 'kingdom' ? '왕국 동굴' : '마을 동굴', sub: `${mineRun}번째 탐험 · 길이 ${mineLevel[0].length}칸`, dur: 3.5, caption: '…동굴 안은 어둡고, 슬라임과 박쥐의 기척이 느껴진다.' };
       },
     },
     // ---- 심연 동굴: 왕국 오른쪽 끝의 문. 엄청나게 어렵지만 상자가 큰 보상을 준다 ----
@@ -125,11 +126,11 @@
     },
     // ---- 광물 동굴: 곡괭이로 광석을 캔다 (마을 39열의 문). 들어갈 때마다 새로 생성되고, 끝의 상자는 코인을 준다 ----
     orecave: {
-      music: 'cave', label: '광물 동굴', returnNear: 'orecave',
+      music: 'cave', label: '광물 동굴', returnNear: 'orecave', get exitTo() { return story.oreFrom || 'village'; },
       get level() { return oreLevel; },
       theme: G.Cave, summon: true, repeatChest: true,
       get goal() { return `목표: 곡괭이로 광석을 캐자 (E 길게). 동굴 끝의 상자 (+${oreCoins()} G). 돌아가려면 입구의 출구에서 E`; },
-      chest: { mode: 'mine', get coins() { return oreCoins(); }, next: 'village', near: 'orecave' },
+      chest: { mode: 'mine', get coins() { return oreCoins(); }, get next() { return story.oreFrom || 'village'; }, near: 'orecave' },
       get banner() {
         return { title: '광물 동굴', sub: `${oreRun}번째 채굴 · 길이 ${oreLevel[0].length}칸`, dur: 3.5, caption: '…벽 곳곳에서 광석이 반짝인다. 곡괭이로 E를 길게 눌러 캐 보자.' };
       },
@@ -1270,6 +1271,7 @@
     }
     if (name === 'legion') setupLegion();
     if (st.dark) scatterPickups(); // 던전에서는 가끔 아이템이 떨어져 있다
+    oreNodes.royal = name === 'orecave' && story.oreFrom === 'kingdom'; // 왕국의 광물 동굴에서는 새 광석이 나온다
     oreNodes.setup(terrain, oreRun, name === 'orecave'); // 광물 동굴이면 광석 덩어리를 깐다
     seeded(floorSeed(darkFloor) ^ 0x9e3779b9, () => dungeonEvents.setup(terrain, darkFloor, name === 'dungeon' && !!(dungeon && dungeon.tower) && darkFloor % 3 === 0)); // 탑의 3층마다(3, 6, 9 …) 이벤트가 나온다. 보스방/허브/그 밖의 층은 비움
     G.Fishing.state.luck = bestNetLuck();
@@ -4218,6 +4220,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         return;
       } else if (near && near.type === 'gate') { // 마을의 문으로 숲/설산/화산에, 다크월드 허브의 문으로 던전에
         if (tollBlocked(near.stage)) { input.endFrame(); return; }
+        if (near.stage === 'orecave') story.oreFrom = stageName === 'kingdom' ? 'kingdom' : 'village'; // 광물 동굴에서 나오면 들어온 도시로
         if (near.stage === 'dungeon' && darkBest >= 1) { openFloorSelect(); input.endFrame(); return; } // 이미 깬 층이 있으면 어느 층으로 갈지 고른다
         if (near.stage === 'dungeon') darkFloor = Math.min(C.DUNGEON_FLOORS, Math.max(darkBest + 1, darkFloor)); // 지금까지 오른 곳 바로 위층부터. 죽거나 나갔어도 마지막으로 있던 층(보스 층 포함)에서 다시 시작
         loadStage(near.stage, true, stageName === 'kingdom' && near.stage === 'village' ? 'kingdom' : null);

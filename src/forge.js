@@ -61,6 +61,10 @@
     { id: 'titanium', name: '티타늄', cls: 'gun', tier: 3, weight: 3, look: ['#bfc9d8', '#5a6a82'], bonus: { gdmg: 8, st: -3 } },
     { id: 'blastite', name: '폭렬석', cls: 'gun', tier: 3, weight: 3, look: ['#ff8a4a', '#8a2a10'], bonus: { gdmg: 10, radius: 0.4 } },
     { id: 'platinum', name: '백금', cls: 'gun', tier: 4, weight: 1.6, look: ['#f4f4ff', '#a0a8c8'], bonus: { gdmg: 25, crit: 0.04 } },
+    // 왕국의 광물 동굴에서만 나오는 새 광석 (kingdom: true): 가장 높은 단계
+    { id: 'royal', name: '왕철', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#ffe9a0', '#b8860b'], bonus: { dmg: 60, boss: 40, hit: 2 } },
+    { id: 'crownstone', name: '왕관석', cls: 'armor', tier: 4, weight: 1, kingdom: true, look: ['#fff0c8', '#c9961a'], bonus: { hp: 8, inv: 0.6, spd: 0.05 } },
+    { id: 'piercer', name: '철갑탄석', cls: 'gun', tier: 4, weight: 1, kingdom: true, look: ['#ffd0a0', '#7a3a1a'], bonus: { gdmg: 45, pierce: true, crack: true } },
     { id: 'darksteel', name: '암흑강', cls: 'gun', tier: 4, weight: 1.4, look: ['#8a60d0', '#1a0a30'], bonus: { gdmg: 30, pierce: true } },
   ];
   const ORE = {};

@@ -80,7 +80,8 @@
       let r = Math.random() * total;
       let tier = 1;
       for (const t of [1, 2, 3, 4]) { r -= w[t]; if (r <= 0) { tier = t; break; } }
-      const pool = F.ORES.filter((o) => o.tier === tier);
+      if (this.royal && p > 0.3 && Math.random() < 0.4) { const kp = F.ORES.filter((o) => o.kingdom); return kp[Math.floor(Math.random() * kp.length)]; } // 왕국의 광물 동굴: 새 광석
+      const pool = F.ORES.filter((o) => o.tier === tier && !o.kingdom);
       let sum = 0;
       for (const o of pool) sum += o.weight;
       let q = Math.random() * sum;
