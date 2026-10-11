@@ -648,6 +648,10 @@
     ctx.fillStyle = '#e9d8a6';
     ctx.fillRect(baseX - 20, baseY - 110, 40, 16);
     G.TextLayer.add(L.name, baseX, baseY - 102, 'bold 12px sans-serif', '#5a3d17');
+    if (g.stage === 'dungeon' && G.bossSign) { // 던전 문 옆 표지판: 다음 보스는 몇 층에 어떤 보스인지
+      G.TextLayer.add(G.bossSign[0], baseX, baseY - 142, 'bold 13px sans-serif', '#ff9a9a');
+      G.TextLayer.add(G.bossSign[1], baseX, baseY - 124, 'bold 12px sans-serif', '#ffd6a0');
+    }
   }
 
   const Beach = {

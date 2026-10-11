@@ -68,7 +68,7 @@
       get boss() { return dungeon.boss; },
       get label() { return `어둠의 탑 ${darkFloor}층`; },
       get goal() { return `어둠의 탑 ${darkFloor}층 / ${C.DUNGEON_FLOORS}층: ${dungeon.boss ? '보스를 쓰러뜨려라!' : '발판을 타고 꼭대기 계단으로! (암흑은 맞으면 -3)'}  [B 얼음폭탄 · V 먹기]`; },
-      get banner() { return { title: `${darkFloor}층`, sub: dungeon.bossKind ? '보스가 기다린다…' : '어둠의 탑', dur: 2.5, caption: dungeon.bossKind ? '…강한 기운이 느껴진다. 이 층의 끝에 보스가 있다.' : '…위로, 위로. 시크너가 기다린다.' }; },
+      get banner() { return { title: `${darkFloor}층`, sub: dungeon.bossKind ? '보스가 기다린다…' : '어둠의 탑', dur: 2.5, caption: dungeon.bossKind ? '…강한 기운이 느껴진다. 이 층의 끝에 보스가 있다.' : (story.cleared ? '…위로, 위로. 꼭대기까지 올라 보자.' : '…위로, 위로. 시크너가 기다린다.') }; },
     },
     palace: { // 왕궁 안: 알현실. 왕이 옥좌에 앉아 있다
       music: 'village', label: '왕궁', level: G.Levels.palace, theme: G.PalaceTheme, monsterless: true, returnNear: 'palace', exitTo: 'kingdom',
@@ -274,6 +274,7 @@
   let dexUI = null;            // 도감 창 (왕국의 도감관)
   let mapUI = null;            // 마을 지도 {markers}
   let gachaUI = null;          // 뽑기 {cur, res, msg}
+  let floorUI = null;          // 던전 문: 가고 싶은 층 고르기 {sel, max}
   let homeHealT = 0;           // 집 안에서 피가 차는 박자
   let homeFrom = 'village';    // 내 집에 들어온 곳 (마을 또는 왕국): 나갈 때 거기로 돌아간다
   let startPos = null;         // 적군 미션을 시작한 자리 (쓰러지면 여기서 다시 시작)
@@ -1181,7 +1182,10 @@
     }
     const st = STAGES[name];
     G.Audio.setMusic(st.music || 'cave'); // 마을은 활기찬 노래, 나머지는 동굴 곡
-    if (name === 'dungeon') dungeon = seeded(floorSeed(darkFloor), () => G.Dark.makeFloor(darkFloor)); // 층마다 한 번 정해지면 클리어할 때까지 같은 방
+    if (name === 'dungeon') {
+      dungeon = seeded(floorSeed(darkFloor), () => G.Dark.makeFloor(darkFloor));
+      if (darkFloor <= darkBest && dungeon.boss) { dungeon.boss = null; dungeon.bossKind = null; } // 이미 깬 층의 보스는 사라진다
+    } // 층마다 한 번 정해지면 클리어할 때까지 같은 방
     if (name === 'orecave') { oreRun += 1; oreLevel = makeOreCave(oreRun); } // 들어갈 때마다 새 광물 동굴
     if (name === 'abyss') { abyssRun += 1; abyssLevel = makeAbyss(abyssRun); } // 들어갈 때마다 새 심연 동굴
     terrain = new G.Terrain(st.level);
@@ -2285,6 +2289,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const w = wallet();
     const res = G.Shop.buy(item, w);
     if (res.ok && (res.minigame === 'attach' || res.minigame === 'smelt')) { openWorkChoice(res.minigame, res.ore); return; } // 제련/부착: 직접(미니게임) 또는 대장장이에게 맡기기
+    if (res.ok && w.refillStamina) stamina = stMax(); // 활력 충전
     if (res.ok && item.upgrade === 'stmax') stamina += C.STAMINA_MAX_STEP; // 늘어난 만큼 바로 채워 준다
     coins = w.coins;
     exp = w.exp;
@@ -2432,6 +2437,32 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
   }
 
+  // 무기와 방어구 팔기 (인벤토리에서 X, 마을/왕국/다크월드 입구에서만): 산 값의 45%. 장착한 것은 못 판다. 한 번 더 눌러야 팔린다
+  function sellSelected() {
+    const e = equipUI;
+    const en = G.Shop.gridEntries(inv, e.cat)[e.cur];
+    const say = (msg, ok) => { e.msg = msg; e.ok = ok; e.msgT = 2; e.sellId = null; G.Audio.play(ok ? 'coin' : 'deny'); };
+    if (!en) { say('팔 물건을 고르세요', false); return; }
+    const it = G.Shop.ITEMS[en.id];
+    if (!(stageName === 'village' || stageName === 'kingdom' || stageName === 'darkhub')) { say('가게가 있는 도시에서만 팔 수 있어요', false); return; }
+    if (!it.slot || !(it.price > 0) || it.admin) { say('이건 팔 수 없어요 (무기와 방어구만 팔 수 있어요)', false); return; }
+    if (!(inv.gachaOwn && inv.gachaOwn[it.id] > 0)) { say('상점에서 산 건 팔 수 없어요. 뽑기에서 얻은 장비(뽑 표시)만 팔 수 있어요', false); return; }
+    if (Object.values(inv.equipped).includes(it.id)) { say('장착한 건 팔 수 없어요. 먼저 다른 걸 끼세요', false); return; }
+    const price = Math.max(1, Math.round(it.price * 0.45));
+    if (e.sellId !== it.id) { e.sellId = it.id; e.msg = `${it.name}: ${price} G에 팔까요? 한 번 더 X`; e.ok = false; e.msgT = 3; G.Audio.play('catch'); return; }
+    const n = (inv.copies && inv.copies[it.id]) || 1;
+    if (n > 1) inv.copies[it.id] = n - 1;
+    else {
+      inv.items = inv.items.filter((x) => x !== it.id);
+      if (inv.copies) delete inv.copies[it.id];
+      inv.hotbar = inv.hotbar.map((x) => (x === it.id ? null : x));
+    }
+    inv.gachaOwn[it.id] = Math.max(0, inv.gachaOwn[it.id] - 1);
+    coins += price;
+    say(`${it.name}을(를) ${price} G에 팔았다!`, true);
+    effects.sparkle(player.x + player.w / 2, player.y);
+  }
+
   // 인벤토리 창(I 키): 분류 탭(Tab) + 스크롤되는 큰 격자. 방향키/마우스로 칸 선택, E/Enter/클릭으로 장착, 1~5 키로 무기 칸에 넣기, I/Esc로 닫기
   function updateEquip(dt) {
     const e = equipUI;
@@ -2443,6 +2474,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const cats = G.Shop.CATEGORIES;
     if (pressed('KeyQ')) cycleSort();
     if (pressed('KeyH')) equipBest();
+    if (pressed('KeyX')) sellSelected();
     if (pressed('KeyC')) cycleSub();
     if (pressed('Tab')) {
       const k = (cats.findIndex((c) => c.id === e.cat) + 1) % cats.length;
@@ -2873,6 +2905,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const p = canvasPoint(ev);
     if (dexUI) { G.Dex.mouse(dexUI, 'click', p); return; }
     if (gachaUI) { gachaUI.click = p; return; }
+    if (floorUI) { floorUI.click = p; return; }
     if (titleUI && !settingsUI) { // 처음 화면: 칸 클릭 = 시작, 복사/삭제 단추, 설정/끄기 단추
       if (titleUI.halted) return;
       const cards = G.Renderer.titleCards(C.VIEW_W, C.VIEW_H);
@@ -3203,8 +3236,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function eatBest() {
     const has = (id) => inv.consumables[id] > 0;
     const lowSt = stamina < stMax() - 25;
-    const foods = ['f_bread', 'f_stew', 'f_fish', 'f_cake', 'f_steak', 'f_feast']; // 음식점 요리 (작은 것부터)
-    const order = lives < maxLives() ? foods.concat(['st30', 'st70']) : ['st30', 'st70'].concat(foods); // 다치면 요리 먼저, 아니면 스태미나 물약부터
+    const dk = G.Shop.DARK_CONS_IDS.map((id) => G.Shop.ITEMS[id]);
+    const dkFood = dk.filter((d) => d.food).sort((x, y) => x.food - y.food).map((d) => d.id);
+    const dkSt = dk.filter((d) => !d.food).sort((x, y) => x.stamina - y.stamina).map((d) => d.id);
+    const foods = ['f_bread', 'f_stew', 'f_fish', 'f_cake', 'f_steak', 'f_feast'].concat(dkFood); // 요리/약초 (작은 것부터)
+    const order = lives < maxLives() ? foods.concat(['st30', 'st70'], dkSt) : ['st30', 'st70'].concat(dkSt, foods); // 다치면 요리 먼저, 아니면 스태미나 물약부터
     for (const id of order) {
       if (!has(id)) continue;
       const r = useConsumable(id);
@@ -3338,6 +3374,85 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       effects.treasure(player.x + player.w / 2, player.y);
     } else dexUI.msg = '새로 등록할 게 없어요';
   }
+  // ---- 챕터 3: 왕의 큰 목표들과 통행료 ----
+  let questT = 0, tollAsk = null, tollT = 0;
+  const questCtx = () => ({ inv, story, missions, darkBest });
+  function updateQuest(dt) {
+    tollT = Math.max(0, tollT - dt);
+    if (tollT <= 0) tollAsk = null;
+    questT -= dt;
+    if (questT > 0 || !story.kingMet || dialog || cutscene || invasion || mini || shop || equipUI || fishUI || dexUI || mapUI || gachaUI || floorUI) return;
+    questT = 0.5;
+    const g = G.Quest.current(questCtx());
+    if (!g) return;
+    if (g.prog(questCtx()) < g.need) return;
+    story.q = (story.q || 0) + 1;
+    coins += g.coins; exp += g.exp;
+    G.Audio.play('treasure');
+    effects.treasure(player.x + player.w / 2, player.y);
+    popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: `목표 달성! ${g.title}  +${g.coins} G  +${g.exp} EXP`, t: 4, color: 'rgba(255,225,120,A)' });
+    startDialogs([`[목표 달성] ${g.title}  (코인 +${g.coins} G, 경험치 +${g.exp})`].concat(g.lines), g.last ? () => { popups.push({ x: player.x + player.w / 2, y: player.y - 80, text: '챕터 3 완결 - 왕국의 번영', t: 6, color: 'rgba(255,225,120,A)' }); effects.shake(6, 0.5); } : null);
+  }
+  function questHud() {
+    if (!story.kingMet) return null;
+    const g = G.Quest.current(questCtx());
+    const n = story.q || 0, total = G.Quest.GOALS.length;
+    if (!g) return { head: '챕터 3 완결', text: '모든 목표를 이뤘어요! 탑 100층이 남았다', cur: 1, max: 1, step: `${total}/${total}` };
+    return { head: `챕터 3 목표 ${n + 1}/${total}: ${g.title}`, text: g.desc, cur: Math.min(g.need, g.prog(questCtx())), max: g.need };
+  }
+  // 통행료: 첫 E는 안내, 한 번 더 E로 낸다. 다 내면 영원히 지나갈 수 있다
+  function tollBlocked(stage) {
+    const toll = G.Quest.TOLLS[stage];
+    if (!toll || stageName !== 'kingdom' || (story.tolls && story.tolls[stage])) return false;
+    if (tollAsk === stage && tollT > 0) {
+      if (coins < toll.cost) { dialog = { text: `다리지기: "통행료 ${toll.cost} G에 ${toll.cost - coins} G가 모자라오."`, t: 3 }; G.Audio.play('deny'); return true; }
+      coins -= toll.cost;
+      story.tolls = story.tolls || {};
+      story.tolls[stage] = 1;
+      tollAsk = null;
+      G.Audio.play('coin');
+      popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: `통행료 -${toll.cost} G  (이제 언제든 지나갈 수 있어요)`, t: 3, color: 'rgba(255,225,120,A)' });
+      return false;
+    }
+    tollAsk = stage; tollT = 4;
+    dialog = { text: `다리지기: "${toll.name} 통행료는 ${toll.cost} G요. 한 번만 내면 평생 지나갈 수 있소. (한 번 더 E를 누르면 낸다)"`, t: 4 };
+    G.Audio.play('pickup');
+    return true;
+  }
+
+  // ---- 던전 문: 이미 깬 층까지는 원하는 층으로 순식간에 이동한다 ----
+  function openFloorSelect() {
+    const max = Math.min(C.DUNGEON_FLOORS, darkBest + 1);
+    floorUI = { sel: max, max, buf: '', t: 0 };
+    G.Audio.play('pickup');
+  }
+  function updateFloorSelect(dt) {
+    const f = floorUI;
+    f.t += dt;
+    const pressed = (...c) => c.some((k) => input.wasPressed(k));
+    const set = (v) => { f.sel = Math.max(1, Math.min(f.max, v)); f.buf = ''; };
+    if (pressed('Escape', 'KeyE')) { floorUI = null; return; }
+    if (pressed('ArrowRight', 'KeyD')) { set(f.sel + 1); G.Audio.play('catch'); }
+    if (pressed('ArrowLeft', 'KeyA')) { set(f.sel - 1); G.Audio.play('catch'); }
+    if (pressed('ArrowUp', 'KeyW')) { set(f.sel + 10); G.Audio.play('catch'); }
+    if (pressed('ArrowDown', 'KeyS')) { set(f.sel - 10); G.Audio.play('catch'); }
+    if (pressed('Home')) set(1);
+    if (pressed('End')) set(f.max);
+    for (let n = 0; n <= 9; n++) if (pressed('Digit' + n, 'Numpad' + n) && f.buf.length < 3) { f.buf += n; f.sel = Math.max(1, Math.min(f.max, parseInt(f.buf, 10) || 1)); }
+    if (pressed('Backspace')) { f.buf = f.buf.slice(0, -1); if (f.buf) f.sel = Math.max(1, Math.min(f.max, parseInt(f.buf, 10) || 1)); }
+    let go = pressed('Enter', 'NumpadEnter', 'Space');
+    if (f.click) {
+      const geo = G.Renderer.floorGeometry(C.VIEW_W, C.VIEW_H);
+      const hit = (r) => f.click.x >= r.x && f.click.x < r.x + r.w && f.click.y >= r.y && f.click.y < r.y + r.h;
+      if (hit(geo.m10)) set(f.sel - 10); else if (hit(geo.m1)) set(f.sel - 1); else if (hit(geo.p1)) set(f.sel + 1); else if (hit(geo.p10)) set(f.sel + 10);
+      else if (hit(geo.first)) set(1); else if (hit(geo.last)) set(f.max);
+      else if (hit(geo.go)) go = true;
+      geo.bosses.forEach((b, i) => { if (hit(b)) set(Object.keys(G.Dark.BOSS_FLOORS).map(Number).sort((a, b2) => a - b2).filter((x) => x <= f.max)[i]); });
+      f.click = null;
+    }
+    if (go) { darkFloor = f.sel; floorUI = null; loadStage('dungeon', true); G.Audio.play('spawn'); }
+  }
+
   // ---- 뽑기 (마을): 1~100번 중 하나를 300 G에 뽑는다. 판은 20분마다 바뀐다 ----
   function openGacha() { G.Gacha.board(inv); gachaUI = { cur: 0, res: null, msg: '', msgT: 0, t: 0 }; G.Audio.play('pickup'); }
   function pickGacha(i) {
@@ -3347,9 +3462,10 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (coins < G.Gacha.PRICE) { g.msg = '코인이 부족해요'; g.msgT = 1.4; G.Audio.play('deny'); return; }
     coins -= G.Gacha.PRICE;
     const r = G.Gacha.pick(inv, i);
+    inv.gachaCount = (inv.gachaCount || 0) + 1;
     if (r.refund) coins += r.refund;
     g.res = Object.assign({ n: i + 1, t: 0 }, r);
-    if (r.id && !r.dup) { applyEquipment(); G.Audio.play('treasure'); effects.treasure(player.x + player.w / 2, player.y); } else G.Audio.play(r.id ? 'coin' : 'deny');
+    if (r.gold) { G.Audio.play('coin'); } else if (r.id && !r.dup) { inv.gachaOwn = inv.gachaOwn || {}; inv.gachaOwn[r.id] = (inv.gachaOwn[r.id] || 0) + 1; applyEquipment(); G.Audio.play('treasure'); effects.treasure(player.x + player.w / 2, player.y); } else G.Audio.play(r.id ? 'coin' : 'deny');
   }
   function updateGacha(dt) {
     const g = gachaUI;
@@ -3371,11 +3487,27 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
   }
 
+  // ---- 던전의 다음 보스: 몇 층에서 어떤 보스가 나오는지 ----
+  function bossName(kind) { return kind === 'sikner' ? (story.cleared ? '100층의 최종 보스' : '어둠의 기사 시크너') : ({ stone: '정의의 어둠돌', justice: '정의의 어둠' }[kind] || kind); }
+  function nextBossInfo(fromFloor) {
+    const floors = Object.keys(G.Dark.BOSS_FLOORS).map(Number).sort((a, b) => a - b);
+    const f = floors.find((x) => x >= fromFloor);
+    if (f === undefined) return null;
+    return { floor: f, name: bossName(G.Dark.BOSS_FLOORS[f]), left: f - fromFloor };
+  }
+  function bossSignFor() { // 던전 문 옆 표지판 / 던전 안 안내판의 글
+    const from = stageName === 'dungeon' ? darkFloor : Math.max(darkBest + 1, darkFloor);
+    const nb = nextBossInfo(from);
+    if (!nb) return null;
+    return [`다음 보스: ${nb.floor}층`, `${nb.name}${stageName === 'dungeon' ? ` (${nb.left === 0 ? '이 층!' : nb.left + '층 남음'})` : ''}`];
+  }
+
   // ---- 낚시와 곤충 채집 (성 밖 숲) ----
   function recordCatch(sp, res) { // 잡은 물고기/곤충을 가방에 넣는다
     const box = sp.kind === 'fish' ? (inv.fish = inv.fish || {}) : (inv.bugs = inv.bugs || {});
     inv.catchVal = inv.catchVal || {};
     box[sp.id] = (box[sp.id] || 0) + 1;
+    inv.caughtTotal = (inv.caughtTotal || 0) + 1;
     inv.catchVal[sp.id] = (inv.catchVal[sp.id] || 0) + res.value;
     dexSee(sp.id); // 도감에 기록
   }
@@ -3752,6 +3884,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       input.endFrame();
       return;
     }
+    if (floorUI) { updateFloorSelect(dt); input.endFrame(); return; } // 던전 층 고르는 동안 게임이 멈춘다
     if (gachaUI) { updateGacha(dt); input.endFrame(); return; } // 뽑기 창이 열려 있는 동안 게임이 멈춘다
     if (mapUI) { if (input.wasPressed('Escape') || input.wasPressed('KeyN')) mapUI = null; input.endFrame(); return; } // 지도를 펴 보는 동안 게임이 멈춘다
     if (!mapUI && input.wasPressed('KeyN') && (stageName === 'village' || stageName === 'kingdom') && !shop && !equipUI && !mini && !settingsUI && !dialog && !cutscene && !devUI && !adminUI && !dexUI && !fishUI) { // N: 마을 지도 (사야 쓸 수 있다)
@@ -3921,6 +4054,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         input.endFrame();
         return;
       } else if (near && near.type === 'gate') { // 마을의 문으로 숲/설산/화산에, 다크월드 허브의 문으로 던전에
+        if (tollBlocked(near.stage)) { input.endFrame(); return; }
+        if (near.stage === 'dungeon' && darkBest >= 1) { openFloorSelect(); input.endFrame(); return; } // 이미 깬 층이 있으면 어느 층으로 갈지 고른다
         if (near.stage === 'dungeon') darkFloor = Math.min(C.DUNGEON_FLOORS, Math.max(darkBest + 1, darkFloor)); // 지금까지 오른 곳 바로 위층부터. 죽거나 나갔어도 마지막으로 있던 층(보스 층 포함)에서 다시 시작
         loadStage(near.stage, true, stageName === 'kingdom' && near.stage === 'village' ? 'kingdom' : null);
         input.endFrame();
@@ -3934,6 +4069,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         dialog = { text: lines[near.index % lines.length], t: 4 };
       }
     }
+    updateQuest(dt);
     if (input.wasPressed('KeyQ')) { // 게임 중 바로 물약 마시기
       const id = G.Shop.bestPotion(inv, lives, maxLives());
       let text = lives >= maxLives() ? '피가 가득 차 있어요' : '마실 물약이 없어요';
@@ -4059,7 +4195,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         dexSee(G.Dex.mobKey(s)); // 도감에 기록
         if (s.golden) effects.treasure(s.x + s.w / 2, s.y + s.h / 2); // 황금박쥐는 금화가 쏟아진다
         const base = s.coinVal !== undefined ? s.coinVal : s.kind === 'darkstone' ? C.DARKSTONE_COIN : s.kind === 'shade' ? C.SHADE_COIN : s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'golem' ? C.GOLEM_COIN : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
-        const floorMul = STAGES[stageName].dark ? 1 + darkFloor * 0.05 : 1; // 던전은 올라갈수록 코인과 경험치가 늘어난다
+        const floorMul = (STAGES[stageName].dark ? 1 + darkFloor * 0.05 : 1) * (STAGES[stageName].dark && darkFloor <= darkBest ? 1.5 : 1); // 던전은 올라갈수록 코인과 경험치가 늘어난다
         const drop = Math.round(base * floorMul * (G.Shop.ITEMS[inv.equipped.weapon].elem === 'gold' ? 1.5 : 1) * (1 + G.Shop.homeBonuses(inv).coin) * dungeonEvents.rewardMul()); // 황금 검은 코인 +50%, 집 장식 보너스, 던전 층 이벤트(혈월 등)
         if (drop) {
           coins += drop;
@@ -4278,6 +4414,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const house = terrain.houses[0];
     const npcs = ending && ending.mode === 'house' && house ? [{ kind: 'elder', x: house.col * C.TILE + C.TILE / 2 + 44, y: (house.row + 1) * C.TILE, facing: -1, alpha: ending.npcAlpha }] : [];
     terrain.fishingActive = !!fishUI;
+    G.bossSign = stageName === 'darkhub' ? bossSignFor() : null;
     renderer.draw(terrain, player, camera, monsters, effects, {
       lives, maxLives: maxLives(), coins, exp, potions: inv.potions, gameOver,
       stamina, staminaMax: stMax(), consumables: inv.consumables,
@@ -4287,8 +4424,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       hotbar: inv.hotbar, weaponId: inv.equipped.weapon,
       settings: settingsUI,
       fishing: fishUI,
+      quest: questHud(),
+      bossHint: stageName === 'dungeon' ? (() => { const s = bossSignFor(); return s ? { head: s[0], text: s[1], all: Object.keys(G.Dark.BOSS_FLOORS).map((f) => `${f}층 ${bossName(G.Dark.BOSS_FLOORS[f]).replace('정의의 ', '').replace('어둠의 기사 ', '')}`).join('  ·  '), cur: darkFloor } : null; })() : null,
       dex: dexUI ? Object.assign({}, dexUI, { inv }) : null,
       gacha: gachaUI ? Object.assign({}, gachaUI, { board: inv.gacha, coins }) : null,
+      floorSel: floorUI ? { sel: floorUI.sel, max: floorUI.max, buf: floorUI.buf, best: darkBest, cleared: story.cleared } : null,
       map: mapUI ? { terrain, markers: mapUI.markers, player, title: stageName === 'kingdom' ? '왕이 다스리는 도시 지도' : '해변 마을 지도' } : null,
       title: titleUI ? { cur: titleUI.cur, del: titleUI.del, copy: titleUI.copy, quit: titleUI.quit, halted: titleUI.halted, msg: (titleUI.msgT || 0) > 0 ? titleUI.msg : '', slots: titleUI.slots, t: titleUI.t } : null,
       pw: pwUI ? { n: pwUI.buf.length, msg: pwUI.msgT > 0 ? pwUI.msg : '' } : null,
@@ -4300,8 +4440,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI ? null : banner, prompt: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI ? null : prompt, dialog: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI ? null : dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
-    }, sword, { cutscene, chest, ending, npcs, allies, bugs, popups: settingsUI || pwUI || fishUI || dexUI || mapUI || gachaUI ? [] : popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
+      won, cutscene: !!cutscene, goal: st.goal, banner: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : banner, prompt: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : prompt, dialog: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
+    }, sword, { cutscene, chest, ending, npcs, allies, bugs, popups: settingsUI || pwUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? [] : popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   if (!noSave()) { openTitle(); G.Audio.setMusic('title'); } // 처음 화면: 저장 칸 3개 + 타이틀 노래
   requestAnimationFrame(frame);
@@ -4328,6 +4468,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get darkFloor() { return darkFloor; },
     set darkFloor(v) { darkFloor = v; },
     get darkBest() { return darkBest; },
+    set darkBest(v) { darkBest = v; },
     get dialog_() { return dialog; },
     get coins() { return coins; },
     get exp() { return exp; },
@@ -4345,6 +4486,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get dexUI() { return dexUI; },
     get mapUI() { return mapUI; },
     get gachaUI() { return gachaUI; },
+    get quest() { return questHud(); },
+    get story() { return story; },
+    questTick() { questT = 0; updateQuest(0.01); },
+    get floorUI() { return floorUI; },
+    openFloorSelect,
     pickGacha, openGacha,
     dexSee, openDexHall,
     get fishUI() { return fishUI; },

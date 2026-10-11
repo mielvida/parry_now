@@ -153,7 +153,7 @@
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
       this._drawEdgeTexts(main, hud);
-      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha));
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
@@ -237,6 +237,43 @@
     }
 
     // 설정 창 (O 키): 음악 음량 + 효과 끄기. 행 위치는 settingsRows 와 같아야 한다
+    // ---- 던전 층 고르기 창 ----
+    static floorGeometry(vw, vh) {
+      const cx = vw / 2, y = 250;
+      const bs = Object.keys(G.Dark.BOSS_FLOORS).map(Number).sort((a, b) => a - b);
+      return {
+        m10: { x: cx - 250, y: y, w: 70, h: 56 }, m1: { x: cx - 170, y: y, w: 60, h: 56 }, p1: { x: cx + 110, y: y, w: 60, h: 56 }, p10: { x: cx + 180, y: y, w: 70, h: 56 },
+        first: { x: cx - 250, y: y + 86, w: 110, h: 34 }, last: { x: cx + 140, y: y + 86, w: 110, h: 34 }, go: { x: cx - 110, y: y + 130, w: 220, h: 50 },
+        bosses: bs.map((f, i) => ({ x: cx - 140 + i * 100, y: y + 80, w: 90, h: 34 })),
+      };
+    }
+    _drawFloorSelect(ctx, f) {
+      const W = this.viewW, H = this.viewH, cx = W / 2;
+      const geo = Renderer.floorGeometry(W, H);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#1d1230'; ctx.fillRect(cx - 300, 90, 600, 380);
+      ctx.strokeStyle = '#b070ff'; ctx.lineWidth = 4; ctx.strokeRect(cx - 300, 90, 600, 380);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#d9b0ff'; ctx.fillText('어둠의 탑 - 어느 층으로 갈까요?', cx, 128);
+      ctx.font = '14px sans-serif'; ctx.fillStyle = '#b8a8d8'; ctx.fillText(`깬 층까지 순식간에 갈 수 있어요 (지금까지 ${f.best}층 클리어 · 가장 높은 곳 ${f.max}층)`, cx, 158);
+      const bf = G.Dark.BOSS_FLOORS[f.sel];
+      ctx.font = 'bold 74px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(`${f.sel}층`, cx, 214);
+      const btn = (r, label, on) => { ctx.fillStyle = on ? 'rgba(176,112,255,0.35)' : 'rgba(255,255,255,0.1)'; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = '#b070ff'; ctx.lineWidth = 2; ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#e8dcff'; ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2); };
+      btn(geo.m10, '-10'); btn(geo.m1, '-1'); btn(geo.p1, '+1'); btn(geo.p10, '+10');
+      const cleared = f.sel <= f.best;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = cleared ? '#7dffa0' : '#ffd54a';
+      const name = { stone: '정의의 어둠돌', justice: '정의의 어둠', sikner: f.cleared ? '최종 보스' : '시크너' }[bf];
+      ctx.fillText(cleared ? (bf ? `이미 깬 층 · 보스(${name})는 사라졌어요 · 코인 x1.5` : '이미 깬 층 · 코인 x1.5') : (bf ? `새로 도전하는 층 · 보스: ${name}` : '새로 도전하는 층'), cx, 312);
+      const bs = Object.keys(G.Dark.BOSS_FLOORS).map(Number).sort((a, b) => a - b);
+      geo.bosses.forEach((b, i) => { btn(b, `${bs[i]}층`, f.sel === bs[i]); });
+      ctx.fillStyle = 'rgba(176,112,255,0.4)'; ctx.fillRect(geo.go.x, geo.go.y, geo.go.w, geo.go.h); ctx.strokeStyle = '#d9b0ff'; ctx.lineWidth = 3; ctx.strokeRect(geo.go.x, geo.go.y, geo.go.w, geo.go.h);
+      ctx.font = 'bold 22px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText('이 층으로 이동 (Enter)', cx, geo.go.y + geo.go.h / 2);
+      ctx.font = '13px sans-serif'; ctx.fillStyle = '#9a8ab8'; ctx.fillText('←→ ±1 · ↑↓ ±10 · 숫자 입력 · Home/End · Esc 닫기 (마우스 클릭도 돼요)', cx, 440);
+      ctx.restore();
+    }
+
     // ---- 뽑기 창 ----
     static gachaGeometry(vw, vh) {
       const cs = 38, gap = 3;
@@ -268,7 +305,8 @@
         ctx.textAlign = 'center';
         if (picked) {
           const id = b.prizes[i];
-          if (id) this._drawItemIcon(ctx, G.Shop.ITEMS[id], c.x + c.w / 2, c.y + c.h / 2 + 1, 0.55);
+          if (id === G.Gacha.GOLD) { ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(c.x + c.w / 2, c.y + c.h / 2 - 3, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8a5a00'; ctx.font = 'bold 9px sans-serif'; ctx.fillText('G', c.x + c.w / 2, c.y + c.h / 2 - 3); ctx.font = 'bold 10px sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.fillText('500', c.x + c.w / 2, c.y + c.h - 8); }
+          else if (id) this._drawItemIcon(ctx, G.Shop.ITEMS[id], c.x + c.w / 2, c.y + c.h / 2 + 1, 0.55);
           else { ctx.font = '14px sans-serif'; ctx.fillStyle = '#7a8398'; ctx.fillText('꽝', c.x + c.w / 2, c.y + c.h / 2); }
         } else { ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = on ? '#fff' : '#d8dcf0'; ctx.fillText(i + 1, c.x + c.w / 2, c.y + c.h / 2); }
       });
@@ -284,6 +322,9 @@
         if (open < 1) { // 캡슐이 열리는 연출
           ctx.fillStyle = '#ff6a4a'; ctx.beginPath(); ctx.arc(cx, cy - 6 * open, 34, Math.PI, 0); ctx.fill();
           ctx.fillStyle = '#f4f1e8'; ctx.beginPath(); ctx.arc(cx, cy + 6 * open, 34, 0, Math.PI); ctx.fill();
+        } else if (res.gold) {
+          ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(cx, cy, 34, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8a5a00'; ctx.font = 'bold 30px sans-serif'; ctx.fillText('G', cx, cy);
+          ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.fillText('골드 500 G!', cx, ry + 160); ctx.font = '13px sans-serif'; ctx.fillStyle = '#7dffa0'; ctx.fillText('코인으로 들어왔어요', cx, ry + 188);
         } else if (res.id) {
           const it = G.Shop.ITEMS[res.id];
           this._drawItemIcon(ctx, it, cx, cy, 1.5);
@@ -701,6 +742,62 @@
       }
     }
 
+    // (챕터 3 목표 판은 모든 플레이 화면에서 보인다)
+    // 다크월드 회복 아이템 20가지의 그림
+    _drawDarkFoodIcon(ctx, item) {
+      const L = item.look || ['#fff', '#888'];
+      const circ = (x, y, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+      const ell = (x, y, rx, ry, c, rot = 0) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); };
+      const rect = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+      const line = (x0, y0, x1, y1, c, w = 2) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+      const poly = (pts, c) => { ctx.fillStyle = c; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.fill(); };
+      const bottle = (liq, glass = '#e8f1ff', cork = '#9a6b3c') => { rect(-11, -8, 22, 28, '#dfe8f4'); rect(-8, -5, 16, 22, liq); rect(-5, -20, 10, 13, glass); rect(-6, -27, 12, 7, cork); rect(-7, -3, 3, 16, 'rgba(255,255,255,0.45)'); };
+      switch (item.id) {
+        case 'd_candy': // 사탕: 포장지에 싼 둥근 사탕
+          poly([[-24, -6], [-12, 0], [-12, -12]], L[1]); poly([[24, -6], [12, 0], [12, -12]], L[1]); circ(0, -4, 13, L[0]); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, -4, 7, 0.5, 4); ctx.stroke(); break;
+        case 'd_jerky': // 말린 고기: 줄에 걸린 길쭉한 고기
+          line(-22, -14, 22, -14, '#6a4a2a', 2); for (const x of [-12, 8]) { line(x, -14, x, -8, '#6a4a2a', 2); ell(x + 2, 6, 6, 15, L[0], 0.12); ell(x + 2, 4, 3, 10, L[1], 0.12); } break;
+        case 'd_mush': // 버섯
+          rect(-6, 0, 12, 18, '#f0e8d0'); ell(0, -2, 22, 14, L[1]); rect(-22, -2, 44, 5, L[1]); ell(0, -6, 19, 9, L[0]); circ(-8, -8, 3, '#fff'); circ(6, -10, 2.5, '#fff'); circ(12, -4, 2, '#fff'); break;
+        case 'd_water': // 샘물: 물방울 모양 병
+          poly([[0, -22], [14, 4], [14, 14], [0, 22], [-14, 14], [-14, 4]], L[1]); poly([[0, -17], [10, 4], [10, 12], [0, 18], [-10, 12], [-10, 4]], L[0]); line(-5, 2, -5, 12, 'rgba(255,255,255,0.8)', 3); break;
+        case 'd_herb': // 약초: 잎 세 장
+          line(0, 20, 0, -2, '#2f6a2a', 3); for (const [x, y, r] of [[-12, -2, -0.9], [12, -2, 0.9], [0, -14, 0]]) ell(x, y, 6, 13, L[0], r); ell(-10, 3, 4, 8, L[1], -0.9); break;
+        case 'd_soup': // 뼈 수프: 그릇 + 뼈
+          poly([[-22, -2], [22, -2], [16, 18], [-16, 18]], '#4a3a2a'); ell(0, -2, 22, 6, L[0]); ell(0, -3, 17, 4, L[1]); line(-8, -8, 8, -2, '#f4f0e0', 4); circ(-9, -9, 3, '#f4f0e0'); circ(10, -1, 3, '#f4f0e0'); line(-6, -14, -4, -22, 'rgba(255,255,255,0.7)', 2); line(6, -14, 8, -22, 'rgba(255,255,255,0.7)', 2); break;
+        case 'd_berry': // 달빛 열매: 가지에 달린 둥근 열매 셋
+          line(0, -20, 0, -8, '#4a6a3a', 3); line(0, -12, -12, -2, '#4a6a3a', 2); line(0, -12, 12, -2, '#4a6a3a', 2); for (const [x, y] of [[-12, 6], [12, 6], [0, 8]]) { circ(x, y, 9, L[1]); circ(x, y - 1, 7, L[0]); circ(x - 3, y - 4, 2, '#fff'); } poly([[2, -20], [12, -26], [8, -16]], '#3a9a4a'); break;
+        case 'd_cheese': // 치즈 조각
+          poly([[-24, 14], [24, 14], [24, -4], [-24, 4]], L[0]); poly([[-24, 4], [24, -4], [14, -12], [-14, -6]], '#fff0a0'); circ(-8, 8, 3, L[1]); circ(8, 6, 3.5, L[1]); circ(16, 1, 2, L[1]); break;
+        case 'd_roots': // 뿌리: 굵은 뿌리와 잔뿌리
+          poly([[-8, -16], [8, -16], [12, 4], [0, 20], [-12, 4]], L[0]); poly([[-4, -16], [4, -16], [6, 2], [0, 14], [-6, 2]], '#d8b888'); line(0, 20, -4, 26, L[1], 2); line(10, 8, 22, 14, L[1], 3); line(-10, 6, -22, 10, L[1], 3); line(-3, -16, -8, -24, '#3a8a3a', 3); line(3, -16, 8, -24, '#3a8a3a', 3); break;
+        case 'd_tonic': // 강장제: 초록 병에 번개
+          bottle(L[1]); rect(-8, 2, 16, 15, L[0]); poly([[2, -3], [-5, 9], [0, 9], [-2, 17], [6, 4], [1, 4]], '#fff'); break;
+        case 'd_milk': { // 우유: 병 + 별
+          bottle(L[0], '#f4f4ff', '#c8c8e8'); ctx.fillStyle = L[1]; ctx.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 3 : 7, a = -Math.PI / 2 + i * Math.PI / 5; ctx.lineTo(Math.cos(a) * r, 6 + Math.sin(a) * r); } ctx.closePath(); ctx.fill(); break; }
+        case 'd_elixir': // 비약: 둥근 플라스크 + 거품
+          circ(0, 8, 15, '#dfe8f4'); circ(0, 9, 12, L[0]); rect(-4, -18, 8, 14, '#dfe8f4'); rect(-5, -24, 10, 6, '#6a4a2a'); circ(-4, 5, 3, 'rgba(255,200,255,0.8)'); circ(5, 11, 2.5, 'rgba(255,200,255,0.8)'); circ(2, 0, 2, 'rgba(255,200,255,0.8)'); break;
+        case 'd_meat': // 구운 괴물 고기: 뼈 달린 고기
+          line(10, -4, 24, -16, '#f4f0e0', 5); circ(24, -18, 4, '#f4f0e0'); circ(27, -12, 4, '#f4f0e0'); ell(-2, 6, 20, 13, L[1], -0.3); ell(-3, 4, 16, 9, L[0], -0.3); line(-12, 0, -6, 10, '#3a1208', 2); line(-4, -2, 2, 8, '#3a1208', 2); break;
+        case 'd_wine': // 포도주: 잔
+          poly([[-14, -18], [14, -18], [12, 0], [0, 6], [-12, 0]], '#dfe8f4'); poly([[-12, -8], [12, -8], [11, 0], [0, 5], [-11, 0]], L[0]); rect(-2, 5, 4, 12, '#dfe8f4'); ell(0, 18, 12, 3, '#dfe8f4'); break;
+        case 'd_pie': // 파이: 윗면이 갈라진 파이
+          ell(0, 12, 25, 8, '#5a4a6a'); ell(0, 6, 25, 11, L[0]); ell(0, 3, 21, 8, '#8a7a9a'); line(-12, 0, 12, 6, L[1], 2); line(-12, 6, 12, 0, L[1], 2); circ(0, 2, 3, '#e8334a'); break;
+        case 'd_honey': // 꿀단지
+          ell(0, 8, 17, 15, L[1]); ell(0, 6, 15, 12, L[0]); rect(-10, -10, 20, 6, '#8a5a2a'); ell(0, -10, 10, 3, '#b07a3a'); poly([[-8, 2], [8, 2], [6, 10], [-6, 10]], '#fff0a0'); line(-4, -14, -4, -4, '#ffd54a', 3); circ(-4, -2, 3, '#ffd54a'); break;
+        case 'd_ambrosia': // 영약: 빛나는 금 잔
+          poly([[-16, -14], [16, -14], [12, 4], [0, 10], [-12, 4]], L[1]); poly([[-13, -11], [13, -11], [10, 3], [0, 8], [-10, 3]], L[0]); rect(-3, 9, 6, 8, L[1]); ell(0, 19, 12, 3, L[1]); for (const [x, y] of [[-18, -20], [18, -20], [0, -24]]) { line(x - 4, y, x + 4, y, '#fff', 2); line(x, y - 4, x, y + 4, '#fff', 2); } break;
+        case 'd_phoenix': // 불사조 깃털
+          poly([[-14, 20], [-10, 4], [-2, -14], [10, -24], [14, -8], [8, 6], [-4, 18]], L[1]); poly([[-10, 16], [-6, 2], [2, -12], [9, -19], [10, -6], [5, 5], [-3, 14]], L[0]); line(-14, 22, 8, -20, '#ffe27a', 2); circ(10, -22, 3, '#ffe27a'); break;
+        case 'd_holy': // 성수: 십자가가 새겨진 작은 병
+          bottle(L[0], '#fff', '#d4a017'); rect(-2, -2, 4, 14, L[1]); rect(-6, 2, 12, 4, L[1]); line(-18, -10, -14, -16, '#ffe27a', 2); line(18, -10, 14, -16, '#ffe27a', 2); break;
+        case 'd_heart': // 용사의 심장
+          ctx.fillStyle = L[1]; ctx.beginPath(); ctx.moveTo(0, 22); ctx.bezierCurveTo(-30, 0, -22, -22, 0, -10); ctx.bezierCurveTo(22, -22, 30, 0, 0, 22); ctx.fill();
+          ctx.fillStyle = L[0]; ctx.beginPath(); ctx.moveTo(0, 17); ctx.bezierCurveTo(-24, 0, -17, -17, 0, -8); ctx.bezierCurveTo(17, -17, 24, 0, 0, 17); ctx.fill(); circ(-9, -6, 3, 'rgba(255,255,255,0.7)'); line(-22, 12, -14, 12, '#ffe27a', 2); line(22, 12, 14, 12, '#ffe27a', 2); break;
+        default: circ(0, 6, 12, L[0]);
+      }
+    }
+
     _drawItemIcon(ctx, item, cx, cy, s) {
       ctx.save();
       ctx.translate(cx, cy);
@@ -845,6 +942,8 @@
         ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(-7, -4, 4, 18);
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(-5, -20, 10, 13);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(-6, -27, 12, 7);
+      } else if (G.Shop.DARK_CONS_IDS.includes(item.id)) { // 다크월드 약초·음식: 하나하나 다른 그림
+        this._drawDarkFoodIcon(ctx, item);
       } else if (item.food !== undefined) { // 음식점: 모두 음식 그림
         this._drawFoodIcon(ctx, item);
       } else if (item.consumable) { // 소모품 아이콘
@@ -1722,7 +1821,7 @@
         ctx.textAlign = 'right';
         ctx.font = 'bold 23px sans-serif';
         ctx.fillStyle = it.forge && it.kind === 'info' ? '#8fb8ff' : placing ? (it.id === s.slotItem ? '#8a93a8' : '#7dffa0') : owned ? '#8a93a8' : afford ? '#ffd54a' : '#ff6b7a';
-        const label = it.forge ? it.label(s.inv) : placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : it.upgrade === 'holy' ? '크리스탈 1개' : it.expCost ? `${price} EXP` : `${price} G`;
+        const label = it.forge ? it.label(s.inv) : placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : it.upgrade === 'holy' ? '크리스탈 1개' : it.devil && it.devil !== 'back' ? '피 1칸' : it.expCost ? `${price} EXP` : `${price} G`;
         const twoLine = it.heal !== undefined || it.consumable || (it.decor && !it.clear);
         ctx.fillText(label, row.x + row.w - 16, row.y + row.h / 2 - (twoLine ? 8 : 0));
         if (twoLine) { // 물약/장식품은 가진 개수를 보여준다
@@ -1988,6 +2087,14 @@
             ctx.textAlign = 'left';
             ctx.fillText(`+${e.inv.wlevel[id]}`, c.x + 5, c.y + c.h - 9.5);
           }
+          if (e.inv.gachaOwn && e.inv.gachaOwn[id] > 0) { // 뽑기에서 얻은 장비 표시 (팔 수 있다)
+            ctx.fillStyle = '#ff7a3a';
+            ctx.fillRect(c.x + c.w - 19, c.y + 20, 17, 14);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('뽑', c.x + c.w - 10.5, c.y + 27.5);
+          }
           const hb = e.inv.hotbar ? e.inv.hotbar.indexOf(id) : -1;
           if (hb >= 0) { // 무기 칸 번호
             ctx.fillStyle = '#ffd54a';
@@ -2039,6 +2146,7 @@
           ctx.fillStyle = '#9fe8a8';
           ctx.fillText(d.note, info.x + 14, info.y + 53);
         }
+        if (e.inv.gachaOwn && e.inv.gachaOwn[selId] > 0) { ctx.fillStyle = '#ff9a5a'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(`★ 뽑기에서 얻은 장비 — X로 ${Math.round(defs[selId].price * 0.45)} G에 팔 수 있어요`, info.x + 14, info.y + 71); }
         const sv = G.Shop.sortValue(e.inv, selId); // 정렬 기준 값
         if (sv) {
           ctx.textAlign = 'right';
@@ -2069,7 +2177,7 @@
       ctx.textAlign = 'center';
       ctx.font = '14px sans-serif';
       ctx.fillStyle = '#9aa4c0';
-      ctx.fillText('방향키/마우스: 선택   휠: 스크롤   Tab: 분류   C: 종류   Q: 정렬   H: 최고 장착   E·Enter·클릭: 장착/사용   무기를 끌어 빠른 칸에 (1~5 키)   I·]·Esc: 닫기', x + w / 2, y + h - 14);
+      ctx.fillText('방향키/마우스: 선택   휠: 스크롤   Tab: 분류   C: 종류   Q: 정렬   H: 최고 장착   X: 팔기(뽑기 장비만)   E·Enter·클릭: 장착/사용   무기를 끌어 빠른 칸에 (1~5 키)   I·]·Esc: 닫기', x + w / 2, y + h - 14);
       ctx.restore();
     }
 
@@ -3758,14 +3866,41 @@
       if (hud.dev) this._drawDev(ctx, hud.dev);
       if (hud.fishing) G.Fishing.drawFishing(ctx, this.viewW, this.viewH, hud.fishing);
       if (hud.dex) G.Dex.draw(ctx, this.viewW, this.viewH, hud.dex);
+      if (hud.bossHint && !hud.shop && !hud.equip && !hud.dev && !hud.settings) { // 던전 안: 다음 보스 안내판 (오른쪽 위, 하트 아래)
+        const bh = hud.bossHint;
+        const w = 300, x = this.viewW - w - 14, y = 118;
+        ctx.save();
+        ctx.fillStyle = 'rgba(30,10,20,0.78)'; ctx.fillRect(x, y, w, 62);
+        ctx.strokeStyle = '#ff6a6a'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, 62);
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#ff9a9a'; ctx.fillText(bh.head, x + 12, y + 16);
+        ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#ffe0b0'; ctx.fillText(bh.text, x + 12, y + 38);
+        ctx.font = '11px sans-serif'; ctx.fillStyle = '#b8a0a8'; ctx.fillText(bh.all, x + 12, y + 55);
+        ctx.restore();
+      }
+      if (hud.quest && !hud.shop && !hud.equip && !hud.dev && !hud.settings && !hud.mini && !hud.admin && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.dialog ) { // 챕터 3 목표 (오른쪽 위)
+        const q = hud.quest;
+        const w = 300, x = this.viewW - w - 14, y = hud.bossHint ? 190 : 118;
+        ctx.save();
+        ctx.fillStyle = 'rgba(10,20,40,0.72)'; ctx.fillRect(x, y, w, 58);
+        ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, 58);
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.fillText(q.head, x + 10, y + 14);
+        ctx.font = '12px sans-serif'; ctx.fillStyle = '#dfe8ff'; ctx.fillText(q.text, x + 10, y + 32);
+        ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(x + 10, y + 43, w - 20, 7);
+        ctx.fillStyle = '#7dffa0'; ctx.fillRect(x + 10, y + 43, (w - 20) * Math.min(1, q.cur / q.max), 7);
+        ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.fillText(`${q.cur}/${q.max}`, x + w - 10, y + 14);
+        ctx.restore();
+      }
       if (hud.gacha) this._drawGacha(ctx, hud.gacha);
+      if (hud.floorSel) this._drawFloorSelect(ctx, hud.floorSel);
       if (hud.map) G.TownMap.draw(ctx, this.viewW, this.viewH, hud.map.terrain, hud.map.markers, hud.map.player, hud.map.title, performance.now() / 1000);
       if (hud.admin) G.Admin.draw(ctx, this.viewW, this.viewH, hud.admin, hud.admin.me);
       if (hud.mini) this._drawMini(ctx, hud.mini);
       if (hud.settings) this._drawSettings(ctx, hud.settings);
       if (hud.pw) this._drawPassword(ctx, hud.pw);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

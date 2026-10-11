@@ -23,6 +23,15 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const alive = (m) => m.alive && !m.flying && m.appear <= 0;
 
+  // 두 점 사이에 벽/땅이 없는지
+  function clearShot(terrain, x0, y0, x1, y1) {
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 12));
+    for (let i = 1; i < n; i++) {
+      if (terrain.isSolid(Math.floor((x0 + ((x1 - x0) * i) / n) / T), Math.floor((y0 + ((y1 - y0) * i) / n) / T))) return false;
+    }
+    return true;
+  }
+
   // 발사. (x, y) = 지팡이 끝. hooks.hit(monster, element, dir, x, y)
   // opts: 다크월드 무기용 {dmg, radius(px), pierce, count}
   function cast(state, el, x, y, dir, terrain, monsters, hooks, opts = {}) {
@@ -75,7 +84,7 @@
           const dx = m.x + m.w / 2 - s.x;
           if (Math.sign(dx) !== s.dir && Math.abs(dx) > 24) continue;
           const d = Math.hypot(dx, m.y + m.h / 2 - s.y);
-          if (d < bd) { bd = d; best = m; }
+          if (d < bd && clearShot(terrain, s.x, s.y, m.x + m.w / 2, m.y + m.h / 2)) { bd = d; best = m; } // 벽이 막고 있으면 그쪽으로는 쏘지 않는다
         }
         if (best) {
           const dx = best.x + best.w / 2 - s.x;

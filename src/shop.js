@@ -192,7 +192,38 @@
   add({ id: 'f_cake', name: '크림 케이크', desc: '스태미나 100 회복 (달콤하다!)', price: 200, consumable: true, stamina: 100, look: ['#ffd0e0', '#d46a90'] });
   add({ id: 'f_feast', name: '왕의 만찬', desc: '피 3칸, 스태미나 120 회복', price: 650, consumable: true, food: 3, stamina: 120, look: ['#ffd54a', '#a87a1a'] });
   const FOOD_IDS = ['f_bread', 'f_stew', 'f_fish', 'f_steak', 'f_cake', 'f_feast'];
-  const CONSUMABLE_IDS = ['st70', 'st30', 'icebomb'].concat(FOOD_IDS);
+  // 다크월드 아이템 상점의 회복 아이템 20가지: [id, 이름, 설명 글귀, 값, 피 칸, 스태미나, 색]
+  const DARK_CONS = [
+    ['d_candy', '어둠 사탕', '입안이 얼얼한 사탕', 30, 0, 15, ['#d070ff', '#6a2a9a']],
+    ['d_jerky', '말린 괴물 고기', '질기지만 든든하다', 70, 0.5, 10, ['#a0583a', '#5a2a1a']],
+    ['d_mush', '동굴 버섯', '어둠 속에서 자란 버섯', 90, 0.5, 25, ['#c8b8e8', '#6a5a9a']],
+    ['d_water', '맑은 샘물', '차갑고 맑다', 150, 0, 50, ['#bfe8ff', '#4a90c8']],
+    ['d_herb', '치유 약초', '쌉싸름한 약초', 160, 1, 0, ['#8fe08a', '#2f8a3a']],
+    ['d_soup', '뼈 수프', '뜨끈한 뼈 국물', 220, 1, 30, ['#e8d8a8', '#8a7a4a']],
+    ['d_berry', '달빛 열매', '밤에만 열리는 열매', 250, 0, 60, ['#9fb8ff', '#3a4aa8']],
+    ['d_cheese', '숙성 치즈', '오래 묵은 고소한 맛', 260, 1, 40, ['#ffe070', '#b8902a']],
+    ['d_roots', '심연 뿌리', '깊은 곳에서 캔 뿌리', 340, 1.5, 20, ['#b08a60', '#5a3a1a']],
+    ['d_tonic', '활력 강장제', '정신이 번쩍 든다', 380, 0, 90, ['#7dffa0', '#2a9a50']],
+    ['d_milk', '별빛 우유', '은은하게 빛난다', 420, 1, 70, ['#f4f4ff', '#9aa8d8']],
+    ['d_elixir', '어둠 비약', '검붉은 비약', 450, 2, 40, ['#8a2a8a', '#3a0a4a']],
+    ['d_meat', '구운 괴물 고기', '불에 노릇하게 구웠다', 520, 2, 60, ['#c0583a', '#6a2a1a']],
+    ['d_wine', '용사의 포도주', '향이 깊다', 600, 1.5, 100, ['#a02a5a', '#4a0a2a']],
+    ['d_pie', '그림자 파이', '속이 그림자처럼 까맣다', 650, 2, 80, ['#6a5a7a', '#2a1a3a']],
+    ['d_honey', '황금 꿀', '달콤하고 따뜻하다', 800, 2, 100, ['#ffd54a', '#b8821a']],
+    ['d_ambrosia', '영약', '마시면 힘이 솟는다', 900, 0, 150, ['#fff0a0', '#d8a82a']],
+    ['d_phoenix', '불사조 깃털', '따뜻한 불꽃이 인다', 1200, 3, 60, ['#ff8a3a', '#c8321a']],
+    ['d_holy', '성수', '어둠을 씻어 낸다', 1500, 3, 100, ['#e8f8ff', '#6ab8e8']],
+    ['d_heart', '용사의 심장', '아직도 뛰고 있다', 2400, 4, 150, ['#ff4a5a', '#8a0a1a']],
+  ];
+  const DARK_CONS_IDS = [];
+  for (const [id, name, txt, price, food, st, look] of DARK_CONS) {
+    const parts = [];
+    if (food) parts.push(`피 ${food}칸`);
+    if (st) parts.push(`스태미나 ${st}`);
+    add(Object.assign({ id, name, desc: `${txt} - ${parts.join(', ')} 회복`, price, consumable: true, stamina: st || undefined, look }, food ? { food } : {}));
+    DARK_CONS_IDS.push(id);
+  }
+  const CONSUMABLE_IDS = ['st70', 'st30', 'icebomb'].concat(FOOD_IDS, DARK_CONS_IDS);
 
   // 물약: 사서 인벤토리에 쌓아 두었다가 나중에 마신다 (heal = 회복하는 피 칸 수)
   add({ id: 'potion1', name: '치유 물약', desc: '피 1칸 회복', price: 100, heal: 1, look: ['#e8334a'] });
@@ -302,6 +333,24 @@
   add({ id: 'inn_tea', name: '따뜻한 차', price: 25, service: 'tea', desc: '한 잔 마시면 피가 한 칸 찬다', look: ['#d8b078', '#7a5030'] });
   add({ id: 'critup', name: '치명타 업그레이드', upgrade: 'crit', look: ['#ffd54a', '#e8334a'] });
   //  weapon / armor: 다크월드 강화소. 경험치(EXP)로 지금 낀 무기(Lv은 무기마다)와 갑옷(피 +1칸/레벨)을 강화한다
+  // 경험치로 하는 것들 (강화소): 훈련(훈련소와 같은 레벨을 올린다, 값은 EXP), 치유, 교환
+  add({ id: 'etrn_str', name: '근력 훈련 (EXP)', upgrade: 'train', trainKey: 'str', expCost: true, look: ['#ff8a5a', '#a8301a'] });
+  add({ id: 'etrn_foc', name: '집중 훈련 (EXP)', upgrade: 'train', trainKey: 'foc', expCost: true, look: ['#9fd8ff', '#3a78b0'] });
+  add({ id: 'etrn_agi', name: '민첩 훈련 (EXP)', upgrade: 'train', trainKey: 'agi', expCost: true, look: ['#7dffa0', '#2f9a5a'] });
+  add({ id: 'etrn_end', name: '인내 훈련 (EXP)', upgrade: 'train', trainKey: 'end', expCost: true, look: ['#ffd54a', '#a8801a'] });
+  add({ id: 'exp_heal', name: '기운 되찾기', price: 30, expCost: true, service: 'expheal', desc: '경험치를 써서 피를 한 칸 채운다', look: ['#ff8a9a', '#a8303a'] });
+  add({ id: 'exp_full', name: '활력 충전', price: 120, expCost: true, service: 'expfull', desc: '경험치를 써서 피와 스태미나를 가득 채운다', look: ['#7dffd0', '#2fa88a'] });
+  add({ id: 'exp_coin', name: '경험치 환전', price: 100, expCost: true, service: 'expcoin', desc: '경험치 100을 코인 400 G로 바꾼다', look: ['#ffd54a', '#b8860b'] });
+  // 경험치로 하는 업그레이드: 코인 버전과 같은 레벨을 올린다 (값은 코인 값의 1/4 EXP)
+  add({ id: 'eup_stmax', name: '스태미나 최대 (EXP)', upgrade: 'stmax', expCost: true, base: 'stmaxup', look: ['#7dffd0', '#2fa88a'] });
+  add({ id: 'eup_stregen', name: '스태미나 회복 (EXP)', upgrade: 'stregen', expCost: true, base: 'stregenup', look: ['#b8ff7d', '#5fa82f'] });
+  add({ id: 'eup_crit', name: '치명타 (EXP)', upgrade: 'crit', expCost: true, base: 'critup', look: ['#ffd54a', '#e8334a'] });
+  add({ id: 'eup_speed', name: '마을 달리기 (EXP)', upgrade: 'speed', expCost: true, base: 'speedup', look: ['#7dffd0', '#2fa88a'] });
+  // 악마와의 거래: 최대 피를 바치고 큰 것을 얻는다. 최대 피는 2칸 밑으로는 못 내려간다. 코인을 내면 되찾을 수 있다
+  add({ id: 'dv_gold', name: '악마와의 거래: 황금', devil: 'gold', price: 0, desc: '최대 피 1칸을 바치면 코인 3000 G를 준다', look: ['#ffd54a', '#6a1a1a'] });
+  add({ id: 'dv_exp', name: '악마와의 거래: 지식', devil: 'exp', price: 0, desc: '최대 피 1칸을 바치면 경험치 1500을 준다', look: ['#9fd8ff', '#6a1a1a'] });
+  add({ id: 'dv_power', name: '악마와의 거래: 힘', devil: 'power', price: 0, desc: '최대 피 1칸을 바치면 대미지가 영구히 +2 (최대 5번)', look: ['#ff6a4a', '#6a1a1a'] });
+  add({ id: 'dv_back', name: '악마에게서 되찾기', devil: 'back', price: 6000, desc: '코인 6000 G를 주면 바쳤던 최대 피 1칸을 돌려받는다', look: ['#c8a0ff', '#3a1a5a'] });
   add({ id: 'wup', name: '무기 강화', upgrade: 'weapon', expCost: true, look: ['#7dd0ff', '#2a6fb0'] });
   add({ id: 'aup', name: '갑옷 강화', upgrade: 'armor', expCost: true, look: ['#ff9a7a', '#b0402a'] });
   //  holy: 대장간에서 신성 크리스탈을 지금 낀 칼에 붙인다. 붙인 개수 n개 = 탑의 보스에게 주는 대미지 x(n+1)
@@ -342,9 +391,10 @@
   // 다음 레벨로 올리는 가격 (최고 레벨이면 0). 업그레이드가 아닌 아이템은 원래 가격
   function priceOf(item, inv) {
     if (!item.upgrade) return item.price;
+    if (item.expCost && item.base) { const b = ITEMS[item.base]; return upMaxed(b, inv) ? 0 : Math.max(10, Math.round(priceOf(b, inv) / 4 / 10) * 10); } // EXP 업그레이드는 코인 값의 1/4
     if (upMaxed(item, inv)) return 0;
     if (item.upgrade === 'abyss') return 4000 + 2500 * ((inv.abyssLevel || 1) - 1);
-    if (item.upgrade === 'train') { const t = TRAIN[item.trainKey]; return t.base + t.step * trainLv(inv, item.trainKey); }
+    if (item.upgrade === 'train') { const t = TRAIN[item.trainKey]; const g = t.base + t.step * trainLv(inv, item.trainKey); return item.expCost ? Math.max(10, Math.round(g / 4 / 10) * 10) : g; } // EXP 훈련은 코인 값의 1/4
     if (item.upgrade === 'stmax') return C.STAMINA_MAX_PRICE + C.STAMINA_MAX_PRICE_STEP * (inv.stMaxLevel || 0);
     if (item.upgrade === 'stregen') return C.STAMINA_REGEN_PRICE + C.STAMINA_REGEN_PRICE_STEP * (inv.stRegenLevel || 0);
     if (item.upgrade === 'holy') return 1;
@@ -371,6 +421,7 @@
       return { name: `${item.name}  Lv ${lv}/${t.max}`, desc, slotName: '훈련', note: `레벨마다 ${t.unit} (영구)` };
     }
     if (item.townmap) return { name: item.name, desc: item.desc, slotName: '지도', note: 'N 키로 펼친다' };
+    if (item.devil) return { name: item.name, desc: item.desc, slotName: '악마의 거래', note: item.devil === 'back' ? (inv && inv.devilHearts ? `바친 피 ${inv.devilHearts}칸` : '') : `지금까지 바친 피 ${inv ? inv.devilHearts || 0 : 0}칸` };
     if (item.service) return { name: item.name, desc: item.desc, slotName: '서비스', note: item.note || '' };
     if (item.catch) return { name: item.name, desc: item.desc, slotName: item.catch === 'fish' ? '물고기' : '곤충', note: `${item.tier}등급 · ${item.catch === 'fish' ? '생선 가게' : '곤충 채집가'}에 팔자` };
     if (item.upgrade === 'stmax') {
@@ -540,7 +591,13 @@
     dupgrade: {
       title: '강화소 (EXP)',
       exp: true,
-      tabs: [{ name: '강화', items: ids('wup', 'aup') }],
+      tabs: [
+        { name: '강화', items: ids('wup', 'aup') },
+        { name: '훈련', items: ids('etrn_str', 'etrn_foc', 'etrn_agi', 'etrn_end') },
+        { name: '업그레이드', items: ids('eup_stmax', 'eup_stregen', 'eup_crit', 'eup_speed') },
+        { name: '회복·교환', items: ids('exp_heal', 'exp_full', 'exp_coin') },
+        { name: '악마의 거래', items: ids('dv_gold', 'dv_exp', 'dv_power', 'dv_back') },
+      ],
     },
     train: {
       title: '훈련소',
@@ -559,7 +616,11 @@
     },
     ditem: {
       title: '다크월드 아이템 상점',
-      tabs: [{ name: '아이템', items: ids('st70', 'st30', 'icebomb') }],
+      tabs: [
+        { name: '아이템', items: ids('st70', 'st30', 'icebomb') },
+        { name: '스태미나', items: ids(...DARK_CONS.filter((d) => !d[4]).map((d) => d[0])) },
+        { name: '약초·음식', items: ids(...DARK_CONS.filter((d) => d[4]).map((d) => d[0])) },
+      ],
     },
     estate: {
       title: '부동산',
@@ -634,7 +695,7 @@
     const pn = inv.equipped.pants ? ITEMS[inv.equipped.pants] : null;
     const wl = (inv.wlevel && inv.wlevel[inv.equipped.weapon]) || 0;
     const ab = attachOf(inv, w); // 붙인 주괴 보너스
-    const trn = { str: trainLv(inv, 'str'), foc: trainLv(inv, 'foc'), agi: trainLv(inv, 'agi'), end: trainLv(inv, 'end') }; // 훈련소 훈련
+    const trn = { str: trainLv(inv, 'str') + (inv.devilPow || 0), foc: trainLv(inv, 'foc'), agi: trainLv(inv, 'agi'), end: trainLv(inv, 'end') }; // 훈련소 훈련
     const ai = armorInfo(inv);   // 방어구에 붙인 주괴 보너스
     return {
       reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl + ab.reach) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
@@ -661,7 +722,7 @@
     };
   }
 
-  const maxLivesFor = (inv, base) => base + stats(inv).hearts;
+  const maxLivesFor = (inv, base) => Math.max(2, base + stats(inv).hearts - (inv.devilHearts || 0));
 
   // 구매 시도. wallet = { coins, lives, maxLives, inv }를 직접 고치고, 결과 메시지를 돌려준다
   function buy(item, wallet) {
@@ -705,14 +766,23 @@
       wallet.inv.abyssLevel = (wallet.inv.abyssLevel || 1) + 1;
       return { ok: true, msg: `Lv ${wallet.inv.abyssLevel}! 심연 동굴 상자가 이제 ${abyssReward(wallet.inv.abyssLevel)} G를 줍니다.` };
     }
-    if (item.upgrade === 'train') { // 훈련소: 코인으로 영구 훈련
+    if (item.upgrade === 'train') { // 훈련소: 코인(또는 경험치)으로 영구 훈련
       if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
       const cost = priceOf(item, wallet.inv);
-      if (wallet.coins < cost) return { ok: false, msg: '코인이 부족해요.' };
-      wallet.coins -= cost;
+      if (item.expCost) { if ((wallet.exp || 0) < cost) return { ok: false, msg: '경험치가 부족해요.' }; wallet.exp -= cost; }
+      else { if (wallet.coins < cost) return { ok: false, msg: '코인이 부족해요.' }; wallet.coins -= cost; }
       wallet.inv.train = wallet.inv.train || {};
       const lv = (wallet.inv.train[item.trainKey] = trainLv(wallet.inv, item.trainKey) + 1);
       return { ok: true, msg: `${item.name} Lv ${lv}! ${TRAIN[item.trainKey].per(lv)}` };
+    }
+    if (item.service && item.expCost) { // 강화소: 경험치로 하는 서비스
+      if ((wallet.exp || 0) < item.price) return { ok: false, msg: '경험치가 부족해요.' };
+      if (item.service === 'expheal' && wallet.lives >= wallet.maxLives) return { ok: false, msg: '피가 가득 차 있어요.' };
+      wallet.exp -= item.price;
+      if (item.service === 'expheal') { wallet.lives = Math.min(wallet.maxLives, wallet.lives + 1); return { ok: true, msg: '기운을 되찾았다. 피 +1' }; }
+      if (item.service === 'expcoin') { wallet.coins += 400; return { ok: true, msg: '경험치 100 -> 코인 400 G!' }; }
+      wallet.lives = wallet.maxLives; wallet.refillStamina = true;
+      return { ok: true, msg: '활력이 가득 찼다! 피와 스태미나 가득.' };
     }
     if (item.service) { // 여관: 바로 쓰는 서비스
       if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
@@ -721,6 +791,36 @@
       if (item.service === 'tea') { wallet.lives = Math.min(wallet.maxLives, wallet.lives + 1); return { ok: true, msg: '따뜻한 차를 마셨다. 피 +1' }; }
       wallet.lives = wallet.maxLives;
       return { ok: true, rested: true, msg: '푹 쉬었다! 피와 스태미나가 가득 찼고, 여기까지 저장했어요.' };
+    }
+    if (item.devil) { // 악마와의 거래
+      const inv = wallet.inv;
+      const sold = inv.devilHearts || 0;
+      if (item.devil === 'back') {
+        if (sold <= 0) return { ok: false, msg: '바친 피가 없어요.' };
+        if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
+        wallet.coins -= item.price; inv.devilHearts = sold - 1;
+        wallet.maxLives = maxLivesFor(inv, C.PLAYER_LIVES);
+        return { ok: true, msg: '악마가 이를 갈며 피 한 칸을 돌려줬다.' };
+      }
+      if (wallet.maxLives <= 2) return { ok: false, msg: '악마: 그 몸으로는 더 가져갈 게 없군. (최대 피가 2칸 이하)' };
+      if (item.devil === 'power' && (inv.devilPow || 0) >= 10) return { ok: false, msg: '악마: 이미 충분히 강하잖아? (최대 5번)' };
+      inv.devilHearts = sold + 1;
+      wallet.maxLives = maxLivesFor(inv, C.PLAYER_LIVES);
+      wallet.lives = Math.min(wallet.lives, wallet.maxLives);
+      if (item.devil === 'gold') { wallet.coins += 3000; return { ok: true, msg: '계약 성립... 최대 피 -1, 코인 +3000 G' }; }
+      if (item.devil === 'exp') { wallet.exp = (wallet.exp || 0) + 1500; return { ok: true, msg: '계약 성립... 최대 피 -1, 경험치 +1500' }; }
+      inv.devilPow = (inv.devilPow || 0) + 2;
+      return { ok: true, msg: `계약 성립... 최대 피 -1, 대미지 +${inv.devilPow} (누적)` };
+    }
+    if (item.expCost && item.base && ['stmax', 'stregen', 'crit', 'speed'].includes(item.upgrade)) { // 경험치로 하는 업그레이드: 코인 버전을 그대로 실행하되 값만 경험치로 낸다
+      const b = ITEMS[item.base];
+      if (upMaxed(b, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
+      const cost = priceOf(item, wallet.inv);
+      if ((wallet.exp || 0) < cost) return { ok: false, msg: '경험치가 부족해요.' };
+      const w2 = Object.assign({}, wallet, { coins: priceOf(b, wallet.inv) });
+      const r = buy(b, w2);
+      if (r.ok) wallet.exp -= cost;
+      return r;
     }
     if (item.upgrade === 'weapon' || item.upgrade === 'armor') { // 강화소: 경험치로 강화
       if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
@@ -901,7 +1001,9 @@
   }
 
   // 마을 물가: 코인으로 사는 물건(가게 값)은 모두 PRICE_MULT배로 비싸다 (경험치/레벨로 정해지는 강화 값은 그대로)
-  for (const it of Object.values(ITEMS)) if (it.price > 0 && !it.upgrade && !it.noMult && !it.catch) it.price = Math.round((it.price * (C.PRICE_MULT || 1)) / 10) * 10;
+  const darkIds = new Set(); // 다크월드 가게의 물건은 원래 값 그대로
+  for (const k of ['dweapon', 'darmor', 'dupgrade', 'ditem']) for (const t of SHOPS[k].tabs) for (const it of t.items) darkIds.add(it.id);
+  for (const it of Object.values(ITEMS)) if (it.price > 0 && !it.upgrade && !it.noMult && !it.catch && !darkIds.has(it.id)) it.price = Math.round((it.price * (C.PRICE_MULT || 1)) / 10) * 10;
 
-  G.Shop = { abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
+  G.Shop = { DARK_CONS_IDS, abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
 })(window.Game);

@@ -4,6 +4,7 @@
   const PRICE = 300;
   const PERIOD = 20 * 60 * 1000;
   const CONSOLATION = 100;
+  const GOLD = '$500', GOLD_PRIZE = 500;
   G.Shop.SHOPS.gacha = { title: '뽑기', tabs: [] };
 
   function pool() { // 마을 대장간(검, 대검, 단검, 지팡이)과 갑옷 가게(전부)에서 파는 것, 싼 것부터
@@ -20,7 +21,7 @@
     const prizes = [];
     for (let i = 0; i < 100; i++) {
       const r = Math.random();
-      prizes.push(r < 0.4 ? null : r < 0.8 ? pickFrom(0, 0.4) : r < 0.94 ? pickFrom(0.4, 0.8) : pickFrom(0.8, 1)); // 꽝 40 / 싼 것 40 / 중간 14 / 비싼 것 6 쯤
+      prizes.push(r < 0.28 ? null : r < 0.4 ? '$500' : r < 0.76 ? pickFrom(0, 0.4) : r < 0.93 ? pickFrom(0.4, 0.8) : pickFrom(0.8, 1)); // 꽝 28 / 골드 500 G 12 / 싼 것 36 / 중간 17 / 비싼 것 7 쯤
     }
     return { until: Date.now() + PERIOD, prizes, picked: {} };
   }
@@ -35,10 +36,11 @@
     b.picked[i] = 1;
     const id = b.prizes[i];
     if (!id) return { id: null, dup: false, refund: CONSOLATION };
+    if (id === GOLD) return { id, dup: false, gold: true, refund: GOLD_PRIZE }; // 골드: 코인 500 G
     const it = G.Shop.ITEMS[id];
     if (inv.items.includes(id)) return { id, dup: true, refund: Math.round(it.price * 0.5) };
     inv.items.push(id);
     return { id, dup: false, refund: 0 };
   }
-  G.Gacha = { PRICE, PERIOD, board, pick, pool };
+  G.Gacha = { GOLD, PRICE, PERIOD, board, pick, pool };
 })(window.Game);
