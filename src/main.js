@@ -70,6 +70,14 @@
       get goal() { return `어둠의 탑 ${darkFloor}층 / ${C.DUNGEON_FLOORS}층: ${dungeon.boss ? '보스를 쓰러뜨려라!' : '발판을 타고 꼭대기 계단으로! (암흑은 맞으면 -3)'}  [B 얼음폭탄 · V 먹기]`; },
       get banner() { return { title: `${darkFloor}층`, sub: dungeon.bossKind ? '보스가 기다린다…' : '어둠의 탑', dur: 2.5, caption: dungeon.bossKind ? '…강한 기운이 느껴진다. 이 층의 끝에 보스가 있다.' : (story.cleared ? '…위로, 위로. 꼭대기까지 올라 보자.' : '…위로, 위로. 시크너가 기다린다.') }; },
     },
+    legion: { // 다른 나라 군단의 요새: 3층, 층마다 보스. 가로로 길고 위로 오른다
+      music: 'cave', get theme() { return G.Legion.getTheme(); }, monsterDamage: 1, returnNear: 'legion', exitTo: 'kingdom',
+      get level() { return legionLv.rows; },
+      get boss() { return legionLv.boss; },
+      get label() { return `군단 요새 ${legionFloor}층`; },
+      get goal() { return `군단 요새 ${legionFloor}/3층: ${legionFloor === 1 ? '마당의 대포는 포병을 쓰러뜨리면 멈춘다! ' : ''}오르는 길 한가운데에 체크포인트가 있다. 끝의 보스를 쓰러뜨려라!  [저장하기·1분 전 되돌리기는 쓸 수 없다]`; },
+      get banner() { return { title: `군단 요새 ${legionFloor}층`, sub: legionLv.bossInfo.name, dur: 3, caption: legionFloor === 1 ? '…마당에 병사들이 늘어서 있고, 번쩍이는 전기 대포가 이쪽을 노린다.' : '…요새는 점점 깊어진다. 이 층의 끝에도 보스가 기다린다.' }; },
+    },
     palace: { // 왕궁 안: 알현실. 왕이 옥좌에 앉아 있다
       music: 'village', label: '왕궁', level: G.Levels.palace, theme: G.PalaceTheme, monsterless: true, returnNear: 'palace', exitTo: 'kingdom',
       get goal() { return story.kingMet ? ((missions.owed || 0) > 0 ? `왕궁: 옥좌의 왕에게 E로 말을 걸어 의뢰 보상 ${missions.owed} G를 받자` : '왕궁: 옥좌의 왕에게 E로 말을 걸자. 왼쪽 문에서 E: 나가기') : '왕궁 알현실: 왕 앞으로 걸어가자'; },
@@ -274,6 +282,8 @@
   let dexUI = null;            // 도감 창 (왕국의 도감관)
   let mapUI = null;            // 마을 지도 {markers}
   let gachaUI = null;          // 뽑기 {cur, res, msg}
+  let legionFloor = 1, legionLv = null, legionSt = null; // 군단 요새 (층, 지형, 대포·체크포인트 상태)
+  let achUI = null;            // 업적 모음집 {page}
   let floorUI = null;          // 던전 문: 가고 싶은 층 고르기 {sel, max}
   let homeHealT = 0;           // 집 안에서 피가 차는 박자
   let homeFrom = 'village';    // 내 집에 들어온 곳 (마을 또는 왕국): 나갈 때 거기로 돌아간다
@@ -324,7 +334,7 @@
   // keepLives=false(기본)면 목숨을 가득 채우고 시작한다. 코인과 산 검은 항상 유지된다
   // near='D'면 마을의 동굴 입구 앞에서 시작한다 (동굴에서 돌아올 때)
   const makeChest = () => { // 던전(어둠의 탑)에서는 위층으로 오르는 문, 그 밖에는 보물 상자
-    const door = stageName === 'dungeon';
+    const door = stageName === 'dungeon' || stageName === 'legion';
     const w = door ? C.DOOR_W : C.CHEST_W;
     const h = door ? C.DOOR_H : C.CHEST_H;
     return Object.assign(terrain.placeOnTile(terrain.treasure.col, terrain.treasure.row, w, h), { w, h, open: 0, door });
@@ -370,10 +380,10 @@
     stunned() { popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: `${boss.name} 기절! 지금이다!`, t: 2, color: 'rgba(255,230,120,A)' }); G.Audio.play('pickup'); },
     defeated() { // 용머리를 모두 쓰러뜨림: 보물 상자가 나타난다
       if (duelRun) { duelWin(); return; }
-      if (boss) dexSee('boss_' + (boss.dkind || boss.kind)); // 도감에 기록
+      if (boss && stageName !== 'legion') dexSee('boss_' + (boss.dkind || boss.kind)); // 도감에 기록
       chest = makeChest();
       const drop = STAGES[stageName].boss && STAGES[stageName].boss.drop; // 보스가 떨어뜨리는 소중한 물건 (이미 있으면 다시 주지 않는다)
-      const key = stageName === 'dungeon' ? 'dungeon' + darkFloor : stageName;
+      const key = stageName === 'dungeon' ? 'dungeon' + darkFloor : stageName === 'legion' ? 'legion' + legionFloor : stageName;
       const kills = bossKills[key] || 0;
       bossKills[key] = kills + 1;
       bossMul = Math.pow(2 / 3, kills); // 처음엔 그대로, 다시 도전할 때마다 3분의 2
@@ -412,6 +422,10 @@
     const st = STAGES[stageName];
     camera.minX = 0;
     const bk = st.boss && st.boss.kind;
+    if (bk === 'legion') { // 군단 요새의 보스: 새로 만든 보스 3명 (패턴이 서로 하나도 겹치지 않는다)
+      boss = new G.LegionBoss(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv, legionFloor - 1);
+      return;
+    }
     if (bk && bk.startsWith('dark_')) { // 다크월드 보스 (정의의 어둠돌 / 정의의 어둠 / 시크너)
       const DB = bk === 'dark_sikner' ? G.Sikner : G.DarkBoss; // 100층 시크너는 전용 패턴
       boss = new DB(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv, bk.slice(5));
@@ -1186,6 +1200,7 @@
       dungeon = seeded(floorSeed(darkFloor), () => G.Dark.makeFloor(darkFloor));
       if (darkFloor <= darkBest && dungeon.boss) { dungeon.boss = null; dungeon.bossKind = null; } // 이미 깬 층의 보스는 사라진다
     } // 층마다 한 번 정해지면 클리어할 때까지 같은 방
+    if (name === 'legion') { legionFloor = Math.max(1, Math.min(G.Legion.FLOORS, story.legionFloor || 1)); legionLv = G.Legion.makeFloor(legionFloor); legionSt = null; }
     if (name === 'orecave') { oreRun += 1; oreLevel = makeOreCave(oreRun); } // 들어갈 때마다 새 광물 동굴
     if (name === 'abyss') { abyssRun += 1; abyssLevel = makeAbyss(abyssRun); } // 들어갈 때마다 새 심연 동굴
     terrain = new G.Terrain(st.level);
@@ -1236,6 +1251,7 @@
     pickups.length = 0;
     enemyShots.length = 0;
     for (const mo of monsters) {
+      if (mo.maxHp < 20) { mo.maxHp = 20; mo.hp = 20; } // 잡몹의 기본 체력은 20
       mo.stageSpeed = (st.monsterSpeed || 1) * (st.dark ? 1 + Math.min(0.6, darkFloor * 0.006) : 1); // 다크월드는 올라갈수록 빨라진다
       mo.contactDmg = st.monsterDamage || (st.dark ? 3 : 1); // 설산 몬스터는 목숨 2개, 다크월드(암흑)는 3개
       mo.immune = { ice: !!st.iceZone, fire: !!st.fireZone }; // 설산 몬스터는 얼지 않고, 화산 몬스터는 불에 타지 않는다
@@ -1252,6 +1268,7 @@
         mo.extraHits = Math.floor(darkFloor / 12);
       }
     }
+    if (name === 'legion') setupLegion();
     if (st.dark) scatterPickups(); // 던전에서는 가끔 아이템이 떨어져 있다
     oreNodes.setup(terrain, oreRun, name === 'orecave'); // 광물 동굴이면 광석 덩어리를 깐다
     seeded(floorSeed(darkFloor) ^ 0x9e3779b9, () => dungeonEvents.setup(terrain, darkFloor, name === 'dungeon' && !!(dungeon && dungeon.tower) && darkFloor % 3 === 0)); // 탑의 3층마다(3, 6, 9 …) 이벤트가 나온다. 보스방/허브/그 밖의 층은 비움
@@ -1550,7 +1567,7 @@
   function respawn() {
     player.respawn(spawn.x, spawn.y);
     sword = null;
-    monsters.forEach((m) => m.reset());
+    monsters.forEach((m) => { if (stageName === 'legion' && !m.alive && (m.gidx !== undefined || m.opIdx !== undefined)) return; m.reset(); }); // 군단 요새: 쓰러진 병사는 그대로
     if (boss && !boss.done) setupBoss(); // 보스전 중이면 보스도 처음부터 (경기장 밖으로 돌아온다)
     camera.follow(player, terrain, C.DT, true);
   }
@@ -2731,6 +2748,10 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { label: `무적 ${god ? '끄기' : '켜기'}`, hint: god ? '지금 켜짐' : '지금 꺼짐', run: () => { god = !god; devUI.msg = god ? '무적 켜짐' : '무적 꺼짐'; devUI.msgT = 2; G.Audio.play('pickup'); } },
       { label: '시크너 이야기 건너뛰기', hint: '다크월드 열기', run: give('다크월드가 열렸다', () => { story.revealed = true; story.pending = false; }) },
       { label: '오프닝 컷신 다시 보기', hint: '보물 지도', run: goto(() => { loadStage('cave', true); cutscene = new G.Cutscene(terrain, player); }) },
+      { head: '군단 요새' },
+      { label: '군단 요새 1층', hint: '마당 · 대포 · 보스', run: goto(() => { story.cleared = true; story.legionFloor = 1; story.legionCp = null; loadStage('legion', true); }) },
+      { label: '군단 요새 2층', hint: '', run: goto(() => { story.cleared = true; story.legionFloor = 2; story.legionCp = null; loadStage('legion', true); }) },
+      { label: '군단 요새 3층', hint: '군단장', run: goto(() => { story.cleared = true; story.legionFloor = 3; story.legionCp = null; loadStage('legion', true); }) },
       { head: '챕터 2' },
       { label: '챕터 2로 순간이동', hint: '왕국 · 왕 · 음식점', run: goto(() => { story.cleared = true; story.revealed = true; loadStage('kingdom', true); }) },
       { label: '왕의 의뢰 +1 (치트)', hint: '쌓인 의뢰가 늘어난다', run: give('왕의 의뢰가 도착했다', () => { story.cleared = true; addMission(1, true); }) },
@@ -2906,6 +2927,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (dexUI) { G.Dex.mouse(dexUI, 'click', p); return; }
     if (gachaUI) { gachaUI.click = p; return; }
     if (floorUI) { floorUI.click = p; return; }
+    if (achUI) { const g = G.Achv.geometry(C.VIEW_W, C.VIEW_H); const hit = (r) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h; if (hit(g.prev) && achUI.page > 0) achUI.page--; else if (hit(g.next) && achUI.page < G.Achv.pages() - 1) achUI.page++; return; }
     if (titleUI && !settingsUI) { // 처음 화면: 칸 클릭 = 시작, 복사/삭제 단추, 설정/끄기 단추
       if (titleUI.halted) return;
       const cards = G.Renderer.titleCards(C.VIEW_W, C.VIEW_H);
@@ -3066,13 +3088,19 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function hitMonster(s, fromX, fallbackDir) {
     if (s.dummy) { dummyHit(s); return; }
     s.byAlly = false; // 내가 친 것이니 처치 보상은 나에게
+    if (s.barrier > 0 && !s.flying) { // 방어마법: 막이 한 번 대신 맞는다
+      s.barrier -= 1; s.barrierHit = 0.25; s.hitGrace = C.HIT_GRACE;
+      effects.parryHit(s.x + s.w / 2, s.y + s.h / 2); G.Audio.play('catch');
+      popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: s.barrier > 0 ? '방어마법! (한 겹 남음)' : '방어마법이 깨졌다!', t: 0.9, color: 'rgba(160,220,255,A)' });
+      return;
+    }
     reapSteal(s);
     const away = Math.sign(s.x + s.w / 2 - fromX) || fallbackDir;
     if (s.extraHits > 0 && !s.flying && !equipStats.ignoreCrack && !rollCrit()) { // 다크월드의 단단한 몬스터: 여러 번 때려야 쓰러진다
       s.extraHits = Math.max(0, s.extraHits - equipStats.hitPower); // 무기를 강화할수록 단단한 몬스터를 더 많이 깎는다
       s.hitGrace = C.HIT_GRACE;
       if (s.hurt) s.hurt(away);
-      if (s.alive && s.stagger && !s.dummy) { s.stagger(away); s.staggered = Math.max(s.staggered, 1.1); } // 금이 갔다: 뒤로 밀려나 잠깐 기절한다 (닿아도 해롭지 않아 지나갈 수 있다)
+      if (s.alive && s.stagger && !s.dummy && s.extraHits <= 0) { s.stagger(away); s.staggered = Math.max(s.staggered, 1.1); } // 아직 단단하면 기절하지 않는다. 금이 갔을 때만: 뒤로 밀려나 잠깐 기절한다 (닿아도 해롭지 않아 지나갈 수 있다)
       effects.parryHit(s.x + s.w / 2, s.y + s.h / 2);
       popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: s.extraHits > 0 ? `단단하다! (${s.extraHits})` : '금이 갔다!', t: 0.9, color: 'rgba(200,170,255,A)' });
       return;
@@ -3164,6 +3192,17 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       m.byAlly = false; // 내 마법/총/활에 맞았다
       if (el === 'bomb' || el === 'icebomb') return; // 폭탄은 터질 때 피해를 준다 (explode)
       const isBossHit = bossOn() && boss.targets().includes(m);
+      if (m.extraHits > 0 && !m.flying && !isBossHit) { // 딴딴한 몬스터: 총·활·마법으로도 깎을 수 있지만 느리다 (딴딴함 1 = 단단함 3). 광석을 붙이면 더 빨리 깎고, 균열 광석이면 그냥 통한다
+        if (!equipStats.ignoreCrack) {
+          m.extraHits = Math.max(0, m.extraHits - Math.max(1, equipStats.hitPower - (equipStats.hitPower > 1 ? 1 : 0)) / 3);
+          m.hitGrace = Math.max(m.hitGrace || 0, 0);
+          const left = Math.ceil(m.extraHits - 1e-6);
+          popups.push({ x: m.x + m.w / 2, y: m.y - 20, text: left > 0 ? `딴딴하다! (${left})` : '금이 갔다!', t: 0.9, color: 'rgba(200,170,255,A)' });
+          effects.parryHit(x, y);
+          if (m.extraHits <= 0 && m.alive && m.stagger) m.stagger(dir);
+          return;
+        }
+      }
       const weakX = (e) => (isBossHit && boss.weak && e === boss.weak ? 3 : 1); // 보스의 약점 속성이면 x3
       if (el === 'arrow' || el === 'bullet') {
         m.damage((shot && shot.dmg ? shot.dmg : 3) * weakX(weaponElemOf()));
@@ -3254,6 +3293,16 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function updateEnemyShots(dt) {
     for (let k = enemyShots.length - 1; k >= 0; k--) {
       const f = enemyShots[k];
+      if (f.homing && !f.reflected) { // 용사의 유도탄: 플레이어를 따라 휘어 날아간다
+        const want = Math.atan2(player.y + player.h / 2 - f.y, player.x + player.w / 2 - f.x);
+        let cur = Math.atan2(f.vy, f.vx);
+        let d = want - cur;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        cur += Math.max(-2.4 * dt, Math.min(2.4 * dt, d));
+        const sp = f.spd || 270;
+        f.vx = Math.cos(cur) * sp; f.vy = Math.sin(cur) * sp;
+      }
       f.x += f.vx * dt;
       f.y += f.vy * dt;
       f.life = (f.life === undefined ? 5 : f.life) - dt;
@@ -3374,10 +3423,115 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       effects.treasure(player.x + player.w / 2, player.y);
     } else dexUI.msg = '새로 등록할 게 없어요';
   }
+  // ---- 군단 요새: 호위 병사, 전기 대포(포병을 쓰러뜨리면 멈춘다), 체크포인트 ----
+  function setupLegion() {
+    const f = legionFloor;
+    const mk = (variant, col, row) => {
+      const V = G.Raider.VARIANTS[variant];
+      const p = terrain.placeOnTile(col, row, V.w, V.h);
+      const mo = new G.Raider(p.x, p.y, variant);
+      mo.marchX = p.x + V.w / 2;
+      mo.stageSpeed = 1.15 + 0.12 * f;
+      mo.contactDmg = 1;
+      mo.immune = {};
+      mo.noRespawn = true;
+      monsters.push(mo);
+      return mo;
+    };
+    G.Raider.pool = monsters;
+    const ml = maxLives();
+    const TOUGH_MAX = [30, 50, 70][f - 1]; // 층마다 최대 딴딴함: 1층 30, 2층 50, 3층 70
+    story.legionDead = story.legionDead || {};
+    const dead = story.legionDead[f] || (story.legionDead[f] = []); // 한 번 쓰러뜨린 병사는 다시 살아나지 않는다
+    legionLv.extras.guards.forEach((gd, gi) => {
+      if (dead.includes(gi)) return;
+      const mo = mk(gd.variant, gd.col, gd.row);
+      mo.gidx = gi;
+      mo.maxHp = mo.hp = Math.round(50 * (1 + 0.2 * f)); // 병사 하나하나의 체력은 기본 50이 넘는다
+      mo.extraHits = Math.min(TOUGH_MAX, 4 * ml - 1 + 8 * (f - 1) + (gd.variant === 'shield' || gd.variant === 'ogre' ? 2 + f : 0)); // 잡몹 한 마리: 나의 피의 4배 + 층마다 더 (최대 딴딴함을 넘지 않는다)
+      if (gd.variant === 'hero') { mo.extraHits = Math.min(TOUGH_MAX, Math.max(14, ml * 3 + 5) + 10 * (f - 1)); mo.contactDmg = 4; mo.heroUnit = true; } // 용사: 가장 딴딴하고, 닿거나 베면 4
+      if (gd.variant === 'mage') mo.contactDmg = 1;
+    });
+    let opI = 0;
+    legionSt = G.Legion.makeState(legionLv, terrain, (col, row) => {
+      const oi = 1000 + opI++;
+      if (dead.includes(oi)) return { alive: false, x: 0, y: 0, w: 0, h: 0 }; // 이미 쓰러뜨린 포병: 대포는 멈춘 채로
+      const mo = mk('sword', col, row);
+      mo.maxHp = mo.hp = Math.round(50 * (1 + 0.2 * f));
+      mo.extraHits = TOUGH_MAX; // 포병이 가장 세다: 그 층의 최대 딴딴함
+      mo.operator = true; mo.opIdx = oi;
+      return mo;
+    });
+    if (story.legionCp && story.legionCp.floor === f) { // 이미 지나간 체크포인트에서 다시 시작
+      legionSt.cp.reached = true;
+      spawn = terrain.placeOnTile(legionSt.cp.col - 1, legionSt.cp.row, C.PLAYER_W, C.PLAYER_H);
+    }
+  }
+  function updateLegion(dt) {
+    if (!legionSt || stageName !== 'legion') return;
+    G.Legion.update(dt, legionSt, player, (s) => enemyShots.push(s), (x, y, kind) => {
+      if (kind === 'fire') { effects.sparkle(x, y); G.Audio.play('zap'); }
+      else { effects.vanish(x, y); popups.push({ x, y: y - 30, text: '대포가 멈췄다!', t: 2.2, color: 'rgba(160,230,255,A)' }); G.Audio.play('shatter'); }
+    });
+    for (const mo of monsters) { // 쓰러진 병사를 기억해 둔다 (다시 살아나지 않는다)
+      const id = mo.gidx !== undefined ? mo.gidx : mo.opIdx;
+      if (id !== undefined && !mo.alive && !mo.counted) { mo.counted = true; const d = story.legionDead[legionFloor] || (story.legionDead[legionFloor] = []); if (!d.includes(id)) d.push(id); }
+    }
+    const cp = legionSt.cp;
+    if (!cp.reached && Math.abs(player.x + player.w / 2 - cp.x) < 50 && Math.abs(player.y + player.h - cp.y) < 90) { // 체크포인트: 여기서부터 다시 시작
+      cp.reached = true;
+      story.legionCp = { floor: legionFloor };
+      spawn = terrain.placeOnTile(cp.col - 1, cp.row, C.PLAYER_W, C.PLAYER_H);
+      lives = Math.min(maxLives(), lives + 1);
+      G.Audio.play('treasure');
+      effects.treasure(cp.x, cp.y - 40);
+      popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '체크포인트! 피 +1 (죽으면 여기서 다시 시작)', t: 3, color: 'rgba(125,255,160,A)' });
+    }
+  }
+  const LEGION_END = [
+    '왕: "군단장이 쓰러졌다고? 다른 나라의 군단이 모두 물러갔네!"',
+    '왕: "더는 우리 성문을 두드리는 적이 없을 걸세. 용사여, 진정한 영웅일세."',
+    '왕: "이 사례금을 받게나. (+10000 G)"',
+  ];
+  function clearLegion() {
+    const f = legionFloor;
+    const gc = 1500 * f, gx = 150 * f;
+    coins += gc; exp += gx;
+    story.legionCp = null;
+    story.legionDead = {};
+    G.Audio.play('treasure');
+    effects.treasure(player.x + player.w / 2, player.y);
+    if (f < G.Legion.FLOORS) {
+      story.legionFloor = f + 1;
+      loadStage('legion', true);
+      popups.push({ x: player.x + player.w / 2, y: player.y - 50, text: `${f}층 클리어! +${gc} G  +${gx} EXP`, t: 3, color: 'rgba(150,215,255,A)' });
+      return;
+    }
+    story.legionFloor = 1;
+    story.legionDone = true;
+    coins += 10000;
+    loadStage('kingdom', true, 'legion');
+    effects.flash = 0.5; effects.flashColor = '255,236,170';
+    effects.shake(6, 0.6);
+    startDialogs(LEGION_END);
+  }
+
   // ---- 챕터 3: 왕의 큰 목표들과 통행료 ----
   let questT = 0, tollAsk = null, tollT = 0;
-  const questCtx = () => ({ inv, story, missions, darkBest });
+  const questCtx = () => ({ inv, story, missions, darkBest, coins });
+  let achT = 0;
+  function updateAch(dt) { // 업적: 1초마다 확인해 새로 이룬 것을 알린다
+    achT -= dt;
+    if (achT > 0) return;
+    achT = 1;
+    for (const a of G.Achv.check(Object.assign(questCtx(), { playSec }))) {
+      exp += a.exp;
+      G.Audio.play('treasure');
+      popups.push({ x: player.x + player.w / 2, y: player.y - 90, text: `업적 달성! ${a.name}  (경험치 +${a.exp})`, t: 4, color: 'rgba(255,225,120,A)' });
+    }
+  }
   function updateQuest(dt) {
+    updateAch(dt);
     tollT = Math.max(0, tollT - dt);
     if (tollT <= 0) tollAsk = null;
     questT -= dt;
@@ -3386,19 +3540,20 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const g = G.Quest.current(questCtx());
     if (!g) return;
     if (g.prog(questCtx()) < g.need) return;
-    story.q = (story.q || 0) + 1;
+    story.bigDone = true;
     coins += g.coins; exp += g.exp;
     G.Audio.play('treasure');
     effects.treasure(player.x + player.w / 2, player.y);
-    popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: `목표 달성! ${g.title}  +${g.coins} G  +${g.exp} EXP`, t: 4, color: 'rgba(255,225,120,A)' });
-    startDialogs([`[목표 달성] ${g.title}  (코인 +${g.coins} G, 경험치 +${g.exp})`].concat(g.lines), g.last ? () => { popups.push({ x: player.x + player.w / 2, y: player.y - 80, text: '챕터 3 완결 - 왕국의 번영', t: 6, color: 'rgba(255,225,120,A)' }); effects.shake(6, 0.5); } : null);
+    popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: `업적 달성! ${g.title}  +${g.exp} EXP`, t: 4, color: 'rgba(255,225,120,A)' });
+    startDialogs([`[업적 달성] ${g.title}  (경험치 +${g.exp})`].concat(g.lines), g.last ? () => { popups.push({ x: player.x + player.w / 2, y: player.y - 80, text: '업적: 큰손', t: 6, color: 'rgba(255,225,120,A)' }); effects.shake(6, 0.5); } : null);
   }
   function questHud() {
+    return null; // 화면의 업적 표시는 없앴다 (업적 모음집 T 에서 본다)
     if (!story.kingMet) return null;
     const g = G.Quest.current(questCtx());
-    const n = story.q || 0, total = G.Quest.GOALS.length;
-    if (!g) return { head: '챕터 3 완결', text: '모든 목표를 이뤘어요! 탑 100층이 남았다', cur: 1, max: 1, step: `${total}/${total}` };
-    return { head: `챕터 3 목표 ${n + 1}/${total}: ${g.title}`, text: g.desc, cur: Math.min(g.need, g.prog(questCtx())), max: g.need };
+    const total = G.Quest.GOALS.length;
+    if (!g) return { head: '업적 달성!', text: '큰손 - 모든 업적을 이뤘어요', cur: 1, max: 1, step: `${total}/${total}` };
+    return { head: `업적: ${g.title}`, text: g.desc, cur: Math.min(g.need, g.prog(questCtx())), max: g.need };
   }
   // 통행료: 첫 E는 안내, 한 번 더 E로 낸다. 다 내면 영원히 지나갈 수 있다
   function tollBlocked(stage) {
@@ -3577,7 +3732,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   }
 
   // ---- 왕의 의뢰와 적군 ----
-  const MISSION_MIN = 60, MISSION_MAX = 1800; // 1분 ~ 30분마다 새 의뢰가 도착한다
+  const MISSION_MIN = 900, MISSION_MAX = 1800; // 15분 ~ 30분마다 새 의뢰가 도착한다
   const rollMissionTimer = () => MISSION_MIN + Math.random() * (MISSION_MAX - MISSION_MIN);
   function addMission(n = 1, quiet = false) {
     missions.pending += n;
@@ -3833,6 +3988,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       window.location.reload();
       return;
     }
+    if ((i === 5 || i === 6) && stageName === 'legion') { settingsUI.msg = '군단 요새에서는 저장하기와 되돌아가기를 쓸 수 없어요 (체크포인트가 있어요)'; settingsUI.msgT = 3; G.Audio.play('deny'); return; }
     if (i === 5) { if (dir === 0) { const ok = saveGame(); settingsUI.msg = ok ? `저장했어요! 다음에 켜면 여기(${(STAGES[stageName] && STAGES[stageName].label) || stageName})에서 이어져요` : '저장할 수 없어요'; settingsUI.msgT = 2; G.Audio.play(ok ? 'treasure' : 'deny'); } return; }
     if (i === 6) { // 1분 전으로 돌아가기
       if (dir !== 0) return;
@@ -3884,6 +4040,13 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       input.endFrame();
       return;
     }
+    if (achUI) { // 업적 모음집을 보는 동안 게임이 멈춘다
+      if (input.wasPressed('Escape') || input.wasPressed('KeyT')) achUI = null;
+      else if ((input.wasPressed('ArrowRight') || input.wasPressed('KeyD')) && achUI.page < G.Achv.pages() - 1) { achUI.page++; G.Audio.play('catch'); }
+      else if ((input.wasPressed('ArrowLeft') || input.wasPressed('KeyA')) && achUI.page > 0) { achUI.page--; G.Audio.play('catch'); }
+      input.endFrame(); return;
+    }
+    if (!achUI && input.wasPressed('KeyT') && !shop && !equipUI && !mini && !settingsUI && !dialog && !cutscene && !devUI && !adminUI && !dexUI && !fishUI && !mapUI && !gachaUI && !floorUI && !titleUI && !pwUI) { achUI = { page: 0 }; G.Audio.play('pickup'); input.endFrame(); return; }
     if (floorUI) { updateFloorSelect(dt); input.endFrame(); return; } // 던전 층 고르는 동안 게임이 멈춘다
     if (gachaUI) { updateGacha(dt); input.endFrame(); return; } // 뽑기 창이 열려 있는 동안 게임이 멈춘다
     if (mapUI) { if (input.wasPressed('Escape') || input.wasPressed('KeyN')) mapUI = null; input.endFrame(); return; } // 지도를 펴 보는 동안 게임이 멈춘다
@@ -4305,6 +4468,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     updatePickups(dt);
     if (stageName === 'dungeon') dungeonEvents.update(dt);
     if (stageName === 'orecave') oreNodes.update(dt, input.down.has('KeyE')); // E 길게: 곡괭이질
+    if (chest && !won && stageName === 'legion' && player.overlaps(chest)) { clearLegion(); input.endFrame(); return; }
+    updateLegion(dt);
     if (chest && !won && stageName === 'dungeon' && player.overlaps(chest)) { // 던전: 위층으로 오르는 계단
       clearFloor();
       input.endFrame();
@@ -4428,6 +4593,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       bossHint: stageName === 'dungeon' ? (() => { const s = bossSignFor(); return s ? { head: s[0], text: s[1], all: Object.keys(G.Dark.BOSS_FLOORS).map((f) => `${f}층 ${bossName(G.Dark.BOSS_FLOORS[f]).replace('정의의 ', '').replace('어둠의 기사 ', '')}`).join('  ·  '), cur: darkFloor } : null; })() : null,
       dex: dexUI ? Object.assign({}, dexUI, { inv }) : null,
       gacha: gachaUI ? Object.assign({}, gachaUI, { board: inv.gacha, coins }) : null,
+      ach: achUI ? { page: achUI.page, ctx: Object.assign(questCtx(), { playSec }) } : null,
       floorSel: floorUI ? { sel: floorUI.sel, max: floorUI.max, buf: floorUI.buf, best: darkBest, cleared: story.cleared } : null,
       map: mapUI ? { terrain, markers: mapUI.markers, player, title: stageName === 'kingdom' ? '왕이 다스리는 도시 지도' : '해변 마을 지도' } : null,
       title: titleUI ? { cur: titleUI.cur, del: titleUI.del, copy: titleUI.copy, quit: titleUI.quit, halted: titleUI.halted, msg: (titleUI.msgT || 0) > 0 ? titleUI.msg : '', slots: titleUI.slots, t: titleUI.t } : null,
@@ -4440,8 +4606,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : banner, prompt: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : prompt, dialog: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
-    }, sword, { cutscene, chest, ending, npcs, allies, bugs, popups: settingsUI || pwUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? [] : popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
+      won, cutscene: !!cutscene, goal: st.goal, banner: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI || achUI ? null : banner, prompt: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : prompt, dialog: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
+    }, sword, { cutscene, chest, ending, npcs, allies, bugs, popups: settingsUI || pwUI || fishUI || dexUI || mapUI || gachaUI || floorUI || achUI ? [] : popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, legion: stageName === 'legion' ? legionSt : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   if (!noSave()) { openTitle(); G.Audio.setMusic('title'); } // 처음 화면: 저장 칸 3개 + 타이틀 노래
   requestAnimationFrame(frame);
@@ -4487,9 +4653,14 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get mapUI() { return mapUI; },
     get gachaUI() { return gachaUI; },
     get quest() { return questHud(); },
+    achCheck() { achT = 0; updateAch(0.01); },
     get story() { return story; },
     questTick() { questT = 0; updateQuest(0.01); },
     get floorUI() { return floorUI; },
+    get achUI() { return achUI; },
+    get legion() { return legionSt; },
+    get legionLv() { return legionLv; },
+    clearLegion,
     openFloorSelect,
     pickGacha, openGacha,
     dexSee, openDexHall,

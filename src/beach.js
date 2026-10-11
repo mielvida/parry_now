@@ -608,6 +608,7 @@
     orecave: { name: '광물 동굴', a: '#4a3320', b: '#ffd68a' },
     meadow: { name: '성 밖 숲', a: '#3a8a3a', b: '#d8ffb0' },
     village: { name: '마을', a: '#2a9a8a', b: '#c0fff0' },
+    legion: { name: '군단 요새 (위험!)', a: '#5a2a1a', b: '#ffcf6a' },
     abyss: { name: '심연 동굴 (위험!)', a: '#5a0a14', b: '#ff5a3a' },
   };
   // 차원문: 룬이 새겨진 돌 아치, 안쪽에서 소용돌이치는 빛, 문 주위를 도는 룬, 문 안으로 빨려 드는 빛 알갱이, 하늘로 솟는 빛기둥

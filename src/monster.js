@@ -58,6 +58,7 @@
     // 마법 피해: 체력이 0이 되면 그 자리에서 터진다 (날아가는 중이거나 죽은 몬스터는 무시)
     damage(n) {
       if (!this.alive || this.flying) return;
+      if (this.barrier > 0) { this.barrier -= 1; this.barrierHit = 0.25; return; } // 방어마법이 막아 준다
       this.hp -= n;
       this.dmgFx += n;
       if (this.hp <= 0) this._die();
@@ -135,6 +136,7 @@
     // 죽음/부활/날아가는 중 처리. true를 반환하면 이번 프레임의 평소 AI는 건너뛴다.
     tickLifecycle(dt, terrain) {
       if (!this.alive) {
+        if (this.noRespawn) return true; // 한 번 쓰러지면 다시 살아나지 않는다 (군단 요새의 병사)
         this.respawnTimer -= dt;
         if (this.respawnTimer <= 0) {
           this.reset();

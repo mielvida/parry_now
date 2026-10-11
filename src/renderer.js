@@ -95,6 +95,7 @@
       if (extras.chest) (extras.chest.door ? this._drawDoor(ctx, extras.chest) : this._drawChest(ctx, extras.chest));
       if (extras.pickups) for (const p of extras.pickups) this._drawPickup(ctx, p, time);
       if (extras.events) extras.events.draw(ctx, time, { x: camX, y: camY, w: this.viewW, h: this.viewH }); // 던전 이벤트 (샘, 함정, 상인 …)
+      if (extras.legion) G.Legion.draw(ctx, extras.legion, time); // 군단 요새: 전기 대포와 체크포인트
       if (extras.ores) extras.ores.draw(ctx, time, { x: camX, y: camY, w: this.viewW, h: this.viewH }); // 광물 동굴의 광석 덩어리
       if (extras.enemyShots) for (const f of extras.enemyShots) this._drawEnemyShot(ctx, f);
       if (extras.boss) extras.boss.drawFront(ctx); // 머리, 꼬리, 화염구
@@ -153,7 +154,7 @@
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
       this._drawEdgeTexts(main, hud);
-      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel));
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel || hud.ach));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
@@ -3180,6 +3181,24 @@
       else if (m.kind === 'dummy') this._paintDummy(ctx, m);
       else this._paintSlime(ctx, m);
       if (m.dark) this._drawDarkAura(ctx, m);
+      if (m.barrier > 0) { // 방어마법: 몸을 감싸는 푸른 막 (한 겹마다 한 번 막아 준다)
+        const t = performance.now() / 1000;
+        for (let i = 0; i < m.barrier; i++) {
+          ctx.save(); ctx.strokeStyle = `rgba(140,210,255,${0.85 - 0.25 * i})`; ctx.lineWidth = 3;
+          ctx.fillStyle = 'rgba(140,210,255,0.14)';
+          ctx.beginPath(); ctx.ellipse(m.x + m.w / 2, m.y + m.h / 2, m.w * 0.75 + i * 6 + Math.sin(t * 4) * 1.5, m.h * 0.65 + i * 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+        }
+      }
+      if (m.hasteT > 0) { ctx.fillStyle = 'rgba(255,230,90,0.9)'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('>>', m.x + m.w / 2, m.y - 14); }
+      if (m.castFx && m.castFx.tgt) { // 마법사 → 아군 마법 줄기
+        const tg = m.castFx.tgt;
+        ctx.save(); ctx.strokeStyle = m.castFx.kind === 'haste' ? 'rgba(255,230,90,0.85)' : 'rgba(150,215,255,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]);
+        ctx.beginPath(); ctx.moveTo(m.x + m.w / 2, m.y + 4); ctx.lineTo(tg.x + tg.w / 2, tg.y + tg.h / 2); ctx.stroke(); ctx.restore();
+      }
+      if (m.kind === 'raider' && (m.variant === 'hero' || m.variant === 'mage') && m.alive && !m.flying) { // 이름표
+        ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = m.variant === 'hero' ? '#ff9a7a' : '#d9b0ff';
+        ctx.fillText(m.variant === 'hero' ? '적국 용사' : '마법사', m.x + m.w / 2, m.y - (m.variant === 'mage' ? 24 : 18)); ctx.restore();
+      }
       if (m.staggered > 0) this._drawDazed(ctx, m);
       if (m.poison) this._drawPoisoned(ctx, m);
       if (m.burn) this._drawBurning(ctx, m);
@@ -3402,6 +3421,34 @@
     // 몬스터가 쏜 어둠 구슬 (쳐내면 하얗게 변해 되돌아간다)
     _drawEnemyShot(ctx, f) {
       const white = f.reflected;
+      if (f.missile) { // 용사의 유도탄: 불꽃을 뿜는 로켓
+        const a = Math.atan2(f.vy, f.vx);
+        ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
+        ctx.fillStyle = 'rgba(255,170,60,0.85)'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-26 - Math.random() * 8, -4); ctx.lineTo(-26 - Math.random() * 8, 4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = white ? '#ffffff' : '#c8d0dc'; ctx.fillRect(-12, -5, 22, 10);
+        ctx.fillStyle = white ? '#ffe9a0' : '#d02a2a'; ctx.beginPath(); ctx.moveTo(10, -5); ctx.lineTo(20, 0); ctx.lineTo(10, 5); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = white ? '#fff' : '#2a56b8'; ctx.fillRect(-12, -7, 6, 3); ctx.fillRect(-12, 4, 6, 3);
+        ctx.restore();
+        return;
+      }
+      if (f.bolt) { // 마법사의 마법 구슬
+        const gr = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, 16);
+        gr.addColorStop(0, white ? 'rgba(255,255,255,0.95)' : 'rgba(230,190,255,0.95)'); gr.addColorStop(1, 'rgba(150,80,255,0)');
+        ctx.fillStyle = gr; ctx.fillRect(f.x - 16, f.y - 16, 32, 32);
+        ctx.fillStyle = white ? '#fff' : '#a05aff'; ctx.beginPath(); ctx.arc(f.x, f.y, 5, 0, Math.PI * 2); ctx.fill();
+        return;
+      }
+      if (f.elec) { // 전기 대포: 지그재그 번개 구슬
+        const a = Math.atan2(f.vy, f.vx);
+        ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
+        const g2 = ctx.createRadialGradient(0, 0, 1, 0, 0, 20);
+        g2.addColorStop(0, white ? 'rgba(255,255,255,0.95)' : 'rgba(200,245,255,0.95)'); g2.addColorStop(1, 'rgba(70,160,255,0)');
+        ctx.fillStyle = g2; ctx.fillRect(-20, -20, 40, 40);
+        ctx.strokeStyle = white ? '#ffffff' : '#9fe8ff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-18, 0);
+        for (let i = 1; i <= 6; i++) ctx.lineTo(-18 + i * 6, (i % 2 ? -6 : 6) * (Math.sin(performance.now() / 40 + i) > 0 ? 1 : 0.6));
+        ctx.stroke(); ctx.restore();
+        return;
+      }
       if (f.arrow) { // 궁수의 화살
         const a = Math.atan2(f.vy, f.vx);
         ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
@@ -3601,7 +3648,7 @@
     _paintRaider(ctx, m) {
       const flash = m.flying && Math.floor(m.flightTime / 0.05) % 2 === 0;
       const v = m.variant;
-      const pal = { ally: ['#3a4a7a', '#c9d2dc', '#e8b98a'], sword: ['#7a3a3a', '#d4a017', '#e8b98a'], spear: ['#4a5a82', '#c0273a', '#e8b98a'], shield: ['#6a707e', '#2a56b8', '#e8b98a'], archer: ['#3a6a3a', '#7a5a2a', '#e8b98a'], rusher: ['#8a3a3a', '#f2f2f2', '#e8b98a'], ogre: ['#5e7a3e', '#7a4a2a', '#7e9a56'] }[v];
+      const pal = { ally: ['#3a4a7a', '#c9d2dc', '#e8b98a'], sword: ['#7a3a3a', '#d4a017', '#e8b98a'], spear: ['#4a5a82', '#c0273a', '#e8b98a'], shield: ['#6a707e', '#2a56b8', '#e8b98a'], archer: ['#3a6a3a', '#7a5a2a', '#e8b98a'], rusher: ['#8a3a3a', '#f2f2f2', '#e8b98a'], ogre: ['#5e7a3e', '#7a4a2a', '#7e9a56'], hero: ['#2a56b8', '#e8e8f4', '#e8b98a'], mage: ['#5a2a8a', '#ffd54a', '#e8b98a'] }[v];
       const body = flash ? '#ffffff' : pal[0], acc = flash ? '#ffffff' : pal[1], skin = flash ? '#ffffff' : pal[2];
       const k = m.h / 40;
       const walking = Math.abs(m.vx) > 5;
@@ -3610,9 +3657,9 @@
       ctx.save();
       ctx.translate(sp(m.x + m.w / 2), sp(m.y + m.h));
       ctx.scale(m.dir >= 0 ? 1 : -1, 1);
-      ctx.translate(strike && v !== 'spear' && v !== 'sword' && v !== 'ally' ? 4 : 0, -bob);
+      ctx.translate(strike && v !== 'spear' && v !== 'sword' && v !== 'ally' && v !== 'hero' ? 4 : 0, -bob);
       ctx.scale(k, k);
-      ctx.rotate(strike && v !== 'spear' && v !== 'sword' && v !== 'ally' ? 0.16 : 0);
+      ctx.rotate(strike && v !== 'spear' && v !== 'sword' && v !== 'ally' && v !== 'hero' ? 0.16 : 0);
       const dark = '#2a2230';
       ctx.fillStyle = dark; ctx.fillRect(-8, -10, 6, 10); ctx.fillRect(2, -10, 6, 10); // 다리
       ctx.fillStyle = body; ctx.fillRect(-10, -26, 20, 17); // 몸통
@@ -3625,14 +3672,26 @@
       if (v === 'shield') { ctx.fillStyle = '#c9d2dc'; ctx.fillRect(-9, -40, 18, 3); }
       if (v === 'archer') { ctx.fillStyle = body; ctx.fillRect(-9, -41, 18, 7); ctx.fillStyle = skin; ctx.fillRect(-5, -36, 10, 8); }
       if (v === 'rusher') { ctx.fillStyle = acc; ctx.fillRect(-8, -35, 16, 3); ctx.fillRect(6, -36, 6, 2); }
+      if (v === 'hero') { // 적국 용사: 파란 갑옷에 흰 투구깃, 빨간 목도리 (나와 비슷하게 생겼다)
+        ctx.fillStyle = flash ? '#fff' : '#d02a2a'; ctx.fillRect(-12, -27, 24, 4); ctx.fillRect(-14, -26, 5, 12);
+        ctx.fillStyle = flash ? '#fff' : '#f4f4ff'; ctx.fillRect(-2, -47, 4, 8); ctx.fillRect(-4, -44, 8, 4);
+      }
+      if (v === 'mage') { // 마법사: 뾰족한 보랏빛 모자와 로브
+        ctx.fillStyle = flash ? '#fff' : '#3a1a5a'; ctx.beginPath(); ctx.moveTo(-10, -39); ctx.lineTo(0, -58); ctx.lineTo(10, -39); ctx.closePath(); ctx.fill(); ctx.fillRect(-12, -41, 24, 4);
+        ctx.fillStyle = flash ? '#fff' : '#5a2a8a'; ctx.fillRect(-11, -14, 22, 14);
+      }
       if (v === 'ogre') { ctx.fillStyle = '#e8e0c8'; ctx.fillRect(2, -33, 3, 5); ctx.fillRect(-6, -33, 3, 5); }
       if (v === 'ally') { // 성의 병사: 왕 옆 호위병과 같은 은빛 투구와 갈색 머리, 눈은 평범하게
         ctx.fillStyle = flash ? '#fff' : '#3a2f22'; ctx.fillRect(-8, -38, 16, 3);
         ctx.fillStyle = flash ? '#fff' : '#c9d2dc'; ctx.fillRect(-9, -42, 18, 4); ctx.fillRect(-6, -47, 12, 6);
         ctx.fillStyle = '#222'; ctx.fillRect(2, -32, 2, 3);
       } else { ctx.fillStyle = '#d02a2a'; ctx.fillRect(2, -32, 3, 3); } // 눈
+      if (v === 'hero' && m.ranged) { // 유도탄 발사 준비: 총을 겨눈다
+        ctx.fillStyle = flash ? '#fff' : '#2a2a34'; ctx.fillRect(8, -28, 18, 6); ctx.fillRect(8, -24, 6, 8);
+        ctx.fillStyle = '#ffd54a'; ctx.fillRect(25, -27, 3, 4);
+      }
       ctx.strokeStyle = dark; ctx.lineWidth = 4; ctx.lineCap = 'round';
-      if (v === 'sword' || v === 'ally') { // 검: 평소엔 어깨에 걸치고, 예비동작에서 머리 위로 치켜들고, 베면서 앞으로 크게 휘두른다
+      if (v === 'sword' || v === 'ally' || v === 'hero') { // 검: 평소엔 어깨에 걸치고, 예비동작에서 머리 위로 치켜들고, 베면서 앞으로 크게 휘두른다
         const hx = 10, hy = -22;
         const ang = wind ? -2.2 : strike ? 0.25 : -0.9;
         ctx.strokeStyle = flash ? '#fff' : '#e8f1ff'; ctx.lineWidth = 5;
@@ -3650,6 +3709,11 @@
         ctx.fillStyle = flash ? '#fff' : '#2a56b8'; ctx.fillRect(strike ? 8 : 10, -30, 11, 24);
         ctx.fillStyle = flash ? '#fff' : '#ffd54a'; ctx.fillRect(strike ? 11 : 13, -22, 5, 8);
         ctx.strokeStyle = '#c9d2dc'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, -22); ctx.lineTo(-14, -42); ctx.stroke();
+      } else if (v === 'mage') { // 지팡이와 빛나는 구슬
+        ctx.strokeStyle = '#7a5a2a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(14, -4); ctx.lineTo(14, -46); ctx.stroke();
+        const gl = 0.6 + 0.4 * Math.sin(m.time * 6) + (m.castFx ? 0.8 : 0);
+        ctx.fillStyle = `rgba(190,140,255,${Math.min(1, 0.5 * gl)})`; ctx.beginPath(); ctx.arc(14, -50, 9 + 3 * gl, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = flash ? '#fff' : '#d9b0ff'; ctx.beginPath(); ctx.arc(14, -50, 5, 0, Math.PI * 2); ctx.fill();
       } else if (v === 'archer') {
         ctx.strokeStyle = '#a07a3a'; ctx.lineWidth = 2.5;
         const pull = wind ? 6 : 0;
@@ -3883,7 +3947,7 @@
         ctx.font = '11px sans-serif'; ctx.fillStyle = '#b8a0a8'; ctx.fillText(bh.all, x + 12, y + 55);
         ctx.restore();
       }
-      if (hud.quest && !hud.shop && !hud.equip && !hud.dev && !hud.settings && !hud.mini && !hud.admin && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.dialog ) { // 챕터 3 목표 (오른쪽 위)
+      if (hud.quest && !hud.shop && !hud.equip && !hud.dev && !hud.settings && !hud.mini && !hud.admin && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.ach && !hud.dialog ) { // 챕터 3 목표 (오른쪽 위)
         const q = hud.quest;
         const w = 300, x = this.viewW - w - 14, y = hud.bossHint ? 190 : 118;
         ctx.save();
@@ -3899,13 +3963,14 @@
       }
       if (hud.gacha) this._drawGacha(ctx, hud.gacha);
       if (hud.floorSel) this._drawFloorSelect(ctx, hud.floorSel);
+      if (hud.ach) G.Achv.draw(ctx, this.viewW, this.viewH, hud.ach);
       if (hud.map) G.TownMap.draw(ctx, this.viewW, this.viewH, hud.map.terrain, hud.map.markers, hud.map.player, hud.map.title, performance.now() / 1000);
       if (hud.admin) G.Admin.draw(ctx, this.viewW, this.viewH, hud.admin, hud.admin.me);
       if (hud.mini) this._drawMini(ctx, hud.mini);
       if (hud.settings) this._drawSettings(ctx, hud.settings);
       if (hud.pw) this._drawPassword(ctx, hud.pw);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.ach && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
