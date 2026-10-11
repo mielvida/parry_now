@@ -374,5 +374,5 @@
   };
 
   G.HomeTheme = HomeTheme;
-  G.Home = { levelFor, slots, drawDecor, drawDecorIcon, drawHouseIcon, drawLot, houseDef };
+  G.Home = { DRAW, levelFor, slots, drawDecor, drawDecorIcon, drawHouseIcon, drawLot, houseDef };
 })(window.Game);

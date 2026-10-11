@@ -232,7 +232,7 @@
       { const x = 236 * T + T / 2; if (inView(x, 160)) fountain(ctx, x, gyS, time); }
       { const x = 264 * T + T / 2; if (inView(x)) statue(ctx, x, gyS); }
       Beach.drawDecor(ctx, terrain, camera, time); // 가게, 문, 시민
-      const met = !!(terrain.story && terrain.story.kingMet);
+      const met = !!(terrain.story && terrain.story.kingMet) && !(terrain.story.legionDone && !terrain.story.harborDone); // 의문의 사람이 서 있는 동안 호위무사들이 문을 막는다
       for (const C2 of terrain.castles) { // 성문의 호위병: 처음엔 문을 막고 서 있고, 왕을 만난 뒤에는 양옆으로 비켜 선다
         const gx = C2.col * T + T / 2, gby = (C2.row + 1) * T;
         if (gx < camera.x - 200 || gx > camera.x + view + 100) continue;

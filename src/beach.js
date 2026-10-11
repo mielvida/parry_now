@@ -540,7 +540,7 @@
       ctx.fillStyle = '#e8d8a8'; ctx.fillRect(x + w / 2 - 34, baseY - 62, 68, 22);
       G.TextLayer.add('문 닫음', baseX, baseY - 51, 'bold 14px sans-serif', '#7a2a1a');
     }
-    G.TextLayer.add(gacha ? '뽑기' : dexhall ? '도감관' : tackle ? '낚시·채집' : fishmonger ? '생선 가게' : collector ? '곤충 채집가' : train ? '훈련소' : inn ? '여관' : food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    G.TextLayer.add(shop.label ? shop.label : gacha ? '뽑기' : dexhall ? '도감관' : tackle ? (shop.sea ? '다이빙 상점' : '낚시·채집') : fishmonger ? (shop.sea ? '해산물 가게' : '생선 가게') : collector ? '곤충 채집가' : train ? '훈련소' : inn ? '여관' : food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
@@ -608,6 +608,7 @@
     orecave: { name: '광물 동굴', a: '#4a3320', b: '#ffd68a' },
     meadow: { name: '성 밖 숲', a: '#3a8a3a', b: '#d8ffb0' },
     village: { name: '마을', a: '#2a9a8a', b: '#c0fff0' },
+    sea: { name: '바다', a: '#1a6aa8', b: '#aef0ff' },
     legion: { name: '군단 요새 (위험!)', a: '#5a2a1a', b: '#ffcf6a' },
     abyss: { name: '심연 동굴 (위험!)', a: '#5a0a14', b: '#ff5a3a' },
   };

@@ -64,6 +64,12 @@
     // 왕국의 광물 동굴에서만 나오는 새 광석 (kingdom: true): 가장 높은 단계
     { id: 'royal', name: '왕철', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#ffe9a0', '#b8860b'], bonus: { dmg: 60, boss: 40, hit: 2 } },
     { id: 'crownstone', name: '왕관석', cls: 'armor', tier: 4, weight: 1, kingdom: true, look: ['#fff0c8', '#c9961a'], bonus: { hp: 8, inv: 0.6, spd: 0.05 } },
+    { id: 'thunderiron', name: '천둥철', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#fff6a0', '#4a6ae8'], bonus: { dmg: 45, elem: 'light', crit: 0.04 } },
+    { id: 'frostking', name: '서리왕석', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#d8f4ff', '#3a7ad0'], bonus: { dmg: 40, elem: 'ice', hit: 1 } },
+    { id: 'cinderking', name: '재불왕석', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#ffb070', '#b02a10'], bonus: { dmg: 40, elem: 'fire', crit: 0.03 } },
+    { id: 'chainshot', name: '연쇄탄석', cls: 'gun', tier: 4, weight: 1, kingdom: true, look: ['#c0ffd0', '#2a8a50'], bonus: { gdmg: 40, radius: 0.5, crit: 0.05 } },
+    { id: 'ironhail', name: '철우석', cls: 'gun', tier: 4, weight: 1, kingdom: true, look: ['#d0d8e8', '#4a5a78'], bonus: { gdmg: 55, st: -5 } },
+    { id: 'kingward', name: '수호왕석', cls: 'armor', tier: 4, weight: 1, kingdom: true, look: ['#ffe8b0', '#2a6ad8'], bonus: { hp: 6, inv: 0.3, perk: 'volt' } },
     { id: 'piercer', name: '철갑탄석', cls: 'gun', tier: 4, weight: 1, kingdom: true, look: ['#ffd0a0', '#7a3a1a'], bonus: { gdmg: 45, pierce: true, crack: true } },
     { id: 'darksteel', name: '암흑강', cls: 'gun', tier: 4, weight: 1.4, look: ['#8a60d0', '#1a0a30'], bonus: { gdmg: 30, pierce: true } },
   ];

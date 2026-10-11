@@ -109,7 +109,29 @@
       }
     }
 
+    // 물속: 중력 없이 상하좌우로 헤엄친다 (swimSpeed = 오리발 강화로 빨라진다)
+    _swimStep(dt, input, terrain) {
+      this.blocking = false; this.slideT = 0; this.dashLeft = 0;
+      const sp = this.swimSpeed || 140;
+      const k = Math.min(1, dt * 5);
+      this.vx += (input.moveX * sp - this.vx) * k;
+      this.vy += ((input.moveY || 0) * sp + 14 - this.vy) * k; // 가만히 있으면 아주 천천히 가라앉는다
+      if (input.moveX) this.facing = input.moveX;
+      this._applyParry(dt, input);
+      this.onGround = false;
+      this.moveX(dt, terrain);
+      this.moveY(dt, terrain);
+      this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+      this.invuln = Math.max(0, this.invuln - dt);
+      this.guardTimer = Math.max(0, this.guardTimer - dt);
+      this.chainT = Math.max(0, (this.chainT || 0) - dt);
+      this.shadowTime = Math.max(0, this.shadowTime - dt);
+      this.animTime += dt;
+      this.runPhase += Math.hypot(this.vx, this.vy) * dt * 0.05;
+    }
+
     update(dt, input, terrain) {
+      if (this.swim) { this._swimStep(dt, input, terrain); return; }
       this._startDash(input);
       this.slideT = Math.max(0, (this.slideT || 0) - dt);
       if (this.slideT > 0 && (!this.onGround || input.jumpPressed || this.dashLeft > 0)) this.slideT = 0; // 점프하거나 대시하면 슬라이딩이 끝난다

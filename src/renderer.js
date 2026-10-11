@@ -95,7 +95,9 @@
       if (extras.chest) (extras.chest.door ? this._drawDoor(ctx, extras.chest) : this._drawChest(ctx, extras.chest));
       if (extras.pickups) for (const p of extras.pickups) this._drawPickup(ctx, p, time);
       if (extras.events) extras.events.draw(ctx, time, { x: camX, y: camY, w: this.viewW, h: this.viewH }); // 던전 이벤트 (샘, 함정, 상인 …)
-      if (extras.legion) G.Legion.draw(ctx, extras.legion, time); // 군단 요새: 전기 대포와 체크포인트
+      if (extras.legion) G.Legion.draw(ctx, extras.legion, time);
+      if (extras.sea) G.Sea.draw(ctx, extras.sea, time); // 바다: 헤엄치는 해산물과 거품
+      if (extras.stranger) G.Stranger.drawCloak(ctx, extras.stranger.x, extras.stranger.y, extras.stranger.facing, time, {}); // 군단 요새 문 앞에서 기다리는 의문의 사람 // 군단 요새: 전기 대포와 체크포인트
       if (extras.ores) extras.ores.draw(ctx, time, { x: camX, y: camY, w: this.viewW, h: this.viewH }); // 광물 동굴의 광석 덩어리
       if (extras.enemyShots) for (const f of extras.enemyShots) this._drawEnemyShot(ctx, f);
       if (extras.boss) extras.boss.drawFront(ctx); // 머리, 꼬리, 화염구
@@ -154,7 +156,7 @@
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
       this._drawEdgeTexts(main, hud);
-      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel || hud.ach));
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel || hud.ach || hud.cook));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
@@ -744,6 +746,25 @@
     }
 
     // (챕터 3 목표 판은 모든 플레이 화면에서 보인다)
+    // 해물 요리점의 요리 8가지의 그림
+    _drawSeaDishIcon(ctx, item) {
+      const L = item.look, art = item.seaDish;
+      const circ = (x, y, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+      const ell = (x, y, rx, ry, c, rot = 0) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); };
+      const rect = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+      const plate = () => { ell(0, 16, 28, 8, '#e8e4da'); ell(0, 15, 22, 5, '#c8c2b4'); };
+      const bowl = (c) => { ctx.fillStyle = '#4a3a2a'; ctx.beginPath(); ctx.moveTo(-24, -2); ctx.lineTo(24, -2); ctx.lineTo(17, 18); ctx.lineTo(-17, 18); ctx.closePath(); ctx.fill(); ell(0, -2, 24, 6, c); };
+      const steam = () => { ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; for (const x of [-8, 2, 10]) { ctx.beginPath(); ctx.moveTo(x, -10); ctx.quadraticCurveTo(x + 5, -16, x, -22); ctx.stroke(); } };
+      if (art === 'soup') { bowl(L[0]); circ(-8, -3, 4, '#f0a080'); circ(6, -2, 4, '#e8d8a0'); circ(0, -4, 3, '#7ac070'); steam(); }
+      else if (art === 'shrimp') { plate(); for (const dx of [-10, 6]) { ctx.strokeStyle = L[1]; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(dx, 8, 10, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke(); ctx.strokeStyle = L[0]; ctx.lineWidth = 5; ctx.stroke(); } ctx.lineCap = 'butt'; circ(18, 4, 4, '#7ac070'); }
+      else if (art === 'squid') { plate(); ell(0, 8, 24, 7, L[1]); ell(0, 6, 22, 5, L[0]); for (let i = -2; i <= 2; i++) rect(i * 8 - 1, 2, 2, 9, '#7a3a1a'); circ(20, 2, 4, '#7ac070'); }
+      else if (art === 'octo') { plate(); ell(0, 2, 12, 10, L[0]); for (let i = -2; i <= 2; i++) { ctx.strokeStyle = L[0]; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(i * 4, 8); ctx.quadraticCurveTo(i * 9, 14, i * 12, 18); ctx.stroke(); } circ(-4, 0, 2, '#fff'); circ(4, 0, 2, '#fff'); }
+      else if (art === 'stew') { bowl(L[0]); ell(-6, -3, 8, 3, '#e8c890', -0.2); circ(8, -3, 3, '#7ac070'); circ(-14, -3, 2.5, '#d86a5a'); steam(); }
+      else if (art === 'clam') { plate(); for (const dx of [-14, 0, 14]) { ctx.fillStyle = L[0]; ctx.beginPath(); ctx.arc(dx, 10, 10, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.strokeStyle = L[1]; ctx.lineWidth = 1.5; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(dx, 10); ctx.lineTo(dx + i * 5, 2); ctx.stroke(); } } circ(0, 4, 3, '#ffe9a0'); }
+      else if (art === 'tuna') { plate(); ell(0, 7, 22, 10, L[1]); ell(-1, 5, 19, 7, L[0]); ctx.strokeStyle = '#4a0a0a'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-10 + i * 9, 0); ctx.lineTo(-6 + i * 9, 10); ctx.stroke(); } circ(18, -2, 4, '#7ac070'); }
+      else { ctx.fillStyle = '#d4a017'; ctx.beginPath(); ctx.ellipse(0, 16, 32, 9, 0, 0, Math.PI * 2); ctx.fill(); ell(0, 14, 26, 6, '#ffe27a'); ell(-8, 4, 14, 9, '#c85a2a'); ell(12, 6, 8, 6, '#e8a040'); ctx.strokeStyle = '#4a7ab0'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(-18, 10, 8, Math.PI, Math.PI * 2.1); ctx.stroke(); ctx.lineCap = 'butt'; circ(22, 12, 5, '#d02a2a'); circ(26, 8, 4, '#8a4fb8'); }
+    }
+
     // 다크월드 회복 아이템 20가지의 그림
     _drawDarkFoodIcon(ctx, item) {
       const L = item.look || ['#fff', '#888'];
@@ -795,7 +816,7 @@
         case 'd_heart': // 용사의 심장
           ctx.fillStyle = L[1]; ctx.beginPath(); ctx.moveTo(0, 22); ctx.bezierCurveTo(-30, 0, -22, -22, 0, -10); ctx.bezierCurveTo(22, -22, 30, 0, 0, 22); ctx.fill();
           ctx.fillStyle = L[0]; ctx.beginPath(); ctx.moveTo(0, 17); ctx.bezierCurveTo(-24, 0, -17, -17, 0, -8); ctx.bezierCurveTo(17, -17, 24, 0, 0, 17); ctx.fill(); circ(-9, -6, 3, 'rgba(255,255,255,0.7)'); line(-22, 12, -14, 12, '#ffe27a', 2); line(22, 12, 14, 12, '#ffe27a', 2); break;
-        default: circ(0, 6, 12, L[0]);
+        default: if (item.cookKey) { G.Cook.drawDish(ctx, item.cookKey, 0); break; } if (item.seaDish) { this._drawSeaDishIcon(ctx, item); break; } circ(0, 6, 12, L[0]);
       }
     }
 
@@ -864,6 +885,22 @@
         ctx.beginPath();
         for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; const rr = k % 2 ? 7 : 17; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
         ctx.closePath(); ctx.fill();
+      } else if (item.xm) { // 경험돈: 금화와 파란 별
+        ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(-6, 4, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b8860b'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('G', -6, 4);
+        ctx.fillStyle = '#5aa0ff'; ctx.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 5 : 12, a = -Math.PI / 2 + (i * Math.PI) / 5; ctx.lineTo(10 + Math.cos(a) * r, -8 + Math.sin(a) * r); } ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+      } else if (item.upgrade === 'divesuit') { // 잠수복
+        ctx.fillStyle = L[1]; ctx.fillRect(-12, -16, 24, 30); ctx.fillRect(-20, -14, 8, 22); ctx.fillRect(12, -14, 8, 22); ctx.fillRect(-10, 14, 8, 12); ctx.fillRect(2, 14, 8, 12);
+        ctx.fillStyle = L[0]; ctx.fillRect(-3, -16, 6, 30); ctx.beginPath(); ctx.arc(0, -20, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#bfe8ff'; ctx.fillRect(-4, -23, 8, 5);
+      } else if (item.upgrade === 'divelamp') { // 랜턴
+        ctx.fillStyle = '#5a6272'; ctx.fillRect(-8, -18, 16, 8); ctx.fillRect(-7, 8, 14, 8); ctx.fillStyle = L[0]; ctx.fillRect(-9, -10, 18, 18); const gl = ctx.createRadialGradient(0, 0, 2, 0, 0, 26); gl.addColorStop(0, 'rgba(255,240,160,0.8)'); gl.addColorStop(1, 'rgba(255,240,160,0)'); ctx.fillStyle = gl; ctx.fillRect(-26, -26, 52, 52); ctx.fillStyle = L[1]; ctx.fillRect(-1, -10, 2, 18);
+      } else if (item.upgrade === 'divetank') { // 산소통
+        ctx.fillStyle = L[1]; ctx.fillRect(-9, -18, 18, 36); ctx.fillStyle = L[0]; ctx.fillRect(-6, -15, 12, 30);
+        ctx.fillStyle = '#dfe8f4'; ctx.fillRect(-4, -26, 8, 10); ctx.fillStyle = '#e8334a'; ctx.fillRect(-10, -4, 20, 4);
+        ctx.strokeStyle = '#dfe8f4'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(4, -26); ctx.quadraticCurveTo(18, -30, 16, -14); ctx.stroke();
+      } else if (item.upgrade === 'divefins') { // 오리발
+        ctx.fillStyle = L[1]; ctx.beginPath(); ctx.moveTo(-6, -22); ctx.lineTo(6, -22); ctx.lineTo(18, 20); ctx.lineTo(-18, 20); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.moveTo(-3, -18); ctx.lineTo(3, -18); ctx.lineTo(11, 16); ctx.lineTo(-11, 16); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(-1, -14, 2, 28);
       } else if (item.upgrade === 'stmax' || item.upgrade === 'stregen') { // 스태미나: 번개 병과 위 화살표
         ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-15, -4, 30, 26);
         ctx.fillStyle = L[0]; ctx.fillRect(-13, 0, 26, 22);
@@ -1630,6 +1667,53 @@
     }
 
     // [갑옷] 리벳 박기: 나온 화살표를 순서대로 누른다. 틀리거나 늦으면 그 줄을 새로
+    // 칸 그림의 위치 (main이 마우스 클릭을 칸으로 바꿀 때도 쓴다)
+    static boardGeometry(W, H) {
+      const cs = 54, gap = 5, n = 5;
+      const total = n * cs + (n - 1) * gap;
+      return { x0: Math.round(W / 2 - total / 2), y0: 122, cs, gap, n };
+    }
+    // [갑옷] 리벳 보드게임: 5x5 판. 누르면 이웃 칸까지 리벳이 뒤집힌다. 모두 박으면 성공
+    _drawBoardGame(ctx, a) {
+      const W = this.viewW;
+      const defs = G.Shop.ITEMS;
+      const armor = defs[a.weaponId];
+      ctx.save();
+      const P = this._attachFrame(ctx, a, '부착 — 리벳 보드게임', `리벳 ${a.board.filter(Boolean).length} / ${a.board.length}`);
+      const g = Renderer.boardGeometry(W, this.viewH), n = g.n;
+      const total = n * g.cs + (n - 1) * g.gap;
+      ctx.fillStyle = '#2b3350'; ctx.fillRect(g.x0 - 14, g.y0 - 14, total + 28, total + 28);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.strokeRect(g.x0 - 14, g.y0 - 14, total + 28, total + 28);
+      const cr = Math.floor(a.cur / n), cc = a.cur % n;
+      for (let i = 0; i < n * n; i++) {
+        const r = Math.floor(i / n), c = i % n;
+        const x = g.x0 + c * (g.cs + g.gap), y = g.y0 + r * (g.cs + g.gap);
+        const on = a.board[i];
+        const near = (r === cr && Math.abs(c - cc) <= 1) || (c === cc && Math.abs(r - cr) <= 1); // 누르면 뒤집힐 칸
+        ctx.fillStyle = on ? '#8a93a8' : '#3a4156'; ctx.fillRect(x, y, g.cs, g.cs);
+        ctx.fillStyle = on ? '#aab4c8' : '#2e3548'; ctx.fillRect(x + 3, y + 3, g.cs - 6, g.cs - 6);
+        ctx.fillStyle = on ? '#ffe9a0' : '#171c2a'; ctx.beginPath(); ctx.arc(x + g.cs / 2, y + g.cs / 2, on ? 13 : 10, 0, Math.PI * 2); ctx.fill();
+        if (on) { ctx.fillStyle = '#fff6d0'; ctx.beginPath(); ctx.arc(x + g.cs / 2 - 3, y + g.cs / 2 - 3, 3.5, 0, Math.PI * 2); ctx.fill(); }
+        if (near) { ctx.strokeStyle = 'rgba(255,213,74,0.5)'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, g.cs - 2, g.cs - 2); }
+        if (i === a.cur) { ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 4; ctx.strokeRect(x - 2, y - 2, g.cs + 4, g.cs + 4); }
+        if (i === a.flashCell && a.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${0.5 * a.flash})`; ctx.fillRect(x, y, g.cs, g.cs); }
+      }
+      // 옆: 갑옷과 박힌 리벳 수
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      this._drawItemIcon(ctx, armor, g.x0 - 110, g.y0 + total / 2, 1.4);
+      this._drawItemIcon(ctx, armor, g.x0 + total + 110, g.y0 + total / 2, 1.4);
+      ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#b8c2dc';
+      ctx.fillText(`움직임 ${a.moves}회`, W / 2, g.y0 + total + 26);
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = a.msgT > 0 ? '#7dffa0' : 'rgba(0,0,0,0)';
+      ctx.fillText(a.msg, W / 2, P.y + P.h - 76);
+      ctx.font = '15px sans-serif'; ctx.fillStyle = '#9aa4c0';
+      ctx.fillText(`${a.oreName} 주괴로 ${armor.name}에 리벳을 박는다  ·  난이도 ${['쉬움', '보통', '어려움', '최대'][a.tier - 1]}`, W / 2, P.y + P.h - 48);
+      ctx.fillText('방향키(또는 WASD)로 칸 고르기 · Space/Enter/클릭: 누르기(이웃 칸도 뒤집힘) · Z: 무르기 · R: 처음 판으로 · Esc: 포기', W / 2, P.y + P.h - 24);
+      this._attachResult(ctx, a, P);
+      ctx.restore();
+    }
+
     _drawSeqGame(ctx, a) {
       const W = this.viewW;
       const defs = G.Shop.ITEMS;
@@ -1683,6 +1767,7 @@
     _drawAttachGame(ctx, a) {
       if (a.mode === 'dial') { this._drawDialGame(ctx, a); return; }
       if (a.mode === 'seq') { this._drawSeqGame(ctx, a); return; }
+      if (a.mode === 'board') { this._drawBoardGame(ctx, a); return; }
       if (a.mode && a.mode !== 'hammer') { this._drawAttachMini(ctx, a); return; }
       const W = this.viewW, H = this.viewH;
       const defs = G.Shop.ITEMS;
@@ -1803,7 +1888,7 @@
         const placing = s.mode === 'place'; // 꾸미기 창: 가격 대신 놓기/치우기
         const lives_here = !!it.house && s.inv.home.type === it.id;
         const owned = !it.forge && (maxed || lives_here || (!!(it.slot || it.tool) && s.inv.items.includes(it.id) && !(G.Forge && G.Forge.canMerge(it))));
-        const afford = it.forge ? it.afford(s.inv, s.coins) : it.upgrade === 'holy' ? (s.inv.materials.holycrystal || 0) >= 1 : (it.expCost ? s.exp : s.coins) >= price;
+        const afford = it.canBuy ? it.canBuy(s.inv, s.coins, s.exp) : it.forge ? it.afford(s.inv, s.coins) : it.upgrade === 'holy' ? (s.inv.materials.holycrystal || 0) >= 1 : (it.expCost ? s.exp : s.coins) >= price;
         const hover = s.hover === i;
         ctx.fillStyle = hover ? 'rgba(255,213,74,0.16)' : 'rgba(255,255,255,0.07)';
         ctx.fillRect(row.x, row.y, row.w, row.h);
@@ -1827,7 +1912,7 @@
         ctx.textAlign = 'right';
         ctx.font = 'bold 23px sans-serif';
         ctx.fillStyle = it.forge && it.kind === 'info' ? '#8fb8ff' : placing ? (it.id === s.slotItem ? '#8a93a8' : '#7dffa0') : owned ? '#8a93a8' : afford ? '#ffd54a' : '#ff6b7a';
-        const label = it.forge ? it.label(s.inv) : placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : it.upgrade === 'holy' ? '크리스탈 1개' : it.devil && it.devil !== 'back' ? '피 1칸' : it.expCost ? `${price} EXP` : `${price} G`;
+        const label = it.forge ? it.label(s.inv) : placing ? (it.clear ? '치우기' : it.id === s.slotItem ? '놓여 있음' : '놓기') : maxed ? '최고 레벨' : lives_here ? '거주 중' : owned ? '보유 중' : it.upgrade === 'holy' ? '크리스탈 1개' : it.priceLabel ? it.priceLabel(s.inv, s.coins, s.exp) : it.devil && it.devil !== 'back' ? '피 1칸' : it.expCost ? `${price} EXP` : `${price} G`;
         const twoLine = it.heal !== undefined || it.consumable || (it.decor && !it.clear);
         ctx.fillText(label, row.x + row.w - 16, row.y + row.h / 2 - (twoLine ? 8 : 0));
         if (twoLine) { // 물약/장식품은 가진 개수를 보여준다
@@ -2380,7 +2465,7 @@
     // 땅 위의 작은 디테일: 풀, 꽃, 버섯, 눈 더미, 용암 균열, 보랏빛 룬, 종유석/고드름 (타일 좌표로 정해져 항상 같은 자리에 난다)
     _kindOfTheme() {
       const th = this.theme;
-      return th === G.Snow ? 'snow' : th === G.Volcano ? 'volcano' : th === G.DarkTheme ? 'dark' : th === G.Cave ? 'cave' : th === G.Beach ? 'beach' : 'grass';
+      return th === G.Sea.Theme ? 'sea' : th === G.Snow ? 'snow' : th === G.Volcano ? 'volcano' : th === G.DarkTheme ? 'dark' : th === G.Cave ? 'cave' : th === G.Beach ? 'beach' : 'grass';
     }
 
     _drawGroundDecor(ctx, terrain, camera, time) {
@@ -3099,11 +3184,20 @@
         ctx.globalAlpha = 1;
       }
       // 무적 중엔 깜빡인다
-      const shadow = p.shadowTime > 0; // 그림자 단검: 흐릿하게 (피격 깜빡임과 구분)
-      const blink = !shadow && p.invuln > 0 && Math.floor(p.invuln / 0.08) % 2 === 0;
+      const shadow = p.shadowTime > 0 && !p.dead && !(p.lying > 0) && !(p.suck > 0); // 그림자 단검: 흐릿하게 (피격 깜빡임과 구분)
+      const blink = !shadow && !p.dead && !(p.lying > 0) && !(p.suck > 0) && p.invuln > 0 && Math.floor(p.invuln / 0.08) % 2 === 0; // 죽거나 쓰러질 때는 투명해지지 않는다
       if (blink) ctx.globalAlpha = 0.3;
       if (shadow) ctx.globalAlpha = 0.4;
-      this._paintPlayer(ctx, p);
+      if (p.lying > 0 || p.suck > 0) { // 칼에 맞아 뒤로 쓰러진다 / 차원문에 빨려 든다
+        const cx = p.x + p.w / 2, by = p.y + p.h;
+        ctx.save(); ctx.translate(cx, by - 4);
+        const away = p.facing >= 0 ? -1 : 1;
+        ctx.rotate(away * (p.lying || 0) * (Math.PI / 2) + (p.suck || 0) * 9);
+        const sc = 1 - 0.95 * (p.suck || 0);
+        ctx.scale(sc, sc); ctx.translate(-cx, -(by - 4));
+        this._paintPlayer(ctx, p);
+        ctx.restore();
+      } else this._paintPlayer(ctx, p);
       ctx.globalAlpha = 1;
       // 패링 상태바: 몸 옆(등 뒤)에 세로로 선다.
       //   휘두르는 중 = 주황 / 쿨다운 = 차오르는 막대 (주황 -> 노랑 -> 초록) / 맞혔다 = 하늘색 "2단" (쿨다운이 없어져 바로 다시 공격할 수 있다)
@@ -3178,6 +3272,7 @@
       else if (m.kind === 'darkstone') this._paintDarkStone(ctx, m);
       else if (m.kind === 'shade') this._paintShade(ctx, m);
       else if (m.kind === 'raider') this._paintRaider(ctx, m);
+      else if (m.kind === 'seafish') G.Sea.paintFish(ctx, m, performance.now() / 1000);
       else if (m.kind === 'dummy') this._paintDummy(ctx, m);
       else this._paintSlime(ctx, m);
       if (m.dark) this._drawDarkAura(ctx, m);
@@ -3961,6 +4056,8 @@
         ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.fillText(`${q.cur}/${q.max}`, x + w - 10, y + 14);
         ctx.restore();
       }
+      if (hud.dive && !hud.shop && !hud.equip && !hud.dev && !hud.settings && !hud.mini && !hud.admin && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.ach) G.Sea.drawHud(ctx, this.viewW, this.viewH, hud.dive); // 수심과 산소 게이지
+      if (hud.cook) G.Cook.draw(ctx, this.viewW, this.viewH, hud.cook.ui, hud.cook.inv); // 가스레인지 요리 창
       if (hud.gacha) this._drawGacha(ctx, hud.gacha);
       if (hud.floorSel) this._drawFloorSelect(ctx, hud.floorSel);
       if (hud.ach) G.Achv.draw(ctx, this.viewW, this.viewH, hud.ach);
@@ -3970,7 +4067,7 @@
       if (hud.settings) this._drawSettings(ctx, hud.settings);
       if (hud.pw) this._drawPassword(ctx, hud.pw);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.ach && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.ach && !hud.cook && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

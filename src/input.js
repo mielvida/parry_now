@@ -42,6 +42,9 @@
     get moveX() {
       return (this._anyDown(RIGHT) ? 1 : 0) - (this._anyDown(LEFT) ? 1 : 0);
     }
+    get moveY() { // 물속에서 위(W/↑/Space) -1, 아래(S/↓) +1
+      return (this._anyDown(['ArrowDown', 'KeyS']) ? 1 : 0) - (this._anyDown(['ArrowUp', 'KeyW', 'Space']) ? 1 : 0);
+    }
     get jumpHeld() {
       return this._anyDown(JUMP);
     }

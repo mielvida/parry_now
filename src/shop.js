@@ -301,7 +301,7 @@
   }
   // 꾸미기 창의 물품 목록: 가진 장식품(그 자리에 놓을 수 있는 종류) + 치우기. 5개 넘으면 4개씩 쪽으로 나눈다
   function placeTabs(inv, kind) {
-    const list = [{ id: 'clear', clear: true, name: '치우기' }].concat(DECOR.filter((d) => d.place === kind && (inv.home.owned[d.id] || 0) > 0).map((d) => ITEMS[d.id]));
+    const list = [{ id: 'clear', clear: true, name: '치우기' }].concat(Object.values(ITEMS).filter((d) => d.decor && d.place === kind && (inv.home.owned[d.id] || 0) > 0)); // 바다·주방 장식도 모두 놓을 수 있다
     if (list.length <= 5) return [{ name: '놓기', items: list }];
     const tabs = [];
     for (let k = 0; k < list.length; k += 4) tabs.push({ name: `${tabs.length + 1}쪽`, items: list.slice(k, k + 4) });
@@ -351,6 +351,11 @@
   add({ id: 'dv_exp', name: '악마와의 거래: 지식', devil: 'exp', price: 0, desc: '최대 피 1칸을 바치면 경험치 1500을 준다', look: ['#9fd8ff', '#6a1a1a'] });
   add({ id: 'dv_power', name: '악마와의 거래: 힘', devil: 'power', price: 0, desc: '최대 피 1칸을 바치면 대미지가 영구히 +2 (최대 5번)', look: ['#ff6a4a', '#6a1a1a'] });
   add({ id: 'dv_back', name: '악마에게서 되찾기', devil: 'back', price: 6000, desc: '코인 6000 G를 주면 바쳤던 최대 피 1칸을 돌려받는다', look: ['#c8a0ff', '#3a1a5a'] });
+  // 다이빙 장비 (바다의 다이빙 상점, 코인): 산소통 = 물속에서 버티는 시간, 오리발 = 헤엄 속도
+  add({ id: 'divetank', name: '산소통', upgrade: 'divetank', look: ['#7ad0ff', '#2a6aa8'] });
+  add({ id: 'divefins', name: '오리발', upgrade: 'divefins', look: ['#ffd54a', '#c8781a'] });
+  add({ id: 'divesuit', name: '잠수복', upgrade: 'divesuit', look: ['#3a4a8a', '#1a2a5a'] });
+  add({ id: 'divelamp', name: '랜턴', upgrade: 'divelamp', look: ['#fff0a0', '#c8a02a'] });
   add({ id: 'wup', name: '무기 강화', upgrade: 'weapon', expCost: true, look: ['#7dd0ff', '#2a6fb0'] });
   add({ id: 'aup', name: '갑옷 강화', upgrade: 'armor', expCost: true, look: ['#ff9a7a', '#b0402a'] });
   //  holy: 대장간에서 신성 크리스탈을 지금 낀 칼에 붙인다. 붙인 개수 n개 = 탑의 보스에게 주는 대미지 x(n+1)
@@ -377,8 +382,15 @@
   const speedMult = (level) => 1 + ((C.VILLAGE_SPEED_MAX - 1) * Math.min(level, C.VILLAGE_SPEED_LEVELS)) / C.VILLAGE_SPEED_LEVELS;
   const critDamage = (inv) => C.CRIT_BASE_DAMAGE + Math.min(inv.critLevel, C.CRIT_MAX_LEVEL);
   const abyssReward = (lv) => 2000 + 800 * (lv - 1); // 심연 동굴 상자 코인: 보상 상점에서 올릴수록 늘어난다 (최대 레벨이 없다)
-  const levelOf = (item, inv) => (item.upgrade === 'abyss' ? inv.abyssLevel || 1 : item.upgrade === 'train' ? trainLv(inv, item.trainKey) : item.upgrade === 'stmax' ? inv.stMaxLevel || 0 : item.upgrade === 'stregen' ? inv.stRegenLevel || 0 : item.upgrade === 'holy' ? holyLevel(inv) : item.upgrade === 'weapon' ? weaponLevel(inv) : item.upgrade === 'armor' ? inv.armorLevel || 0 : item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
-  const maxLevelOf = (item) => (item.upgrade === 'abyss' ? Infinity : item.upgrade === 'train' ? TRAIN[item.trainKey].max : item.upgrade === 'stmax' ? C.STAMINA_MAX_LEVELS : item.upgrade === 'stregen' ? C.STAMINA_REGEN_LEVELS : item.upgrade === 'holy' ? HOLY_MAX : item.upgrade === 'weapon' ? WUP_MAX : item.upgrade === 'armor' ? AUP_MAX : item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
+  const diveOf = (inv, k) => (inv.dive && inv.dive[k]) || 0;
+  const DIVE = { // 업그레이드 종류 -> 저장 키, 이름, 값 식, 설명
+    divetank: { k: 'tank', val: (l) => 45 + 20 * l, unit: '초', what: '산소', note: '물속에서 숨을 오래 참는다 (산소 0이면 숨이 막힌다)', price: (l) => 600 + 500 * l + 160 * l * l },
+    divefins: { k: 'fins', val: (l) => 140 + 16 * l, unit: '', what: '헤엄 속도', note: '물속을 더 빨리 헤엄친다', price: (l) => 600 + 500 * l + 160 * l * l },
+    divesuit: { k: 'suit', val: (l) => 100 - 5 * l, unit: '%', what: '산소 소모', note: '잠수복: 산소가 덜 닳는다 (Lv마다 -5%)', price: (l) => 800 + 600 * l + 200 * l * l },
+    divelamp: { k: 'lamp', val: (l) => l, unit: '단계', what: '랜턴 밝기', note: '랜턴: 깊은 바다가 더 밝게 보인다', price: (l) => 500 + 400 * l + 120 * l * l },
+  };
+  const levelOf = (item, inv) => (DIVE[item.upgrade] ? diveOf(inv, DIVE[item.upgrade].k) : item.upgrade === 'abyss' ? inv.abyssLevel || 1 : item.upgrade === 'train' ? trainLv(inv, item.trainKey) : item.upgrade === 'stmax' ? inv.stMaxLevel || 0 : item.upgrade === 'stregen' ? inv.stRegenLevel || 0 : item.upgrade === 'holy' ? holyLevel(inv) : item.upgrade === 'weapon' ? weaponLevel(inv) : item.upgrade === 'armor' ? inv.armorLevel || 0 : item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
+  const maxLevelOf = (item) => (DIVE[item.upgrade] ? 10 : item.upgrade === 'abyss' ? Infinity : item.upgrade === 'train' ? TRAIN[item.trainKey].max : item.upgrade === 'stmax' ? C.STAMINA_MAX_LEVELS : item.upgrade === 'stregen' ? C.STAMINA_REGEN_LEVELS : item.upgrade === 'holy' ? HOLY_MAX : item.upgrade === 'weapon' ? WUP_MAX : item.upgrade === 'armor' ? AUP_MAX : item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
   // 훈련소 (왕국): 코인으로 산 훈련은 영구히 강해진다
   const TRAIN = {
     str: { max: 15, base: 600, step: 350, unit: '근접·원거리 대미지 +1', per: (lv) => `대미지 +${lv}` },
@@ -393,6 +405,7 @@
     if (!item.upgrade) return item.price;
     if (item.expCost && item.base) { const b = ITEMS[item.base]; return upMaxed(b, inv) ? 0 : Math.max(10, Math.round(priceOf(b, inv) / 4 / 10) * 10); } // EXP 업그레이드는 코인 값의 1/4
     if (upMaxed(item, inv)) return 0;
+    if (DIVE[item.upgrade]) return Math.round(DIVE[item.upgrade].price(levelOf(item, inv)) / 10) * 10;
     if (item.upgrade === 'abyss') return 4000 + 2500 * ((inv.abyssLevel || 1) - 1);
     if (item.upgrade === 'train') { const t = TRAIN[item.trainKey]; const g = t.base + t.step * trainLv(inv, item.trainKey); return item.expCost ? Math.max(10, Math.round(g / 4 / 10) * 10) : g; } // EXP 훈련은 코인 값의 1/4
     if (item.upgrade === 'stmax') return C.STAMINA_MAX_PRICE + C.STAMINA_MAX_PRICE_STEP * (inv.stMaxLevel || 0);
@@ -409,6 +422,7 @@
 
   // 아이템 한 개의 이름/설명 (상점과 인벤토리 창이 보여준다)
   function describe(item, inv) {
+    if (item.onDescribe) return item.onDescribe(item, inv); // 길드 현상금, 경험돈 같은 자체 설명이 있는 항목
     if (item.forge) return item.view(inv); // 대장간의 합치기/제련/부착 카드
     if (item.upgrade === 'abyss') { // 심연 동굴 보상 (왕국의 보상 상점)
       const lv = inv ? inv.abyssLevel || 1 : 1;
@@ -424,6 +438,11 @@
     if (item.devil) return { name: item.name, desc: item.desc, slotName: '악마의 거래', note: item.devil === 'back' ? (inv && inv.devilHearts ? `바친 피 ${inv.devilHearts}칸` : '') : `지금까지 바친 피 ${inv ? inv.devilHearts || 0 : 0}칸` };
     if (item.service) return { name: item.name, desc: item.desc, slotName: '서비스', note: item.note || '' };
     if (item.catch) return { name: item.name, desc: item.desc, slotName: item.catch === 'fish' ? '물고기' : '곤충', note: `${item.tier}등급 · ${item.catch === 'fish' ? '생선 가게' : '곤충 채집가'}에 팔자` };
+    if (DIVE[item.upgrade]) { // 다이빙 장비
+      const D = DIVE[item.upgrade];
+      const lv = inv ? diveOf(inv, D.k) : 0;
+      return { name: `${item.name}  Lv ${lv}/10`, desc: lv >= 10 ? `최고 레벨! ${D.what} ${D.val(lv)}${D.unit}` : `${D.what} ${D.val(lv)}${D.unit} -> ${D.val(lv + 1)}${D.unit}`, slotName: '다이빙', note: D.note };
+    }
     if (item.upgrade === 'stmax') {
       const lv = inv ? inv.stMaxLevel || 0 : 0;
       const desc = lv >= C.STAMINA_MAX_LEVELS ? `최고 레벨! 최대 스태미나 ${staminaMax(inv)}` : `최대 스태미나 ${staminaMax(inv)} -> ${staminaMax(inv) + C.STAMINA_MAX_STEP}`;
@@ -614,6 +633,8 @@
         { name: '간식·만찬', items: ids('f_cake', 'f_feast') },
       ],
     },
+    divegear: { title: '다이빙 상점', tabs: [{ name: '장비', items: ids('divetank', 'divefins') }] },
+    divegear2: { title: '잠수 장비점', tabs: [{ name: '장비', items: ids('divesuit', 'divelamp') }] },
     ditem: {
       title: '다크월드 아이템 상점',
       tabs: [
@@ -699,9 +720,9 @@
     const ai = armorInfo(inv);   // 방어구에 붙인 주괴 보너스
     return {
       reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl + ab.reach) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
-      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg + trn.str : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
+      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg + trn.str + 0.05 * (inv.xmUsed || 0) : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
       bossBonus: w.shot ? 0 : wBonus(wl) + ab.boss,  // 강화: 근접 무기는 보스에게 더 아프다 (레벨이 오를수록 더 크게)
-      baseDmg: w.shot ? 1 : meleeBase(w) + ab.dmg + trn.str,
+      baseDmg: (w.shot ? 1 : meleeBase(w) + ab.dmg + trn.str) + 0.05 * (inv.xmUsed || 0), // 경험돈으로 올린 영구 대미지(개당 0.05)
       hitPower: w.shot ? 1 : 1 + Math.floor(wBonus(wl) / 5) + Math.floor(meleeBase(w) / 4) + ab.hit + Math.floor(ab.dmg / 3), // 단단한 몬스터를 한 번에 깎는 횟수
       staminaAdd: ab.st,                              // 쏘는 무기: 한 번에 드는 스태미나 증감 (티타늄 등은 줄여 준다)
       radiusAdd: ab.radius,                           // 폭탄 폭발 범위 증가(칸)
@@ -726,6 +747,7 @@
 
   // 구매 시도. wallet = { coins, lives, maxLives, inv }를 직접 고치고, 결과 메시지를 돌려준다
   function buy(item, wallet) {
+    if (item.onBuy) return item.onBuy(item, wallet); // 길드 현상금, 경험돈 같은 자체 구입 처리가 있는 항목
     if (item.consumable) { // 소모품: 개수가 쌓인다
       if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
       wallet.coins -= item.price;
@@ -836,6 +858,16 @@
       const id = wallet.inv.equipped.weapon;
       wallet.inv.wlevel[id] = (wallet.inv.wlevel[id] || 0) + 1;
       return { ok: true, msg: `${ITEMS[id].name} Lv ${wallet.inv.wlevel[id]}! 강화 완료.` };
+    }
+    if (DIVE[item.upgrade]) { // 다이빙 상점 / 잠수 장비점
+      const D = DIVE[item.upgrade];
+      if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
+      const cost = priceOf(item, wallet.inv);
+      if (wallet.coins < cost) return { ok: false, msg: '코인이 부족해요.' };
+      wallet.coins -= cost;
+      wallet.inv.dive = wallet.inv.dive || { tank: 0, fins: 0 };
+      wallet.inv.dive[D.k] = (wallet.inv.dive[D.k] || 0) + 1;
+      return { ok: true, msg: `${item.name} Lv ${wallet.inv.dive[D.k]}! ${D.what} ${D.val(wallet.inv.dive[D.k])}${D.unit}` };
     }
     if (item.upgrade === 'stmax' || item.upgrade === 'stregen') { // 보상 상점: 스태미나
       if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
@@ -1005,5 +1037,5 @@
   for (const k of ['dweapon', 'darmor', 'dupgrade', 'ditem']) for (const t of SHOPS[k].tabs) for (const it of t.items) darkIds.add(it.id);
   for (const it of Object.values(ITEMS)) if (it.price > 0 && !it.upgrade && !it.noMult && !it.catch && !darkIds.has(it.id)) it.price = Math.round((it.price * (C.PRICE_MULT || 1)) / 10) * 10;
 
-  G.Shop = { DARK_CONS_IDS, abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
+  G.Shop = { CONSUMABLE_IDS, DARK_CONS_IDS, abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
 })(window.Game);

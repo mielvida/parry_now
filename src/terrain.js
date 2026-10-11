@@ -82,6 +82,10 @@
           if (ch === 's') this.shops.push({ col: c, row: r, kind: 'tackle' }); // 낚시·채집 용품점
           if (ch === 'x') this.shops.push({ col: c, row: r, kind: 'fishmonger' }); // 생선 가게 (물고기를 산다)
           if (ch === 'l') this.shops.push({ col: c, row: r, kind: 'collector' }); // 곤충 채집가 (곤충을 산다)
+          if (ch === '4') this.shops.push({ col: c, row: r, kind: 'train', sub: 'guild', label: '모험가 길드' }); // 왕국의 모험가 길드 (현상금)
+          if (ch === '5') this.shops.push({ col: c, row: r, kind: 'fishmonger', sea: true }); // 바다의 해산물 가게
+          if (ch === '6') this.shops.push({ col: c, row: r, kind: 'tackle', sea: true, dive: true }); // 바다의 다이빙 상점
+          if (ch === '8') this.gates.push({ col: c, row: r, stage: 'sea' }); // 항구 마을 오른쪽의 바다
           if (ch === 'h') this.gates.push({ col: c, row: r, stage: 'meadow' }); // 성 밖 숲으로
           if (ch === 'c') this.gates.push({ col: c, row: r, stage: 'village' }); // 마을로 가는 포탈
           if (ch === 'V') this.villagers.push({ col: c, row: r });
