@@ -163,7 +163,22 @@
   function drawSword(ctx, angle) {
     ctx.save();
     ctx.rotate(angle * DEG);
-    if (weaponType === 'staff') { // 지팡이: 나무 막대 + 끝의 빛나는 구슬
+    if (weaponType === 'rod') { // 낚싯대: 가늘고 긴 대와 릴, 늘어진 낚싯줄과 찌
+      rect(ctx, '#8a5a2b', -6, -1, 46, 2);
+      rect(ctx, blade[0], 30, -1, 10, 2);
+      circle(ctx, blade[1], 2, 2.5, 3);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(40, 0); ctx.quadraticCurveTo(46, 10, 44, 20); ctx.stroke();
+      circle(ctx, '#e8334a', 44, 21, 2.2); rect(ctx, '#ffffff', 42, 20.6, 4, 1);
+    } else if (weaponType === 'net') { // 잠자리채: 긴 자루와 끝의 둥근 그물
+      rect(ctx, '#8a5a2b', -6, -1.2, 36, 2.4);
+      ctx.strokeStyle = blade[1]; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.ellipse(38, 0, 9, 7, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(235,245,255,0.35)'; ctx.beginPath(); ctx.ellipse(38, 0, 9, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 0.6;
+      for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(38 + i * 3.5, -6); ctx.lineTo(38 + i * 3, 6); ctx.stroke(); }
+      for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(30, j * 3.6); ctx.lineTo(47, j * 3.6); ctx.stroke(); }
+      rect(ctx, blade[0], 27, -2.2, 4, 4.4);
+    } else if (weaponType === 'staff') { // 지팡이: 나무 막대 + 끝의 빛나는 구슬
       rect(ctx, '#6b4423', -8, -1.5, 36, 3);
       rect(ctx, '#e0b12f', 22, -3, 3, 6);
       const orb = ctx.createRadialGradient(33, 0, 1, 33, 0, 9);

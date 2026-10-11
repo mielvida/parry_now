@@ -363,6 +363,7 @@
       return { name: `${item.name}  Lv ${lv}/${t.max}`, desc, slotName: '훈련', note: `레벨마다 ${t.unit} (영구)` };
     }
     if (item.service) return { name: item.name, desc: item.desc, slotName: '서비스', note: item.note || '' };
+    if (item.catch) return { name: item.name, desc: item.desc, slotName: item.catch === 'fish' ? '물고기' : '곤충', note: `${item.tier}등급 · ${item.catch === 'fish' ? '생선 가게' : '곤충 채집가'}에 팔자` };
     if (item.upgrade === 'stmax') {
       const lv = inv ? inv.stMaxLevel || 0 : 0;
       const desc = lv >= C.STAMINA_MAX_LEVELS ? `최고 레벨! 최대 스태미나 ${staminaMax(inv)}` : `최대 스태미나 ${staminaMax(inv)} -> ${staminaMax(inv) + C.STAMINA_MAX_STEP}`;
@@ -607,6 +608,7 @@
       wlevel: {}, // 무기 강화 레벨 (무기 id마다)
       armorLevel: 0, // 갑옷 강화 레벨 (최대 피 +1칸 / 레벨)
       train: {}, // 훈련소 훈련 레벨 {str, foc, agi, end}
+      fish: {}, bugs: {}, catchVal: {}, // 잡은 물고기/곤충 마릿수와 종마다 합친 값(팔 때 받는 돈)
       equipped: { weapon: 'wood0', helmet: null, armor: 'rags', gloves: null, pants: null, boots: null, pick: null },
     };
   }
@@ -782,10 +784,10 @@
 
   // 인벤토리 격자에 들어갈 칸 목록: 장비(얻은 순서) 다음에 가진 물약(개수 포함)
   // 인벤토리 분류: 전체 / 무기 / 방어구 / 소모품 / 재료
-  const CATEGORIES = [{ id: 'all', name: '전체' }, { id: 'weapon', name: '무기' }, { id: 'armor', name: '방어구' }, { id: 'consume', name: '소모품' }, { id: 'material', name: '재료' }];
-  const catOf = (it) => (it.quest || it.tool ? 'material' : it.consumable || it.heal !== undefined ? 'consume' : it.slot === 'weapon' ? 'weapon' : 'armor');
+  const CATEGORIES = [{ id: 'all', name: '전체' }, { id: 'weapon', name: '무기' }, { id: 'armor', name: '방어구' }, { id: 'consume', name: '소모품' }, { id: 'food', name: '음식' }, { id: 'catch', name: '채집' }, { id: 'material', name: '재료' }];
+  const catOf = (it) => (it.catch ? 'catch' : it.quest || it.tool ? 'material' : it.food !== undefined ? 'food' : it.consumable || it.heal !== undefined ? 'consume' : it.slot === 'weapon' ? 'weapon' : 'armor');
   // 종류: 무기는 검 -> 대검 -> 단검 -> 낫 -> 지팡이 -> 폭탄 -> 총 -> 활 -> 방패, 방어구는 갑옷 -> 투구 -> 장갑 -> 신발 순으로 묶어서 보여준다
-  const WEAPON_TYPE_ORDER = ['sword', 'great', 'dagger', 'katana', 'rapier', 'spear', 'axe', 'hammer', 'whip', 'scythe', 'staff', 'bomb', 'gun', 'shotgun', 'bow', 'crossbow', 'shield'];
+  const WEAPON_TYPE_ORDER = ['sword', 'great', 'dagger', 'katana', 'rapier', 'spear', 'axe', 'hammer', 'whip', 'scythe', 'staff', 'bomb', 'gun', 'shotgun', 'bow', 'crossbow', 'shield', 'rod', 'net'];
   const ARMOR_SLOT_ORDER = ['armor', 'helmet', 'gloves', 'pants', 'boots'];
   const kindOf = (it) => (it.slot === 'weapon' ? it.type : it.slot && it.slot !== 'weapon' ? it.slot : null); // 세부 종류
   const rankOf = (it) => (it.slot === 'weapon' ? WEAPON_TYPE_ORDER.indexOf(it.type) : it.slot ? 20 + ARMOR_SLOT_ORDER.indexOf(it.slot) : it.consumable || it.heal !== undefined ? 40 : 50);
@@ -850,7 +852,9 @@
       G.Forge ? G.Forge.gridExtra(inv) : [],
       MATERIAL_IDS.filter((id) => inv.materials[id] > 0).map((id) => ({ id, count: inv.materials[id] })),
       CONSUMABLE_IDS.filter((id) => inv.consumables[id] > 0).map((id) => ({ id, count: inv.consumables[id] })),
-      POTION_IDS.filter((id) => inv.potions[id] > 0).map((id) => ({ id, count: inv.potions[id] })));
+      POTION_IDS.filter((id) => inv.potions[id] > 0).map((id) => ({ id, count: inv.potions[id] })),
+      Object.keys(inv.fish || {}).filter((id) => inv.fish[id] > 0 && ITEMS[id]).map((id) => ({ id, count: inv.fish[id] })), // 잡은 물고기와 곤충
+      Object.keys(inv.bugs || {}).filter((id) => inv.bugs[id] > 0 && ITEMS[id]).map((id) => ({ id, count: inv.bugs[id] })));
   }
 
   // 물약을 마신다. 피가 가득이면 마시지 않는다. 결과 { ok, lives, msg }
@@ -873,6 +877,9 @@
     if (has('potion2')) return 'potion2';
     return null;
   }
+
+  // 마을 물가: 코인으로 사는 물건(가게 값)은 모두 PRICE_MULT배로 비싸다 (경험치/레벨로 정해지는 강화 값은 그대로)
+  for (const it of Object.values(ITEMS)) if (it.price > 0 && !it.upgrade && !it.noMult && !it.catch) it.price = Math.round((it.price * (C.PRICE_MULT || 1)) / 10) * 10;
 
   G.Shop = { subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
 })(window.Game);

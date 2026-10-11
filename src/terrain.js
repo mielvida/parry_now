@@ -18,6 +18,7 @@
       this.darkStoneSpawns = []; // 어둠의 돌 (k)
       this.shadeSpawns = [];     // 시크너의 그림자 (j)
       this.story = null;         // 이야기 진행 (다크월드 문을 보일지 정한다). main이 연결한다
+      this.ponds = [];       // 성 밖 숲의 연못 {col,row} (낚시)
       this.homeLots = [];    // 마을의 내 집 터 (Y)
       this.home = null;      // 인벤토리의 home (산 집 종류, 놓은 장식품). main이 연결한다
       this.homeSlots = [];   // 집 안의 꾸밀 자리 (home 스테이지에서 main이 채운다)
@@ -75,6 +76,12 @@
           if (ch === 'R') this.shops.push({ col: c, row: r, kind: 'estate' });
           if (ch === 'Q') this.shops.push({ col: c, row: r, kind: 'decor' });
           if (ch === 'Y') this.homeLots.push({ col: c, row: r });
+          if (ch === 'b') this.ponds.push({ col: c, row: r });
+          if (ch === 's') this.shops.push({ col: c, row: r, kind: 'tackle' }); // 낚시·채집 용품점
+          if (ch === 'x') this.shops.push({ col: c, row: r, kind: 'fishmonger' }); // 생선 가게 (물고기를 산다)
+          if (ch === 'l') this.shops.push({ col: c, row: r, kind: 'collector' }); // 곤충 채집가 (곤충을 산다)
+          if (ch === 'h') this.gates.push({ col: c, row: r, stage: 'meadow' }); // 성 밖 숲으로
+          if (ch === 'c') this.gates.push({ col: c, row: r, stage: 'village' }); // 마을로 가는 포탈
           if (ch === 'V') this.villagers.push({ col: c, row: r });
           if (ch === 'D') this.caveEntrances.push({ col: c, row: r });
           if (ch === 'X') this.exits.push({ col: c, row: r });
@@ -82,6 +89,7 @@
           if (ch === 'v') this.altars.push({ col: c, row: r });
           if (ch === 'F') this.gates.push({ col: c, row: r, stage: 'forest' });
           if (ch === 'u') this.gates.push({ col: c, row: r, stage: 'orecave' });
+          if (ch === 'y') this.gates.push({ col: c, row: r, stage: 'abyss' }); // 왕국의 더 위험한 동굴
           if (ch === 'N') this.gates.push({ col: c, row: r, stage: 'snow' });
           if (ch === 'M') this.gates.push({ col: c, row: r, stage: 'volcano' });
         }

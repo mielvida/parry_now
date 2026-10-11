@@ -189,12 +189,15 @@ Game.Levels.kingdom = (function () {
   for (let r = 0; r < 18; r++) rows.push(new Array(W).fill(r >= 16 ? '#' : '.'));
   const put = (r, c, ch) => { rows[r][c] = ch; };
   put(15, 2, 'X'); put(15, 5, 'P');
-  for (const c of [12, 28, 48, 64, 84, 208, 231, 241, 262, 268, 284]) put(15, c, 'V');
+  for (const c of [28, 48, 64, 84, 231, 241, 262, 268, 284]) put(15, c, 'V');
+  put(15, 10, 'c'); // 마을로 가는 포탈
+  put(15, 22, 'h'); // 성 밖 숲으로 가는 문 (낚시·곤충 채집)
   // 가게는 필요한 것만 성 양옆에 붙여 놓았다: 물약 K · 갑옷 A · 무기 W · 특수무기 g · 용광로 f · 훈련소 t · 여관 i | 음식점 r · 보상 U · 부동산 R · 인테리어 Q
-  const shops = { K: 89, A: 94, W: 99, g: 104, f: 109, t: 115, i: 120, r: 182, U: 187, R: 192, Q: 197 };
+  const shops = { K: 89, A: 94, W: 99, g: 104, f: 109, t: 115, i: 120, r: 182, U: 187, R: 192, Q: 197, s: 202, x: 207, l: 212 };
   for (const ch of Object.keys(shops)) put(15, shops[ch], ch);
-  for (const c of [70, 78, 204, 214, 250, 258, 274, 290]) put(15, c, 'H'); // 성 주변 집들 (오른쪽 거리에도)
+  for (const c of [70, 78, 250, 258, 274, 290]) put(15, c, 'H'); // 성 주변 집들 (오른쪽 거리에도)
   put(15, 224, 'Y'); // 내 집 터 (부동산에서 집을 사면 여기에 지어진다)
+  put(15, 297, 'y'); // 심연 동굴 입구: 훨씬 위험하지만 보상이 두둑하다
   for (let c = 126; c <= 174; c++) put(15, c, '#'); // 성이 놓인 단
   put(14, 150, 'e'); put(14, 150, 'e');
   return rows.map((r) => r.join(''));
@@ -207,5 +210,19 @@ Game.Levels.palace = (function () {
   for (let r = 0; r < 18; r++) rows.push(new Array(W).fill(r >= 16 ? '#' : '.'));
   rows[15][3] = 'X'; rows[15][6] = 'P'; rows[15][20] = 'o'; // 왕은 입구에서 가깝고, 옥좌 뒤는 조금만 남는다
   for (let r = 0; r < 16; r++) for (let c = 24; c < W; c++) rows[r][c] = '#'; // 옥좌 뒤는 돌벽
+  return rows.map((r) => r.join(''));
+})();
+
+// 성 밖 숲: 왕국 왼쪽의 문으로 나간다. 풀밭 위를 곤충이 날아다니고, 두 연못에서 낚시를 한다 ('b' = 연못 가운데, 9칸 폭)
+Game.Levels.meadow = (function () {
+  const W = 170;
+  const rows = [];
+  for (let r = 0; r < 18; r++) rows.push(new Array(W).fill(r >= 16 ? '#' : '.'));
+  rows[15][2] = 'X'; rows[15][5] = 'P';
+  for (const pc of [48, 122]) { // 연못: 한 칸 깊이로 판다
+    for (let c = pc - 4; c <= pc + 4; c++) rows[16][c] = '.';
+    rows[15][pc] = 'b';
+  }
+  for (const [c0, n] of [[70, 3], [92, 2], [150, 4]]) for (let c = c0; c < c0 + n; c++) rows[15][c] = '#'; // 낮은 둔덕
   return rows.map((r) => r.join(''));
 })();

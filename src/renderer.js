@@ -102,6 +102,7 @@
       const crisp = !G.Config.SMOOTH_SPRITES;
       this.snapOn = crisp; // 몬스터와 플레이어: 반 도트 단위로 부드럽게 움직인다
       for (const m of monsters) if (m.alive && this._inView(m, camera)) this._drawMonster(ctx, m); // 화면 밖은 그리지 않음 (대량 소환 대비)
+      if (extras.bugs && extras.bugs.length) G.Fishing.drawBugs(ctx, extras.bugs, camera, time); // 성 밖 숲의 곤충
       if (extras.allies) for (const a of extras.allies) { // 성의 병사들: 파란 갑옷 + 머리 위 체력
         this._paintRaider(ctx, a);
         const bx = a.x + a.w / 2 - 14;
@@ -152,7 +153,7 @@
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
       this._drawEdgeTexts(main, hud);
-      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin));
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
@@ -645,7 +646,22 @@
       ctx.translate(cx, cy);
       ctx.scale(s, s);
       const L = item.look || [];
-      if (item.house) { // 집
+      if (item.catch) { // 잡은 물고기 / 곤충
+        G.Fishing.drawCatchIcon(ctx, item, 1.6);
+      } else if (item.slot === 'weapon' && item.type === 'rod') { // 낚싯대
+        ctx.rotate(-0.75);
+        ctx.fillStyle = '#8a5a2b'; ctx.fillRect(-26, -1.5, 56, 3); ctx.fillStyle = L[0]; ctx.fillRect(14, -1.5, 16, 3);
+        ctx.fillStyle = L[1]; ctx.beginPath(); ctx.arc(-14, 5, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(30, 0); ctx.quadraticCurveTo(38, 14, 34, 28); ctx.stroke();
+        ctx.fillStyle = '#e8334a'; ctx.beginPath(); ctx.arc(34, 30, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(30, 29, 8, 2);
+      } else if (item.slot === 'weapon' && item.type === 'net') { // 잠자리채
+        ctx.rotate(-0.75);
+        ctx.fillStyle = '#8a5a2b'; ctx.fillRect(-30, -2, 44, 4);
+        ctx.strokeStyle = L[1]; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(24, 0, 14, 11, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(235,245,255,0.4)'; ctx.beginPath(); ctx.ellipse(24, 0, 14, 11, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 1; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(24 + i * 5, -10); ctx.lineTo(24 + i * 4, 10); ctx.stroke(); }
+        ctx.fillStyle = L[0]; ctx.fillRect(10, -3.5, 6, 7);
+      } else if (item.house) { // 집
         G.Home.drawHouseIcon(ctx, item);
       } else if (item.decor) { // 가구/장식
         G.Home.drawDecorIcon(ctx, item, 0);
@@ -1699,7 +1715,7 @@
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) cells.push({ x: gx + c * (cell + gap), y: gy + r * (cell + gap), w: cell, h: cell });
       }
-      const tabs = [0, 1, 2, 3, 4].map((i) => ({ x: gx + i * (gridW / 5), y: y + 56, w: gridW / 5 - 6, h: 30 }));
+      const tabs = [0, 1, 2, 3, 4, 5, 6].map((i) => ({ x: gx + i * (gridW / 7), y: y + 56, w: gridW / 7 - 6, h: 30 }));
       const chip = (i, n) => { const cw = Math.min(76, 776 / Math.max(1, n)); return { x: x + 104 + i * cw, y: y + 92, w: cw - 3, h: 24 }; }; // 종류 버튼 i번째 (모두 n개)
       const sort = { x: x + w - 300, y: y + 10, w: 150, h: 34 }; // 정렬 버튼
       const best = { x: x + 150, y: y + h - 64, w: 200, h: 34 }; // 최고 장착 버튼 (H)
@@ -3676,12 +3692,13 @@
       if (hud.smelt) this._drawSmeltGame(ctx, hud.smelt);
       if (hud.equip) this._drawEquip(ctx, hud.equip);
       if (hud.dev) this._drawDev(ctx, hud.dev);
+      if (hud.fishing) G.Fishing.drawFishing(ctx, this.viewW, this.viewH, hud.fishing);
       if (hud.admin) G.Admin.draw(ctx, this.viewW, this.viewH, hud.admin, hud.admin.me);
       if (hud.mini) this._drawMini(ctx, hud.mini);
       if (hud.settings) this._drawSettings(ctx, hud.settings);
       if (hud.pw) this._drawPassword(ctx, hud.pw);
 
-      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
+      if (!hud.won && !hud.gameOver && !hud.shop && !hud.equip && !hud.dev && !hud.mini && !hud.admin && !hud.settings && !hud.pw && !hud.fishing && !hud.attach && !hud.smelt && !hud.work && !hud.forgePick) this._text(ctx, hud.goal || '목표: 지도의 X, 동굴 맨 끝의 보물 상자를 찾아라', 12, 106);
 
       if (hud.won) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';

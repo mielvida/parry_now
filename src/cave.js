@@ -250,7 +250,7 @@
         ctx.fillRect(bx - 22, by - 70, 44, 6);
         ctx.fillStyle = '#c9a56a';
         ctx.fillRect(bx - 24, by - 92, 48, 18);
-        G.TextLayer.add('마을', bx, by - 83, 'bold 12px sans-serif', '#5a3d17');
+        G.TextLayer.add(terrain.exitLabel || '마을', bx, by - 83, 'bold 12px sans-serif', '#5a3d17');
         ctx.textAlign = 'start';
       }
     },

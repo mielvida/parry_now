@@ -273,10 +273,13 @@
     const mgGun = shop.kind === 'mggun';
     const food = shop.kind === 'food';
     const train = shop.kind === 'train';
+    const tackle = shop.kind === 'tackle';
+    const fishmonger = shop.kind === 'fishmonger';
+    const collector = shop.kind === 'collector';
     const inn = shop.kind === 'inn';
     const w = 140;
     const x = baseX - w / 2;
-    const stripeA = train ? '#b03a2a' : inn ? '#5a7ac0' : food ? '#e0803a' : potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
+    const stripeA = tackle ? '#2a8a9a' : fishmonger ? '#3a6ab0' : collector ? '#5a9a3a' : train ? '#b03a2a' : inn ? '#5a7ac0' : food ? '#e0803a' : potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
     ctx.fillStyle = 'rgba(0,0,0,0.14)';
     ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒤쪽 벽 + 기둥
@@ -296,6 +299,19 @@
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(bx + 2, baseY - 82, 5, 6);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(bx + 2, baseY - 84, 5, 3);
       });
+    } else if (tackle) { // 기대 세운 낚싯대들과 걸린 잠자리채
+      for (let i = 0; i < 4; i++) { ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x + 14 + i * 9, baseY - 30); ctx.lineTo(x + 30 + i * 9, baseY - 96); ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 30 + i * 9, baseY - 96); ctx.lineTo(x + 36 + i * 9, baseY - 78); ctx.stroke(); }
+      ctx.strokeStyle = '#c9a86a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 84, baseY - 34); ctx.lineTo(x + 98, baseY - 80); ctx.stroke();
+      ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x + 102, baseY - 90, 11, 13, 0.3, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(x + 102 + i * 4, baseY - 101); ctx.lineTo(x + 102 + i * 3, baseY - 79); ctx.stroke(); }
+    } else if (fishmonger) { // 얼음 위의 생선과 매달린 물고기
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 80, w - 20, 4);
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = ['#8fb4d0', '#e8a85a', '#a0c8a0', '#d0d8e0'][i]; ctx.beginPath(); ctx.ellipse(x + 26 + i * 26, baseY - 66, 6, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#222'; ctx.fillRect(x + 25 + i * 26, baseY - 74, 2, 2); }
+      ctx.fillStyle = 'rgba(200,230,255,0.85)'; ctx.fillRect(x + 14, baseY - 46, 70, 14);
+    } else if (collector) { // 핀으로 꽂은 나비 표본 상자와 곤충 채집통
+      ctx.fillStyle = '#6a4423'; ctx.fillRect(x + 14, baseY - 90, 50, 40); ctx.fillStyle = '#f4ecd0'; ctx.fillRect(x + 17, baseY - 87, 44, 34);
+      for (const [dx, dy, c] of [[26, 76, '#ff9ec0'], [42, 70, '#ffe27a'], [52, 80, '#9fd8ff'], [30, 62, '#b08aff']]) { ctx.fillStyle = c; ctx.fillRect(x + dx, baseY - dy, 7, 5); ctx.fillRect(x + dx + 2, baseY - dy - 3, 3, 11); }
+      ctx.fillStyle = 'rgba(200,240,255,0.6)'; ctx.fillRect(x + 84, baseY - 74, 24, 30); ctx.fillStyle = '#4a9a3a'; ctx.fillRect(x + 86, baseY - 52, 20, 6);
     } else if (train) { // 벽에 걸린 목검들과 훈련용 과녁, 모래주머니
       ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 72, 56, 4);
       for (let i = 0; i < 3; i++) { ctx.fillStyle = '#c9a86a'; ctx.fillRect(x + 16 + i * 18, baseY - 92, 5, 22); ctx.fillStyle = '#8a5a2b'; ctx.fillRect(x + 13 + i * 18, baseY - 72, 11, 3); }
@@ -428,7 +444,7 @@
       }
     }
     // 주인
-    if (!closed) G.Npc.draw(ctx, { train: 'trainer', inn: 'innkeeper', food: 'chef', potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
+    if (!closed) G.Npc.draw(ctx, { tackle: 'angler', fishmonger: 'fishmonger', collector: 'collector', train: 'trainer', inn: 'innkeeper', food: 'chef', potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);
@@ -512,7 +528,7 @@
       ctx.fillStyle = '#e8d8a8'; ctx.fillRect(x + w / 2 - 34, baseY - 62, 68, 22);
       G.TextLayer.add('문 닫음', baseX, baseY - 51, 'bold 14px sans-serif', '#7a2a1a');
     }
-    G.TextLayer.add(train ? '훈련소' : inn ? '여관' : food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    G.TextLayer.add(tackle ? '낚시·채집' : fishmonger ? '생선 가게' : collector ? '곤충 채집가' : train ? '훈련소' : inn ? '여관' : food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
@@ -578,6 +594,9 @@
     dungeon: { name: '던전', a: '#2a0a3a', b: '#ff6a8a' },
     kingdom: { name: '왕국', a: '#d4a017', b: '#fff2b0' },
     orecave: { name: '광물 동굴', a: '#4a3320', b: '#ffd68a' },
+    meadow: { name: '성 밖 숲', a: '#3a8a3a', b: '#d8ffb0' },
+    village: { name: '마을', a: '#2a9a8a', b: '#c0fff0' },
+    abyss: { name: '심연 동굴 (위험!)', a: '#5a0a14', b: '#ff5a3a' },
   };
   // 차원문: 룬이 새겨진 돌 아치, 안쪽에서 소용돌이치는 빛, 문 주위를 도는 룬, 문 안으로 빨려 드는 빛 알갱이, 하늘로 솟는 빛기둥
   function drawGate(ctx, g, baseX, baseY, time) {
