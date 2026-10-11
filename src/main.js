@@ -3025,6 +3025,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   window.addEventListener('mouseup', () => { if (sg) sg.mouse = false; if (ag) ag.mouse = false; });
   canvas.addEventListener('mousemove', (ev) => {
     const p = canvasPoint(ev);
+    if (cookUI) { cookMouse('move', p); return; }
     if (titleUI && !settingsUI) { const i = G.Renderer.titleCards(C.VIEW_W, C.VIEW_H).findIndex((c) => inRect(p, c)); if (i >= 0 && !titleUI.del && !titleUI.quit && titleUI.copy === null) titleUI.cur = i; return; }
     if (adminUI) { G.Admin.mouse(adminUI, 'move', p); return; }
     if (fp) { // 대상 고르기: 올려 놓으면 선택
@@ -3051,6 +3052,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
   });
   canvas.addEventListener('wheel', (ev) => { // 휠: 인벤토리/개발 메뉴 스크롤
+    if (cookUI) { ev.preventDefault(); cookMouse('wheel', canvasPoint(ev), ev.deltaY); return; }
     if (adminUI) { ev.preventDefault(); G.Admin.mouse(adminUI, 'wheel', null, ev.deltaY); return; }
     if (dexUI) { ev.preventDefault(); G.Dex.mouse(dexUI, 'wheel', null, ev.deltaY); return; }
     if (fp && fp.step === 'item') { ev.preventDefault(); fpMove(ev.deltaY > 0 ? FP_COLS : -FP_COLS); return; }
@@ -3070,9 +3072,23 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       clampEquipScroll(total);
     }
   }, { passive: false });
+  // 요리 창: 마우스로 줄·냄비 칸·조리법·단추를 누른다 (단추는 키보드 키를 대신 눌러 준다)
+  function cookMouse(kind, p, dy) {
+    const u = cookUI; u.mouse = p;
+    const list = G.Cook.ingredients(inv);
+    if (kind === 'wheel') { u.cur = Math.max(0, Math.min(list.length - 1, u.cur + (dy > 0 ? 1 : -1))); return; }
+    const hit = G.Cook.areas(C.VIEW_W, C.VIEW_H, u, inv).find((a) => inRect(p, a));
+    if (!hit) return;
+    if (kind === 'move') { if (hit.row !== undefined && !u.result) u.cur = hit.row; return; }
+    if (hit.row !== undefined) { u.cur = hit.row; input.pressedSet.add('Enter'); }
+    else if (hit.slot !== undefined) { u.picks.splice(hit.slot, 1); u.msg = ''; G.Audio.play('catch'); }
+    else if (hit.m !== undefined) { u.m = hit.m; G.Audio.play('catch'); }
+    else if (hit.key) input.pressedSet.add(hit.key);
+  }
   canvas.addEventListener('click', (ev) => {
     if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
+    if (cookUI) { cookMouse('click', p); return; }
     if (dexUI) { G.Dex.mouse(dexUI, 'click', p); return; }
     if (gachaUI) { gachaUI.click = p; return; }
     if (floorUI) { floorUI.click = p; return; }
@@ -4344,7 +4360,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           }
           if (pressed('KeyH')) { if (c.hired) { u.msg = '이미 고용했어요.'; } else if (coins < G.Cook.CHEF_HIRE) { u.msg = `코인이 모자라요 (${G.Cook.CHEF_HIRE} G)`; G.Audio.play('deny'); } else { coins -= G.Cook.CHEF_HIRE; c.hired = true; c.last = Date.now(); u.msg = '요리사를 고용했어요! 재료를 맡겨 보세요.'; G.Audio.play('treasure'); } }
           if (pressed('KeyU')) { if (!c.hired) u.msg = '먼저 요리사를 고용하세요.'; else if (c.lv >= G.Cook.CHEF_MAX) u.msg = '이미 가장 빨라요 (30초).'; else { const cost = G.Cook.chefUpCost(inv); if (coins < cost) { u.msg = `코인이 모자라요 (${cost} G)`; G.Audio.play('deny'); } else { coins -= cost; c.lv += 1; u.msg = `요리 속도 업! 이제 ${G.Cook.chefInterval(inv)}초에 1개`; G.Audio.play('treasure'); } } }
-          if (pressed('KeyM')) { c.m = (c.m + 1) % 13; u.msg = ''; G.Audio.play('catch'); }
+          if (pressed('KeyM')) { G.Cook.chefNextMethod(inv); u.msg = ''; G.Audio.play('catch'); }
           if (pressed('KeyN')) { c.k = c.k % 5 + 1; u.msg = ''; G.Audio.play('catch'); }
           if (pressed('KeyG')) { const r = G.Cook.chefCollect(inv); u.msg = r.n ? `요리 ${r.n}개를 받았어요! (${r.names.join(', ')})` : '아직 받을 요리가 없어요.'; G.Audio.play(r.n ? 'treasure' : 'deny'); }
         }
@@ -4357,8 +4373,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           if (pressed('ArrowUp', 'KeyW')) u.cur = Math.max(0, u.cur - 1);
           if (pressed('PageDown')) u.cur = Math.min(list.length - 1, u.cur + 6);
           if (pressed('PageUp')) u.cur = Math.max(0, u.cur - 6);
-          if (pressed('ArrowLeft', 'KeyA')) u.m = (u.m + G.Cook.METHODS.length - 1) % G.Cook.METHODS.length;
-          if (pressed('ArrowRight', 'KeyD')) u.m = (u.m + 1) % G.Cook.METHODS.length;
+          const cms = u.ms || G.Cook.APPS.d_gas.ms, cmi = Math.max(0, cms.indexOf(u.m));
+          if (pressed('ArrowLeft', 'KeyA')) u.m = cms[(cmi + cms.length - 1) % cms.length];
+          if (pressed('ArrowRight', 'KeyD')) u.m = cms[(cmi + 1) % cms.length];
           if (pressed('Enter', 'Space') && list[u.cur]) {
             const it = list[u.cur], used = u.picks.filter((id) => id === it.id).length;
             if (u.picks.length >= 5) { u.msg = '재료는 최대 5개까지예요.'; G.Audio.play('deny'); }
@@ -4366,7 +4383,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
             else { u.picks.push(it.id); u.msg = ''; G.Audio.play('pickup'); }
           }
           if (pressed('Backspace', 'KeyZ')) { u.picks.pop(); u.msg = ''; }
-          if (pressed('KeyX') && u.slot) { G.Shop.placeDecor(inv, u.slot.kind, u.slot.index, null); cookUI = null; popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '가스레인지를 치웠어요 (가방에 돌아왔어요)', t: 2, color: 'rgba(255,225,160,A)' }); G.Audio.play('catch'); }
+          if (pressed('KeyX') && u.slot) { G.Shop.placeDecor(inv, u.slot.kind, u.slot.index, null); cookUI = null; popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: `${G.Cook.APPS[u.app || 'd_gas'].name}: 치웠어요 (가방에 돌아왔어요)`, t: 2, color: 'rgba(255,225,160,A)' }); G.Audio.play('catch'); }
           if (pressed('KeyC')) {
             const r = G.Cook.cook(inv, u.picks, u.m);
             if (!r.ok) { u.msg = r.msg; G.Audio.play('deny'); }
@@ -4569,7 +4586,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         blessCrystals();
       } else if (near && near.type === 'slot') { // 집 안 꾸미기: 가진 장식품을 고른다
         const sl = near.slot;
-        if (inv.home.placed[sl.kind][sl.index] === 'd_gas') { cookUI = G.Cook.open(inv, sl); G.Audio.play('pickup'); input.endFrame(); return; } // 가스레인지: 요리
+        if (G.Cook.APPS[inv.home.placed[sl.kind][sl.index]]) { cookUI = G.Cook.open(inv, sl); G.Audio.play('pickup'); input.endFrame(); return; } // 가스레인지: 요리
         shop = { kind: 'place', mode: 'place', slot: sl, def: { title: sl.kind === 'floor' ? '바닥 가구 놓기' : '벽 장식 걸기', tabs: G.Shop.placeTabs(inv, sl.kind) }, tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
         G.Audio.play('pickup');
       } else if (near && near.type === 'home') { // 마을의 내 집 터
@@ -5042,6 +5059,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     set blue(v) { blue = v; },
     useConsumable, loseLife,
     get cookUI() { return cookUI; },
+    set cookUI(v) { cookUI = v; },
     get seaLv() { return seaLv; },
     get seaO2() { return seaO2; },
     set seaO2(v) { seaO2 = v; },
