@@ -4,6 +4,9 @@
 (function (G) {
   const ITEMS = G.Shop.ITEMS;
   const METHODS = ['구이', '튀김', '찜', '탕', '회', '조림', '볶음', '스튜', '샐러드', '꼬치', '덮밥', '스파게티'];
+  // 조리법마다 이름 꼴 3가지 (모두 다른 낱말이라 요리 이름이 겹치지 않는다)
+  const METHOD_NAMES = [['구이', '직화구이', '그릴'], ['튀김', '바삭튀김', '가라아게'], ['찜', '수증기찜', '약선찜'], ['탕', '매운탕', '맑은탕'], ['회', '사시미', '카르파초'], ['조림', '간장조림', '졸임'], ['볶음', '웍볶음', '철판볶음'], ['스튜', '크림스튜', '토마토스튜'], ['샐러드', '냉채', '오션볼'], ['꼬치', '꼬치구이', '스커워'], ['덮밥', '돈부리', '솥밥'], ['스파게티', '파스타', '링귀니']];
+  const COUNT_NAME = ['', '모둠 ', '특선 ', '왕실 ', '대형 특선 ']; // 재료 수 1~5
   const GARNISH = ['', '허브 ', '매콤 ', '고소한 ', '상큼한 ', '향긋한 ', '달콤 '];
   const GCOL = ['#ffffff', '#4fae45', '#d02a2a', '#e8d8a0', '#f0e060', '#7ad0a0', '#ff9ac0'];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -63,7 +66,8 @@
     const base = baseValue(key.main);
     const food = clamp(Math.round((0.5 + (base * (0.55 + 0.3 * key.n)) / 1400 + key.g * 0.08) * 2) / 2, 0.5, 6);
     const st = Math.round(clamp(20 + (base * (0.5 + 0.25 * key.n)) / 30 + key.g * 3, 20, 260));
-    const nm = `${key.n >= 5 ? '대형 특선 ' : key.n >= 3 ? '특선 ' : ''}${GARNISH[key.g]}${mainSp.name} ${METHODS[key.m]}`;
+    const variant = hashStr(`${key.main}|${key.g}|${key.n}`) % 3; // 같은 재료여도 조리법 이름이 가지가지
+    const nm = `${COUNT_NAME[key.n - 1] || ''}${GARNISH[key.g]}${mainSp.name} ${METHOD_NAMES[key.m][variant]}`; // 재료 수 x 곁들임 x 재료 x 조리법이 모두 달라 이름이 겹치지 않는다
     ITEMS[id] = { id, name: nm, price: Math.round(base * 0.6 * (0.8 + 0.2 * key.n)), consumable: true, food, stamina: st, look: mainSp.look, cookKey: Object.assign({ id, shape: mainSp.shape, look: mainSp.look }, key), desc: `직접 만든 요리 - 피 ${food}칸, 스태미나 ${st} 회복` };
     if (G.Shop.CONSUMABLE_IDS.indexOf(id) < 0) G.Shop.CONSUMABLE_IDS.push(id);
     if (G.Shop.DARK_CONS_IDS.indexOf(id) < 0) G.Shop.DARK_CONS_IDS.push(id);
