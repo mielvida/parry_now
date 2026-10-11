@@ -942,6 +942,11 @@
         ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(-7, -4, 4, 18);
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(-5, -20, 10, 13);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(-6, -27, 12, 7);
+      } else if (item.devil) { // 악마와의 거래: 뿔 달린 악마 얼굴
+        ctx.fillStyle = L[1] || '#6a1a1a'; ctx.beginPath(); ctx.moveTo(-16, -6); ctx.lineTo(-24, -24); ctx.lineTo(-6, -14); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(16, -6); ctx.lineTo(24, -24); ctx.lineTo(6, -14); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = item.devil === 'back' ? '#8a5ac8' : '#c8322a'; ctx.beginPath(); ctx.arc(0, 6, 18, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.ellipse(-7, 2, 4, 2.5, 0.4, 0, Math.PI * 2); ctx.ellipse(7, 2, 4, 2.5, -0.4, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#2a0808'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 11, 8, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
       } else if (G.Shop.DARK_CONS_IDS.includes(item.id)) { // 다크월드 약초·음식: 하나하나 다른 그림
         this._drawDarkFoodIcon(ctx, item);
       } else if (item.food !== undefined) { // 음식점: 모두 음식 그림
