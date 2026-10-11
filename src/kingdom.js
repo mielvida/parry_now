@@ -36,6 +36,40 @@
   }
 
   // 큰 성: 가운데 높은 탑, 양옆 탑, 아치 문, 붉은 카펫
+  // 광장 장식: 나무
+  function tree(ctx, x, y, seed) {
+    const h = 70 + (seed % 5) * 6;
+    ctx.fillStyle = '#6b4a2a'; ctx.fillRect(x - 5, y - h * 0.55, 10, h * 0.55);
+    ctx.fillStyle = '#3f8a3a'; ctx.beginPath(); ctx.arc(x, y - h * 0.7, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#58a84a'; ctx.beginPath(); ctx.arc(x - 9, y - h * 0.78, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2f6f2e'; ctx.beginPath(); ctx.arc(x + 14, y - h * 0.62, 17, 0, Math.PI * 2); ctx.fill();
+  }
+  // 분수: 돌 수반과 솟는 물줄기
+  function fountain(ctx, x, y, time) {
+    ctx.fillStyle = '#9a96a6'; ctx.fillRect(x - 56, y - 22, 112, 22);
+    ctx.fillStyle = '#c8c4d0'; ctx.fillRect(x - 56, y - 22, 112, 6);
+    ctx.fillStyle = '#5aa8d8'; ctx.fillRect(x - 48, y - 18, 96, 8);
+    ctx.fillStyle = '#9a96a6'; ctx.fillRect(x - 8, y - 62, 16, 42); ctx.fillRect(x - 28, y - 62, 56, 8);
+    ctx.fillStyle = '#c8c4d0'; ctx.fillRect(x - 28, y - 62, 56, 3);
+    ctx.strokeStyle = 'rgba(170,225,255,0.9)'; ctx.lineWidth = 3;
+    for (let i = -1; i <= 1; i++) {
+      const ph = (time * 1.6 + i * 0.33) % 1;
+      ctx.beginPath(); ctx.moveTo(x + i * 6, y - 62); ctx.quadraticCurveTo(x + i * 24, y - 100 + ph * 8, x + i * 36, y - 24); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(200,240,255,0.8)';
+    for (let i = 0; i < 6; i++) { const ph = (time * 1.3 + i / 6) % 1; ctx.fillRect(x - 40 + ((i * 29) % 80), y - 70 + ph * 46, 3, 3); }
+  }
+  // 영웅의 동상: 시크너를 쓰러뜨린 용사
+  function statue(ctx, x, y) {
+    ctx.fillStyle = '#8f8a9a'; ctx.fillRect(x - 24, y - 20, 48, 20); ctx.fillStyle = '#b8b2c4'; ctx.fillRect(x - 24, y - 20, 48, 5);
+    ctx.fillStyle = '#a8a2b4'; ctx.fillRect(x - 14, y - 66, 28, 46);
+    ctx.fillStyle = '#c4bed0'; ctx.fillRect(x - 9, y - 84, 18, 18);
+    ctx.fillStyle = '#a8a2b4'; ctx.fillRect(x - 12, y - 90, 24, 8);
+    ctx.fillStyle = '#d4d0dc'; ctx.fillRect(x + 12, y - 120, 5, 56); // 치켜든 검
+    ctx.fillStyle = '#e0b12f'; ctx.fillRect(x + 8, y - 66, 13, 4);
+    ctx.fillStyle = '#ffe9a0'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('용사의 동상', x, y - 28);
+  }
+
   function castle(ctx, x, y, time, inv) {
     const stone = '#d6cfbd', stoneD = '#a89f8a', roofR = '#b02a3a', roofG = '#e0b12f';
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
@@ -89,7 +123,7 @@
       const bw = 160, k = Math.max(0, inv.castleHp / inv.castleMax);
       ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(x - bw / 2 - 2, y - 232, bw + 4, 14);
       ctx.fillStyle = k > 0.5 ? '#6fd25a' : k > 0.25 ? '#ffd54a' : '#ff5a4a'; ctx.fillRect(x - bw / 2, y - 230, bw * k, 10);
-      if (G.TextLayer) G.TextLayer.add(`성 ${Math.max(0, inv.castleHp)}/${inv.castleMax}`, x, y - 240, 'bold 13px sans-serif', '#fff');
+      if (G.TextLayer) G.TextLayer.add(`성 ${Math.ceil(Math.max(0, inv.castleHp))}/${inv.castleMax}`, x, y - 240, 'bold 13px sans-serif', '#fff');
     }
     // 붉은 카펫
     ctx.fillStyle = '#a01830'; ctx.fillRect(x - 30, y - 3, 60, 3);
@@ -186,26 +220,25 @@
         if (c > 124 && c < 176) continue; // 성이 있는 단에는 없다
         lamp(ctx, bx, gy, time);
       }
-      for (let c = 15; c < terrain.cols - 4; c += 24) {
-        const bx = c * T + T / 2;
-        if (bx < camera.x - 80 || bx > camera.x + view) continue;
-        if (c > 120 && c < 180) continue;
-        flag(ctx, bx, gy - 120, c % 48 === 15 ? '#c0273a' : '#2a56b8', time, 36, 22);
-      }
       for (const C2 of terrain.castles) {
         const bx = C2.col * T + T / 2;
         if (bx < camera.x - 400 || bx > camera.x + view + 200) continue;
         castle(ctx, bx, (C2.row + 1) * T, time, terrain.invasion);
       }
+      // 오른쪽 거리의 광장: 분수, 영웅의 동상, 나무
+      const gyS = (terrain.rows - 2) * T;
+      const inView = (x, m = 120) => x > camera.x - m && x < camera.x + view;
+      for (const tc of [229, 243, 266, 282, 296]) { const x = tc * T + T / 2; if (inView(x)) tree(ctx, x, gyS, tc); }
+      { const x = 236 * T + T / 2; if (inView(x, 160)) fountain(ctx, x, gyS, time); }
+      { const x = 264 * T + T / 2; if (inView(x)) statue(ctx, x, gyS); }
       Beach.drawDecor(ctx, terrain, camera, time); // 가게, 문, 시민
-      for (const K of terrain.kings) {
-        const bx = K.col * T + T / 2;
-        if (bx < camera.x - 100 || bx > camera.x + view) continue;
-        const by = (K.row + 1) * T;
-        G.Npc.draw(ctx, 'guard', bx - 60, by, 1, time); // 호위병
-        G.Npc.draw(ctx, 'guard', bx + 60, by, -1, time + 1);
-        king(ctx, bx, by, time);
-        if (G.TextLayer) G.TextLayer.add('왕', bx, by - 82, 'bold 13px sans-serif', '#ffe9a0');
+      const met = !!(terrain.story && terrain.story.kingMet);
+      for (const C2 of terrain.castles) { // 성문의 호위병: 처음엔 문을 막고 서 있고, 왕을 만난 뒤에는 양옆으로 비켜 선다
+        const gx = C2.col * T + T / 2, gby = (C2.row + 1) * T;
+        if (gx < camera.x - 200 || gx > camera.x + view + 100) continue;
+        const d = met ? 78 : 30;
+        G.Npc.draw(ctx, 'guard', gx - d, gby, 1, time);
+        G.Npc.draw(ctx, 'guard', gx + d, gby, -1, time + 1);
       }
     },
 
@@ -216,5 +249,72 @@
     },
   });
 
+  // ---- 왕궁 안 (알현실) ----
+  const Palace = Object.assign({}, Kingdom, {
+    drawBackground(ctx, w, h, camera, time) {
+      let g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#3a2c3c'); g.addColorStop(1, '#6a5240');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      // 돌벽 줄눈
+      ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 2;
+      const off = (camera.x * 0.5) % 96;
+      for (let y = 40; y < h; y += 56) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); for (let x = -off + ((y / 56) % 2) * 48; x < w; x += 96) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 56); ctx.stroke(); } }
+      // 높은 아치 창과 쏟아지는 빛
+      const sp = 260;
+      const o2 = camera.x * 0.55;
+      for (let i = Math.floor(o2 / sp) - 1; i <= Math.ceil((o2 + w) / sp) + 1; i++) {
+        const x = i * sp - o2 + 130;
+        ctx.fillStyle = '#9ec8ee'; ctx.beginPath(); ctx.moveTo(x - 34, h * 0.62); ctx.lineTo(x - 34, h * 0.26); ctx.arc(x, h * 0.26, 34, Math.PI, 0); ctx.lineTo(x + 34, h * 0.62); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 5; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,240,190,0.07)'; ctx.beginPath(); ctx.moveTo(x - 30, h * 0.6); ctx.lineTo(x + 30, h * 0.6); ctx.lineTo(x + 120, h); ctx.lineTo(x - 70, h); ctx.closePath(); ctx.fill();
+        // 늘어진 붉은 깃발
+        ctx.fillStyle = '#a8202c'; ctx.fillRect(x + 80, 18, 30, 130); ctx.fillStyle = '#e0b12f'; ctx.fillRect(x + 80, 18, 30, 6); ctx.fillRect(x + 90, 60, 10, 22);
+      }
+    },
+    drawDecor(ctx, terrain, camera, time) {
+      const view = camera.viewW + 300;
+      const gy = (terrain.rows - 2) * T;
+      const K = terrain.kings[0];
+      const X = terrain.exits[0];
+      // 붉은 융단
+      const cx0 = (X ? X.col + 1.5 : 4) * T, cx1 = (K ? K.col + 3 : 40) * T;
+      ctx.fillStyle = '#a8202c'; ctx.fillRect(cx0, gy - 5, cx1 - cx0, 5);
+      ctx.fillStyle = '#e0b12f'; ctx.fillRect(cx0, gy - 5, cx1 - cx0, 1); ctx.fillRect(cx0, gy - 1, cx1 - cx0, 1);
+      // 횃불
+      for (let c = 10; c < terrain.cols - 4; c += 9) {
+        const x = c * T + T / 2;
+        if (x < camera.x - 40 || x > camera.x + view) continue;
+        ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x - 3, gy - 150, 6, 22);
+        const f = 6 + 2 * Math.sin(time * 9 + c);
+        const gl = ctx.createRadialGradient(x, gy - 158, 0, x, gy - 158, 60); gl.addColorStop(0, 'rgba(255,200,100,0.45)'); gl.addColorStop(1, 'rgba(255,200,100,0)');
+        ctx.fillStyle = gl; ctx.fillRect(x - 60, gy - 218, 120, 120);
+        ctx.fillStyle = '#ff9a3a'; ctx.beginPath(); ctx.ellipse(x, gy - 156, 5, f + 4, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffe07a'; ctx.beginPath(); ctx.ellipse(x, gy - 154, 3, f, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      // 출입문 (왼쪽): 나무 아치 문
+      if (X) {
+        const x = X.col * T + T / 2;
+        ctx.fillStyle = '#e0b12f'; ctx.beginPath(); ctx.moveTo(x - 32, gy); ctx.lineTo(x - 32, gy - 70); ctx.arc(x, gy - 70, 32, Math.PI, 0); ctx.lineTo(x + 32, gy); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#6a4423'; ctx.beginPath(); ctx.moveTo(x - 26, gy); ctx.lineTo(x - 26, gy - 70); ctx.arc(x, gy - 70, 26, Math.PI, 0); ctx.lineTo(x + 26, gy); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#e0b12f'; ctx.fillRect(x - 1, gy - 100, 2, 100); ctx.fillRect(x + 8, gy - 36, 5, 5);
+        if (G.TextLayer) G.TextLayer.add('나가는 문', x, gy - 118, 'bold 12px sans-serif', '#ffe9a0');
+      }
+      // 옥좌와 왕, 호위병
+      if (K) {
+        const bx = K.col * T + T / 2, by = (K.row + 1) * T;
+        if (bx > camera.x - 200 && bx < camera.x + view) {
+          ctx.fillStyle = '#7a7488'; ctx.fillRect(bx - 78, by - 14, 156, 14); ctx.fillStyle = '#948ea4'; ctx.fillRect(bx - 78, by - 14, 156, 4); // 단
+          ctx.fillStyle = '#8a1826'; ctx.fillRect(bx - 44, by - 150, 88, 136); // 등받이
+          ctx.fillStyle = '#e0b12f'; ctx.fillRect(bx - 48, by - 156, 96, 8); ctx.fillRect(bx - 48, by - 150, 6, 136); ctx.fillRect(bx + 42, by - 150, 6, 136);
+          ctx.beginPath(); ctx.moveTo(bx - 14, by - 156); ctx.lineTo(bx, by - 184); ctx.lineTo(bx + 14, by - 156); ctx.closePath(); ctx.fill(); // 왕관 장식
+          G.Npc.draw(ctx, 'guard', bx - 104, by, 1, time);
+          G.Npc.draw(ctx, 'guard', bx + 104, by, -1, time + 1);
+          king(ctx, bx, by - 14, time);
+          if (G.TextLayer) G.TextLayer.add('왕', bx, by - 98, 'bold 13px sans-serif', '#ffe9a0');
+        }
+      }
+    },
+  });
+  G.PalaceTheme = Palace;
   G.KingdomTheme = Kingdom;
 })(window.Game);

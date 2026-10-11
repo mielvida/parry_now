@@ -43,8 +43,8 @@
     kingdom: { // 챕터 2: 왕이 다스리는 거대한 왕국의 도시. 가게가 길게 늘어서 있고 가운데 성에 왕이 있다
       music: 'village', label: '왕국', level: G.Levels.kingdom, theme: G.KingdomTheme, monsterless: true, returnNear: 'kingdom', exitTo: 'village',
       get goal() {
-        if (invasion) return `성을 지켜라! ${invasion.wave + 1}/${invasion.waves} 웨이브 · 성 HP ${Math.max(0, invasion.castleHp)}/${invasion.castleMax} · 남은 적 ${invasion.queue.length + monsters.filter((m) => m.kind === 'raider' && m.alive).length}`;
-        const base = '왕국: 거리를 따라 가게가 늘어서 있다. 가운데 성의 왕에게 말을 걸자(E). 왼쪽 끝 문에서 E: 마을로';
+        if (invasion) return `성을 지켜라! ${invasion.wave + 1}/${invasion.waves} 웨이브 · 성 HP ${Math.ceil(Math.max(0, invasion.castleHp))}/${invasion.castleMax} · 남은 적 ${invasion.queue.length + monsters.filter((m) => m.kind === 'raider' && m.alive).length}`;
+        const base = '왕국: 성 양옆에 가게가 붙어 있다 (오른쪽 끝에 내 집 터). 가운데 성문에서 E: 왕궁으로 들어가 왕을 만나자. 왼쪽 끝 문에서 E: 마을로';
         return missions.pending ? `왕의 의뢰 ${missions.pending}건이 쌓였다! 왕에게 가자.  ${base}` : base;
       },
       banner: { title: 'CHAPTER 2', sub: '왕이 다스리는 도시', dur: 6.5, caption: '…하얀 성이 하늘 높이 솟아 있다. 끝이 보이지 않는 큰 도시, 여기가 왕국이다.' },
@@ -61,6 +61,11 @@
       get label() { return `어둠의 탑 ${darkFloor}층`; },
       get goal() { return `어둠의 탑 ${darkFloor}층 / ${C.DUNGEON_FLOORS}층: ${dungeon.boss ? '보스를 쓰러뜨려라!' : '발판을 타고 꼭대기 계단으로! (암흑은 맞으면 -3)'}  [B 얼음폭탄 · V 먹기]`; },
       get banner() { return { title: `${darkFloor}층`, sub: dungeon.bossKind ? '보스가 기다린다…' : '어둠의 탑', dur: 2.5, caption: dungeon.bossKind ? '…강한 기운이 느껴진다. 이 층의 끝에 보스가 있다.' : '…위로, 위로. 시크너가 기다린다.' }; },
+    },
+    palace: { // 왕궁 안: 알현실. 왕이 옥좌에 앉아 있다
+      music: 'village', label: '왕궁', level: G.Levels.palace, theme: G.PalaceTheme, monsterless: true, returnNear: 'palace', exitTo: 'kingdom',
+      get goal() { return story.kingMet ? ((missions.owed || 0) > 0 ? `왕궁: 옥좌의 왕에게 E로 말을 걸어 의뢰 보상 ${missions.owed} G를 받자` : '왕궁: 옥좌의 왕에게 E로 말을 걸자. 왼쪽 문에서 E: 나가기') : '왕궁 알현실: 왕 앞으로 걸어가자'; },
+      banner: { title: '왕궁', sub: '왕이 계신 곳', dur: 2.5, caption: '…붉은 융단 끝, 옥좌에 왕이 앉아 있다.' },
     },
     duelarena: { // 결투장: 보스전처럼 AI 용사와 싸운다
       music: 'cave', label: '결투장', level: G.Levels.duelarena, theme: G.Beach, monsterless: true, returnNear: 'village', exitTo: 'village',
@@ -156,6 +161,47 @@
     '시민: "저 하얀 성 좀 보세요. 하늘 끝까지 닿을 것 같죠?"',
     '아이: "나도 크면 용사가 될 거예요!"',
   ];
+  // 처음 왕궁에 들어가려 하면: 호위병이 막고, 성 안의 왕이 부른다. 왕은 처음엔 용사를 의심하다가 진짜임을 알아채고 크게 반가워하며 사례금을 준다
+  const GATE_LINES = [ // 성문 앞
+    '호위병: "멈춰라! 이곳은 왕궁이다. 허락 없이는 한 걸음도 들어갈 수 없다!"',
+    '(성 안에서 들려오는 목소리) 왕: "무슨 소란이냐…? 누구인가? 들어오게 하라."',
+    '호위병: "…알겠습니다. 들어가십시오."',
+  ];
+  // 왕은 용사가 든 무기를 보고 의심하고, 알아본다: 무기 종류마다 대사가 다르다 [의심, 알아챔]
+  const WEAPON_TALK = {
+    sword: ['그 검을 보여 보게… 평범해 보이는데, 정말 그것으로 시크너를 벴단 말인가?', '검날에 어둠의 기운이 아직 서려 있다니! 이건 분명 시크너를 벤 검이야!'],
+    great: ['그 커다란 대검을 휘두른다고? 시크너의 갑옷을 가를 만한 크기이긴 하다만…', '검날에 남은 어둠의 흔적… 이만한 대검이 아니면 시크너를 쓰러뜨릴 수 없었겠지!'],
+    dagger: ['단검 한 자루로 어둠의 기사를 쓰러뜨렸다고? 허허, 농담이겠지.', '그림자처럼 파고드는 솜씨… 이 단검에서 시크너의 어둠이 느껴지는군!'],
+    katana: ['이 나라에서 보기 드문 도로군. 정말 그것으로 시크너를 베었다고?', '날 끝에 남은 어둠의 잔향… 틀림없다! 시크너를 벤 도로군!'],
+    rapier: ['가느다란 레이피어로? 시크너의 갑옷을 뚫을 수 있을 리가…', '찌른 자리마다 어둠이 스며 있다… 정확히 약점을 꿰뚫었군!'],
+    spear: ['긴 창이라… 시크너 앞에서 버티려면 큰 용기가 필요했을 텐데, 정말인가?', '창끝에 묻은 어둠… 이건 분명 시크너를 꿰뚫은 창이다!'],
+    axe: ['무식하게 도끼 한 자루로? 허허, 시크너가 웃겠군.', '도끼날에 어둠이 깊이 박혀 있다니… 진짜다!'],
+    hammer: ['그 큰 망치를 어떻게 휘두르나… 시크너의 갑옷을 부수긴 했겠군. 정말인가?', '망치에 어둠의 파편이 박혀 있다! 시크너를 박살 낸 망치로군!'],
+    scythe: ['죽음의 낫이라… 어둠의 기사가 들 만한 무기 아닌가? 수상하군.', '허나 낫에 어린 어둠은 분명 시크너의 것… 그를 거둔 낫이로군!'],
+    whip: ['채찍으로 어둠의 기사를? 서커스단이 아니고?', '채찍 끝에 시크너의 어둠이 묻어 있다니… 놀랍군!'],
+    staff: ['지팡이라… 마법사 같은 차림은 아닌데, 정말 그것으로?', '지팡이에 남은 어둠의 기운… 마법으로 시크너를 쓰러뜨렸군!'],
+    gun: ['그 총으로 어둠의 기사를? 시크너는 총알도 튕겨 낸다던데…', '총신에 어둠이 그을려 있군… 그 총알이 시크너를 꿰뚫었다니!'],
+    shotgun: ['산탄총이라… 시끄럽기만 하고 시크너에게 통했을까?', '총구에 남은 어둠의 그을음… 시크너를 쓰러뜨린 총이 맞군!'],
+    bow: ['활이라… 시크너 같은 강자 앞에서 멀리서 쏘았단 말인가?', '화살촉에 어둠이 묻어 있다! 그 화살이 시크너의 심장을 꿰뚫었군!'],
+    crossbow: ['석궁이라… 시크너의 갑옷을 뚫을 수 있었을까 의심스럽군.', '시위에 남은 어둠의 기운… 진짜 시크너를 쏜 석궁이로군!'],
+    bomb: ['폭탄을 던져 시크너를 쓰러뜨렸다고? 허허, 믿기 어렵군.', '그을음에 섞인 어둠의 기운이라니… 그 폭발이 시크너를 날렸군!'],
+    shield: ['방패로? 막기만 해서 시크너를 쓰러뜨렸단 말인가?', '방패에 새겨진 어둠의 상처… 시크너의 칼을 모두 받아 낸 방패로군!'],
+    wood: ['…부서진 목검? 이걸로 시크너를 쓰러뜨렸다고? 날 놀리는 건가!', '허나 이 부서진 칼날에 어둠이 배어 있다니… 이럴 수가, 진짜로군!'],
+    admin: ['이 기이한 무기는 대체 무엇인가… 세상에 없는 힘이 느껴지는군.', '이 힘… 시크너의 어둠마저 삼킨 무기로군! 틀림없다!'],
+  };
+  const throneLines = () => { // 알현실: 왕은 처음엔 의심하다가 진짜임을 알아채고 크게 반가워하며 사례금을 준다 (든 무기에 따라 대사가 다르다)
+    const w = G.Shop.ITEMS[inv.equipped.weapon] || {};
+    const t = w.admin ? 'admin' : w.wood ? 'wood' : w.type;
+    const tk = WEAPON_TALK[t] || WEAPON_TALK.sword;
+    return [
+      '왕: "그대가… 어둠의 기사 시크너를 쓰러뜨린 용사라고? 허허, 믿기 어렵군. 가짜가 한둘이 아니었거든."',
+      `왕: "${tk[0]}"`,
+      `왕: "${tk[1]} …설마, 정말로?"`,
+      '왕: "오오! 틀림없다! 진짜 용사로구나! 의심해서 미안하네. 이렇게 반가울 데가!"',
+      '왕: "자, 왕국의 감사일세. 받아 주게! 왕국의 가게들도 마음껏 이용하게나."',
+      '왕: "…허나 이것은 시작일 뿐. 성 너머에서 새로운 위협이 깨어나고 있네. — 챕터 2의 막이 오른다 —"',
+    ];
+  };
   const KING_FIRST = [
     '왕: "오오, 그대가 어둠의 탑을 정복한 용사로구나! 짐은 이 왕국의 왕이다."',
     '왕: "시크너의 어둠이 걷혔다는 소식에 온 왕국이 기뻐 춤을 추었지."',
@@ -196,8 +242,12 @@
   const chestTaken = {};            // 이미 연 보물 상자 (같은 상자로 코인을 또 벌 수 없다)
   let nextStage = null;             // 클리어 연출이 끝나면 갈 곳 {name, near}
   let skipBanner = false; // 마을에 처음 왔을 때의 소개/말은 한 번만
-  const missions = { pending: 0, done: 0, timer: null }; // 왕의 의뢰(챕터 2): 1~30분마다 하나씩 도착해 쌓인다
-  let invasion = null;         // 진행 중인 몬스터 군단 {waves, wave, castleHp, ...} (왕국에서만)
+  const missions = { pending: 0, done: 0, timer: null, owed: 0, doneUnclaimed: 0 }; // 왕의 의뢰(챕터 2): 1~30분마다 하나씩 도착해 쌓인다
+  let homeHealT = 0;           // 집 안에서 피가 차는 박자
+  let homeFrom = 'village';    // 내 집에 들어온 곳 (마을 또는 왕국): 나갈 때 거기로 돌아간다
+  let startPos = null;         // 적군 미션을 시작한 자리 (쓰러지면 여기서 다시 시작)
+  let allies = [];             // 적군과 싸우려고 성에서 나온 아군 병사들
+  let invasion = null;         // 진행 중인 적군 {waves, wave, castleHp, ...} (왕국에서만)
   const seenStages = {};
   let fanfare = false;          // 왕국에 처음 들어선 직후 (loadStage 끝에서 소리와 빛을 터뜨린다)
   let equipUI = null;   // 인벤토리 창 {cur(선택한 칸 번호), msg, msgT, ok}
@@ -304,7 +354,25 @@
       popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: boss.defeatText, t: 2.5, color: 'rgba(255,213,74,A)' });
     },
   };
+  // 다시 도전하는 보스는 처치한 횟수만큼 체력이 3분의 2씩 줄어든다 (보상도 3분의 2씩)
+  function weakenRepeatBoss() {
+    if (!boss || duelRun) return;
+    const kills = bossKills[stageName === 'dungeon' ? 'dungeon' + darkFloor : stageName] || 0;
+    if (!kills) return;
+    const f = Math.pow(2 / 3, kills);
+    for (const h of boss.heads || []) {
+      if (!h || !h.maxHp) continue;
+      h.maxHp = Math.max(1, Math.round(h.maxHp * f));
+      h.hp = h.maxHp;
+    }
+    if (boss.maxHp) { boss.maxHp = Math.max(1, Math.round(boss.maxHp * f)); boss.hp = boss.maxHp; }
+    popups.push({ x: player.x + player.w / 2, y: player.y - 90, text: `다시 만난 보스: 체력 ${Math.round(f * 100)}%`, t: 3, color: 'rgba(255,200,140,A)' });
+  }
   function setupBoss() {
+    buildBoss();
+    weakenRepeatBoss();
+  }
+  function buildBoss() {
     resetAnalysis();
     bossMul = 1;
     for (let k = monsters.length - 1; k >= 0; k--) if (monsters[k].fromBoss) monsters.splice(k, 1); // 이전 보스전에서 낳은 슬라임 정리
@@ -1081,7 +1149,7 @@
     }
     spawn = terrain.spawnFor(C.PLAYER_W, C.PLAYER_H);
     // near: 마을로 돌아올 때 어느 입구 앞에서 시작할지 ('D' 동굴 입구, 또는 스테이지 이름 = 그 스테이지의 문)
-    const arrive = near === 'D' ? terrain.caveEntrances[0] : near === 'Y' ? terrain.homeLots[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
+    const arrive = near === 'D' ? terrain.caveEntrances[0] : near === 'Y' ? terrain.homeLots[0] : near === 'palace' ? terrain.castles[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
     if (arrive) spawn = terrain.placeOnTile(arrive.col - 2, arrive.row, C.PLAYER_W, C.PLAYER_H);
 
     chest = terrain.treasure && !chestTaken[name] && !st.boss ? makeChest() : null; // 보스가 있는 스테이지는 보스를 쓰러뜨려야 상자가 나온다
@@ -1131,6 +1199,10 @@
     if (st.dark) scatterPickups(); // 던전에서는 가끔 아이템이 떨어져 있다
     oreNodes.setup(terrain, oreRun, name === 'orecave'); // 광물 동굴이면 광석 덩어리를 깐다
     seeded(floorSeed(darkFloor) ^ 0x9e3779b9, () => dungeonEvents.setup(terrain, darkFloor, name === 'dungeon' && !!(dungeon && dungeon.tower) && darkFloor % 3 === 0)); // 탑의 3층마다(3, 6, 9 …) 이벤트가 나온다. 보스방/허브/그 밖의 층은 비움
+    if (name === 'kingdom') { // 왕이 다스리는 도시, 성 앞의 허수아비 대미지 측정기
+      const dp = terrain.placeOnTile(160, 14, 30, 56);
+      monsters.push(new G.Dummy(dp.x, dp.y));
+    }
     baseMonsterCount = monsters.length;
     spots = terrain.standingSpots();
 
@@ -1141,6 +1213,7 @@
     shop = null;
     equipUI = null;
     dialog = null;
+    allies = [];
     invasion = null; // 왕국을 떠나면 군단전은 끝난다 (쌓인 의뢰는 그대로)
     popups.length = 0;
     G.Magic.clear(magic);
@@ -1187,6 +1260,189 @@
     lives = Math.min(lives, maxLives()); // 갑옷을 벗어 최대 피가 줄면 넘치는 피는 사라진다
   }
 
+  // ---------- 저장 · 불러오기 · 처음부터 다시하기 ----------
+  // 코인, 경험치, 가진 장비와 강화, 보스 처치, 이야기와 의뢰 등 진행 상황을 브라우저(localStorage)에 자동 저장한다 (5초마다, 창을 닫을 때, 설정 창의 "지금 저장하기").
+  // 켜면 저장된 게임이 마을(또는 왕국/다크월드 입구)에서 이어진다. 주소에 ?nosave 가 있으면 저장·불러오기를 하지 않는다.
+  const OLD_KEY = 'parry_now_save_v1'; // 예전의 저장 하나짜리 (첫 칸으로 옮겨 준다)
+  const slotKey = (i) => 'parry_now_slot_' + (i + 1);
+  const LAST_KEY = 'parry_now_last_slot';
+  let slot = null;     // 지금 하고 있는 저장 칸 (0~2). 처음 화면에서 고른다
+  let playSec = 0;     // 이 칸의 플레이 시간 (초)
+  let titleUI = null;  // 처음 화면 {cur, slots:[meta|null x3], del, copy, quit, t}
+  const AREA_NAMES = { palace: '왕궁', cave: '시작 동굴', beach: '낯선 해변', village: '해변 마을', mine: '마을 동굴', orecave: '광물 동굴', home: '우리 집', forest: '속삭이는 숲', snow: '얼음 산', volcano: '불꽃 화산', darkhub: '다크월드 입구', kingdom: '왕이 다스리는 도시', duelarena: '결투장' };
+  const areaNameOf = (st, fl) => (st === 'dungeon' ? `어둠의 탑 ${fl || 1}층` : AREA_NAMES[st] || (STAGES[st] && STAGES[st].label) || st);
+  const areaImgOf = (st, fl) => (st === 'dungeon' ? 'd' + ([1, 3, 10, 33, 50, 66, 90, 100].filter((x) => x <= (fl || 1)).pop() || 1) : ({ duelarena: 'mg_duel', palace: 'kingdom' }[st] || st)); // 지역 그림 (assets/regions)
+  const noSave = () => window.NO_SAVE || /[?&](nosave|stage=)/.test(window.location.search);
+  let saveBlocked = false; // 처음부터 다시하기 중에는 창을 닫을 때 다시 저장하지 않는다
+  function buildSave() {
+    return { v: 1, coins, exp, inv, bossKills, chestTaken, missions, story, seenStages, floorSeeds, miniLv, darkFloor, darkBest, mineRun, oreRun, reapKills, usedT, stage: stageName, playSec: Math.round(playSec), pos: { x: Math.round(player.x), y: Math.round(player.y) } };
+  }
+  function saveGame() {
+    if (noSave() || saveBlocked || gameOver || slot === null || titleUI) return false;
+    try {
+      const data = buildSave();
+      const meta = { area: areaNameOf(stageName, darkFloor), img: areaImgOf(stageName, darkFloor), coins, exp, playSec: data.playSec, at: Date.now() };
+      localStorage.setItem(slotKey(slot), JSON.stringify({ v: 2, meta, data }));
+      localStorage.setItem(LAST_KEY, String(slot));
+      return true;
+    } catch (e) { return false; }
+  }
+  function readSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+  function migrateOldSave() { // 예전의 저장 하나를 첫 칸으로
+    try {
+      const raw = localStorage.getItem(OLD_KEY);
+      if (!raw) return;
+      if (!readSlot(0)) {
+        const d = JSON.parse(raw);
+        const meta = { area: areaNameOf(d.stage, d.darkFloor), img: areaImgOf(d.stage, d.darkFloor), coins: d.coins || 0, exp: d.exp || 0, playSec: d.playSec || 0, at: Date.now() };
+        localStorage.setItem(slotKey(0), JSON.stringify({ v: 2, meta, data: d }));
+      }
+      localStorage.removeItem(OLD_KEY);
+    } catch (e) { /* 저장소 없음 */ }
+  }
+  const replaceObj = (dst, src) => { for (const k of Object.keys(dst)) delete dst[k]; Object.assign(dst, JSON.parse(JSON.stringify(src || {}))); };
+  const RESTORABLE = ['village', 'kingdom', 'palace', 'darkhub', 'beach', 'cave', 'forest', 'snow', 'volcano', 'home']; // 같은 모양으로 다시 만들 수 있는 곳
+  // 저장 내용을 게임에 적용한다. exact = 저장한 자리(스테이지와 위치) 그대로, 아니면 마을에서 시작
+  function applySave(d, exact = true) {
+    coins = d.coins || 0; exp = d.exp || 0;
+    replaceObj(inv, d.inv);
+    replaceObj(bossKills, d.bossKills); replaceObj(chestTaken, d.chestTaken); replaceObj(missions, d.missions);
+    replaceObj(story, d.story); replaceObj(seenStages, d.seenStages); replaceObj(floorSeeds, d.floorSeeds); replaceObj(miniLv, d.miniLv);
+    darkFloor = d.darkFloor || 1; darkBest = d.darkBest || 0; mineRun = d.mineRun || 0; oreRun = d.oreRun || 0; reapKills = d.reapKills || 0; usedT = d.usedT || 0;
+    if (!inv.items || !inv.equipped) { Object.assign(inv, G.Shop.newInventory()); }
+    cutscene = null; mini = null; shop = null; equipUI = null; dialog = null; duelRun = null; invasion = null; allies = []; if (terrain) terrain.invasion = null;
+    const target = RESTORABLE.includes(d.stage) && STAGES[d.stage] ? d.stage : (d.stage === 'dungeon' ? 'darkhub' : 'village');
+    loadStage(target);
+    cutscene = null;
+    applyEquipment();
+    lives = maxLives();
+    stamina = stMax();
+    if (exact && d.pos && target === d.stage) { player.placeAt(d.pos.x, d.pos.y); camera.follow(player, terrain, C.DT, true); player.invuln = 1.5; }
+    return true;
+  }
+  function loadGame() {
+    if (noSave()) return false;
+    const rec = readSlot(slot === null ? 0 : slot);
+    if (!rec || !rec.data || rec.data.v !== 1) return false;
+    playSec = rec.data.playSec || 0;
+    return applySave(rec.data);
+  }
+  // ---- 처음 화면: 저장 칸 세 개 중에서 고른다 (빈 칸이면 새 게임) ----
+  function openTitle() {
+    migrateOldSave();
+    const last = parseInt(localStorage.getItem(LAST_KEY), 10);
+    titleUI = { cur: last >= 0 && last <= 2 ? last : 0, slots: [0, 1, 2].map((i) => { const r = readSlot(i); return r && r.meta ? r.meta : null; }), del: false, copy: null, quit: false, msg: '', msgT: 0, t: 0 };
+  }
+  function startSlot(i) {
+    const rec = readSlot(i);
+    slot = i;
+    if (rec && rec.data && rec.data.v === 1) {
+      playSec = rec.data.playSec || 0;
+      applySave(rec.data);
+      popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `칸 ${i + 1}: ${areaNameOf(stageName, darkFloor)}에서 이어서!`, t: 3, color: 'rgba(160,255,160,A)' });
+    } else {
+      playSec = 0; // 새 게임
+    }
+    titleUI = null;
+    G.Audio.setMusic((STAGES[stageName] && STAGES[stageName].music) || 'cave'); // 타이틀 노래 -> 그 지역의 노래
+    G.Audio.play('treasure');
+    saveGame();
+  }
+  function copySlot(from, to) { // 칸 복사: 같은 저장을 다른 칸에도 둔다 (이미 있으면 덮어쓴다)
+    try { const raw = localStorage.getItem(slotKey(from)); if (!raw || from === to) return false; localStorage.setItem(slotKey(to), raw); } catch (e) { return false; }
+    const r = readSlot(to);
+    titleUI.slots[to] = r && r.meta ? r.meta : null;
+    return true;
+  }
+  function quitGame() { // 게임을 완전히 끈다 (브라우저가 허락하면 창을 닫고, 아니면 끝났다는 화면만 남긴다)
+    saveBlocked = true;
+    titleUI.halted = true;
+    try { window.close(); } catch (e) { /* 창 닫기가 막혀 있다 */ }
+  }
+  function updateTitle(dt) {
+    const t = titleUI;
+    t.t += dt;
+    if (t.halted) return;
+    const pressed = (...c) => c.some((k) => input.wasPressed(k));
+    if (t.quit) { // 게임 끄기 확인
+      if (pressed('Escape', 'KeyN')) { t.quit = false; G.Audio.play('catch'); }
+      else if (pressed('Enter', 'NumpadEnter', 'KeyY')) quitGame();
+      return;
+    }
+    if (t.del) {
+      if (pressed('Escape', 'KeyN')) { t.del = false; G.Audio.play('catch'); }
+      else if (pressed('Enter', 'NumpadEnter', 'KeyY')) { try { localStorage.removeItem(slotKey(t.cur)); } catch (e) { /* 저장소 없음 */ } t.slots[t.cur] = null; t.del = false; G.Audio.play('deny'); }
+      return;
+    }
+    if (t.copy !== null && t.copy !== undefined) { // 복사할 칸 고르기
+      for (let n = 1; n <= 3; n++) if (pressed('Digit' + n, 'Numpad' + n)) { if (n - 1 !== t.copy && copySlot(t.copy, n - 1)) { t.cur = n - 1; t.msg = `칸 ${t.copy + 1} → 칸 ${n} 복사했어요`; t.msgT = 2.5; G.Audio.play('treasure'); } t.copy = null; }
+      if (pressed('Escape')) t.copy = null;
+      return;
+    }
+    t.msgT = Math.max(0, (t.msgT || 0) - dt);
+    if (pressed('ArrowLeft', 'KeyA')) { t.cur = (t.cur + 2) % 3; G.Audio.play('catch'); }
+    if (pressed('ArrowRight', 'KeyD')) { t.cur = (t.cur + 1) % 3; G.Audio.play('catch'); }
+    if (pressed('Digit1', 'Numpad1')) t.cur = 0;
+    if (pressed('Digit2', 'Numpad2')) t.cur = 1;
+    if (pressed('Digit3', 'Numpad3')) t.cur = 2;
+    if (pressed('KeyC') && t.slots[t.cur]) { t.copy = t.cur; G.Audio.play('pickup'); }
+    else if (pressed('Delete', 'KeyX', 'Backspace') && t.slots[t.cur]) { t.del = true; G.Audio.play('deny'); }
+    else if (pressed('Escape')) { t.quit = true; G.Audio.play('deny'); }
+    else if (pressed('Enter', 'NumpadEnter', 'Space')) startSlot(t.cur);
+  }
+  // ---- 1분 전으로 돌아가기: 10초마다 지금 상태를 기억해 두고, 1분쯤 전의 것으로 돌아간다 ----
+  const history = []; // {t(초), json}
+  let histClock = 0, histT = 8;
+  function recordHistory(dt) {
+    histClock += dt;
+    histT -= dt;
+    if (histT > 0 || gameOver || duelRun || mini || cutscene) return;
+    histT = 10;
+    history.push({ t: histClock, json: JSON.stringify(buildSave()) });
+    while (history.length > 9) history.shift(); // 80~90초 분량
+  }
+  function rewindOneMinute() {
+    if (!history.length) return '아직 돌아갈 시점이 없어요 (잠시 뒤에 다시)';
+    let pick = null;
+    for (const h of history) if (histClock - h.t >= 55) pick = h; // 1분(55초) 넘게 지난 것 중 가장 최근
+    const fallback = !pick;
+    if (!pick) pick = history[0];
+    applySave(JSON.parse(pick.json), true);
+    history.length = 0; histT = 8;
+    return fallback ? `가장 오래된 시점(${Math.round(histClock - pick.t)}초 전)으로 돌아갔어요` : '1분 전으로 돌아갔어요!';
+  }
+  function resetGame() { // 처음부터 다시하기: 저장을 지우고 새로고침 (모든 진행이 처음 상태로)
+    saveBlocked = true;
+    try { if (slot !== null) localStorage.removeItem(slotKey(slot)); } catch (e) { /* 저장소 없음 */ }
+    window.location.reload(); // 처음 화면으로 돌아간다
+  }
+  setInterval(saveGame, 5000);
+  G.recordHistory = recordHistory;
+  window.addEventListener('beforeunload', saveGame);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+
+  // 관리자 모드(F1 개발 메뉴, F2 관리자 무기)는 비밀번호를 눌러야 열린다 (창을 새로 켜면 다시 입력)
+  const ADMIN_PW = '96221430';
+  let adminUnlocked = false;
+  let pwUI = null; // {buf, msg, msgT, then}
+  function askPassword(then) {
+    if (adminUnlocked) { then(); return; }
+    pwUI = { buf: '', msg: '', msgT: 0, then };
+    G.Audio.play('pickup');
+  }
+  function updatePassword(dt) {
+    const p = pwUI;
+    const pressed = (...c) => c.some((k) => input.wasPressed(k));
+    p.msgT = Math.max(0, p.msgT - dt);
+    if (pressed('Escape')) { pwUI = null; return; }
+    for (let n = 0; n <= 9; n++) if (pressed('Digit' + n, 'Numpad' + n) && p.buf.length < 12) { p.buf += n; G.Audio.play('catch'); }
+    if (pressed('Backspace')) p.buf = p.buf.slice(0, -1);
+    if (pressed('Enter', 'NumpadEnter')) {
+      if (p.buf === ADMIN_PW) { adminUnlocked = true; const then = p.then; pwUI = null; G.Audio.play('treasure'); then(); }
+      else { p.msg = '비밀번호가 틀렸어요'; p.msgT = 1.6; p.buf = ''; G.Audio.play('deny'); }
+    }
+  }
+
   const startParam = new URLSearchParams(window.location.search).get('stage');
   loadStage(STAGES[startParam] ? startParam : 'cave');
   applyEquipment();
@@ -1223,7 +1479,7 @@
         text = S.data.enabled ? '내 스프라이트 켜짐' : '내 스프라이트 꺼짐';
       }
       popups.push({ x: player.x + player.w / 2, y: player.y - 14, text, t: 1.6, color: 'rgba(255,248,170,A)' });
-    } else if (e.code === 'KeyM') { // 전체화면 켜기/끄기
+    } else if (e.code === 'KeyP') { // 전체화면 켜기/끄기 (M은 소리 끄기)
       if (document.fullscreenElement) document.exitFullscreen();
       else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     }
@@ -1256,6 +1512,7 @@
     lives -= dmg;
     G.Audio.play('hurt');
     if (lives <= 0 && duelRun) { duelLose(); return; }
+    if (lives <= 0 && invasion && stageName === 'kingdom') { retryInvasion(); return; }
     if (lives <= 0) {
       G.Audio.play('gameover');
       gameOver = true;
@@ -1276,13 +1533,16 @@
     const T = C.TILE;
     const px = player.x + player.w / 2;
     const feet = player.y + player.h;
-    for (const s of terrain.shops) {
+    for (const s of invasion ? [] : terrain.shops) { // 적군이 쳐들어오면 가게 문이 닫힌다
       if (Math.abs(px - (s.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (s.row + 1) * T) < T * 2) return { type: 'shop', shop: s };
+    }
+    for (const cs of terrain.castles) { // 성문: 왕궁으로 들어간다
+      if (Math.abs(px - (cs.col * T + T / 2)) < T * 2.4 && Math.abs(feet - (cs.row + 1) * T) < T * 2) return { type: 'palace' };
     }
     for (const k of terrain.kings) {
       if (Math.abs(px - (k.col * T + T / 2)) < T * 2.4 && Math.abs(feet - (k.row + 1) * T) < T * 2) return { type: 'king' };
     }
-    for (let i = 0; i < terrain.villagers.length; i++) {
+    for (let i = 0; i < (invasion ? 0 : terrain.villagers.length); i++) {
       const v = terrain.villagers[i];
       if (Math.abs(px - (v.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (v.row + 1) * T) < T * 2) return { type: 'talk', index: i };
     }
@@ -1972,6 +2232,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     exp = w.exp;
     lives = w.lives;
     applyEquipment();
+    if (res.ok && res.rested) { stamina = stMax(); saveGame(); effects.sparkle(player.x + player.w / 2, player.y); } // 여관에서 푹 쉬었다
     shop.msg = res.msg;
     shop.ok = res.ok;
     shop.msgT = 2;
@@ -2253,6 +2514,14 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
 
   // ---------- 개발 메뉴 (F1): 앞으로 모든 테스트 기능은 여기에 모은다 ----------
   let devUI = null; // {cur, scroll, msg, msgT, fresh}
+  let adminUI = null; // 관리자 무기 편집 창
+  function openAdmin() { // 관리자 무기를 받아 끼고 편집 창을 연다
+    if (!inv.items.includes('admin')) inv.items.push('admin');
+    inv.equipped.weapon = 'admin';
+    applyEquipment();
+    adminUI = G.Admin.open();
+    G.Audio.play('pickup');
+  }
   let settingsUI = null; // 설정 창 {cur}
   let god = false;  // 무적
   // 마을의 가게 앞으로 간다 (개발 메뉴의 순간이동)
@@ -2349,6 +2618,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { label: '정화된 크리스탈 +1', run: give('정화된 크리스탈 +1', () => addM('cleancrystal')) },
       { label: '신성 크리스탈 +1', run: give('신성 크리스탈 +1', () => addM('holycrystal')) },
       { head: '장비' },
+      { label: '관리자 무기 초기화', hint: '설정을 처음 값으로 되돌린다', run: give('관리자 무기를 초기화했다', () => { G.Admin.reset(); applyEquipment(); }) },
+      { label: '관리자 모드 다시 잠그기', hint: '다시 열려면 비밀번호', run: goto(() => { adminUnlocked = false; popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '관리자 모드를 잠갔다', t: 2.5, color: 'rgba(255,170,170,A)' }); G.Audio.play('deny'); }) },
+      { label: '관리자 무기 편집', hint: 'F2: 대미지·범위·속성·색 전부 설정', run: goto(() => openAdmin()) },
       { label: '모든 무기 받기', hint: '합성 무기 제외', run: give('모든 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon' && !it.tier); devUI.msg = `무기 ${n}개를 받았다`; }) },
       { label: '합성 무기 모두 받기', hint: '강화된 · 최강의', run: give('합성 무기를 받았다', () => { const n = giveItems((it) => it.slot === 'weapon' && !!it.tier); devUI.msg = `합성 무기 ${n}개를 받았다`; }) },
       { label: '모든 방어구 받기', hint: '갑옷 · 투구 · 장갑 · 바지 · 신발', run: give('모든 방어구를 받았다', () => { const n = giveItems((it) => it.slot !== 'weapon' && !it.tier); devUI.msg = `방어구 ${n}개를 받았다`; }) },
@@ -2368,7 +2640,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { head: '챕터 2' },
       { label: '챕터 2로 순간이동', hint: '왕국 · 왕 · 음식점', run: goto(() => { story.cleared = true; story.revealed = true; loadStage('kingdom', true); }) },
       { label: '왕의 의뢰 +1 (치트)', hint: '쌓인 의뢰가 늘어난다', run: give('왕의 의뢰가 도착했다', () => { story.cleared = true; addMission(1, true); }) },
-      { label: '몬스터 군단 바로 시작', hint: '왕국에서 쌓인 의뢰만큼', run: goto(() => { story.cleared = true; story.revealed = true; story.kingMet = true; if (!missions.pending) addMission(1, true); loadStage('kingdom', true); startInvasion(); }) },
+      { label: '적군 바로 시작', hint: '왕국에서 쌓인 의뢰만큼', run: goto(() => { story.cleared = true; story.revealed = true; story.kingMet = true; if (!missions.pending) addMission(1, true); loadStage('kingdom', true); startInvasion(); }) },
     ];
   }
 
@@ -2489,6 +2761,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   window.addEventListener('mouseup', () => { if (sg) sg.mouse = false; if (ag) ag.mouse = false; });
   canvas.addEventListener('mousemove', (ev) => {
     const p = canvasPoint(ev);
+    if (titleUI && !settingsUI) { const i = G.Renderer.titleCards(C.VIEW_W, C.VIEW_H).findIndex((c) => inRect(p, c)); if (i >= 0 && !titleUI.del && !titleUI.quit && titleUI.copy === null) titleUI.cur = i; return; }
+    if (adminUI) { G.Admin.mouse(adminUI, 'move', p); return; }
     if (fp) { // 대상 고르기: 올려 놓으면 선택
       const g = G.Renderer.forgePickGeometry(C.VIEW_W, C.VIEW_H);
       if (fp.step === 'cat') { const i = g.cats.findIndex((r) => inRect(p, r)); if (i >= 0) fp.cur = i; }
@@ -2513,6 +2787,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
   });
   canvas.addEventListener('wheel', (ev) => { // 휠: 인벤토리/개발 메뉴 스크롤
+    if (adminUI) { ev.preventDefault(); G.Admin.mouse(adminUI, 'wheel', null, ev.deltaY); return; }
     if (fp && fp.step === 'item') { ev.preventDefault(); fpMove(ev.deltaY > 0 ? FP_COLS : -FP_COLS); return; }
     if (devUI) {
       ev.preventDefault();
@@ -2533,6 +2808,36 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   canvas.addEventListener('click', (ev) => {
     if (suppressClick) { suppressClick = false; return; }
     const p = canvasPoint(ev);
+    if (titleUI && !settingsUI) { // 처음 화면: 칸 클릭 = 시작, 복사/삭제 단추, 설정/끄기 단추
+      if (titleUI.halted) return;
+      const cards = G.Renderer.titleCards(C.VIEW_W, C.VIEW_H);
+      const btn = G.Renderer.titleButtons(C.VIEW_W, C.VIEW_H);
+      if (titleUI.quit) { // 끄기 확인 창
+        const bx = G.Renderer.titleQuitButtons(C.VIEW_W, C.VIEW_H);
+        if (inRect(p, bx.yes)) quitGame(); else if (inRect(p, bx.no)) titleUI.quit = false;
+        return;
+      }
+      if (titleUI.del) {
+        const bx = G.Renderer.titleQuitButtons(C.VIEW_W, C.VIEW_H);
+        if (inRect(p, bx.yes)) { try { localStorage.removeItem(slotKey(titleUI.cur)); } catch (e) { /* 저장소 없음 */ } titleUI.slots[titleUI.cur] = null; titleUI.del = false; G.Audio.play('deny'); } else if (inRect(p, bx.no)) titleUI.del = false;
+        return;
+      }
+      if (inRect(p, btn.settings)) { settingsUI = { cur: 0, fromTitle: true }; G.Audio.play('pickup'); return; }
+      if (inRect(p, btn.quit)) { titleUI.quit = true; G.Audio.play('deny'); return; }
+      const i = cards.findIndex((c) => inRect(p, c));
+      if (i < 0) return;
+      if (titleUI.copy !== null) { // 복사할 칸을 눌렀다
+        if (i !== titleUI.copy && copySlot(titleUI.copy, i)) { titleUI.msg = `칸 ${titleUI.copy + 1} → 칸 ${i + 1} 복사했어요`; titleUI.msgT = 2.5; titleUI.cur = i; G.Audio.play('treasure'); }
+        titleUI.copy = null;
+        return;
+      }
+      titleUI.cur = i;
+      if (titleUI.slots[i] && inRect(p, cards[i].copy)) { titleUI.copy = i; G.Audio.play('pickup'); }
+      else if (titleUI.slots[i] && inRect(p, cards[i].del)) { titleUI.del = true; G.Audio.play('deny'); }
+      else startSlot(i);
+      return;
+    }
+    if (adminUI) { G.Admin.mouse(adminUI, 'click', p, ev.shiftKey); return; }
     if (fp) { // 대상 고르기: 종류 버튼 / 종류 필터 / 네모 칸 / 뒤로
       const g = G.Renderer.forgePickGeometry(C.VIEW_W, C.VIEW_H);
       if (fp.step === 'cat') {
@@ -2648,7 +2953,21 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     lives = Math.min(maxLives(), lives + 0.25);
     popups.push({ x: s.x + s.w / 2, y: s.y - 8, text: '+¼', t: 0.9, color: 'rgba(255,140,170,A)' });
   }
+  // 허수아비(대미지 측정기): 쓰러지지 않고, 한 번 휘두를 때마다 보스에게 입히는 만큼의 대미지를 잰다
+  function dummyHit(s) {
+    if (s.hitGrace > 0) return;
+    s.hitGrace = 0.45;
+    const crit = rollCrit();
+    const dmg = crit ? G.Shop.critDamage(inv) : bossDamage();
+    s.record(dmg, crit);
+    weaponElementHit(s, Math.sign(s.x + s.w / 2 - (player.x + player.w / 2)) || player.facing, player.x + player.w / 2); // 속성 무기: 불꽃·독 등이 허수아비에게도 걸린다
+    effects.parryHit(s.x + s.w / 2, s.y + s.h * 0.4);
+    G.Audio.play('parry');
+    if (crit) critFx(s.x + s.w / 2, s.y + s.h * 0.4);
+  }
   function hitMonster(s, fromX, fallbackDir) {
+    if (s.dummy) { dummyHit(s); return; }
+    s.byAlly = false; // 내가 친 것이니 처치 보상은 나에게
     reapSteal(s);
     const away = Math.sign(s.x + s.w / 2 - fromX) || fallbackDir;
     if (s.extraHits > 0 && !s.flying && !equipStats.ignoreCrack && !rollCrit()) { // 다크월드의 단단한 몬스터: 여러 번 때려야 쓰러진다
@@ -2743,6 +3062,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   // 지팡이 마법이 몬스터에 닿았을 때의 효과
   const magicHooks = {
     hit(m, el, dir, x, y, shot) {
+      m.byAlly = false; // 내 마법/총/활에 맞았다
       if (el === 'bomb' || el === 'icebomb') return; // 폭탄은 터질 때 피해를 준다 (explode)
       const isBossHit = bossOn() && boss.targets().includes(m);
       const weakX = (e) => (isBossHit && boss.weak && e === boss.weak ? 3 : 1); // 보스의 약점 속성이면 x3
@@ -2857,7 +3177,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       if (player.invuln === 0 && !player.dashing && Math.abs(f.x - (player.x + player.w / 2)) < player.w / 2 + 9 && Math.abs(f.y - (player.y + player.h / 2)) < player.h / 2 + 9) {
         effects.parryHit(f.x, f.y);
         dead();
-        loseLife(player.x + player.w / 2, player.y + player.h / 2, STAGES[stageName].dark ? 3 : 1);
+        loseLife(player.x + player.w / 2, player.y + player.h / 2, f.dmg !== undefined ? f.dmg : STAGES[stageName].dark ? 3 : 1);
       }
     }
   }
@@ -2902,25 +3222,40 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
 
   // 여러 줄 대사를 차례로 보여준다 (E로 다음 줄)
   // 왕: 처음 만나면 챕터 2 이야기를 들려주고 사례금을 준다. 그다음부터는 한마디씩
-  function talkToKing() {
-    if (!story.kingMet) {
+  function startGateEvent() { // 성문 앞: 호위병이 막고 성 안의 왕이 부른다 -> 왕궁(알현실)으로
+    startDialogs(GATE_LINES, () => { loadStage('palace', true); });
+  }
+  function startThroneEvent() { // 알현실: 왕이 용사를 알아보고 사례금을 준다
+    startDialogs(throneLines(), () => {
       story.kingMet = true;
       coins += 3000;
       G.Audio.play('treasure');
       effects.treasure(player.x + player.w / 2, player.y);
       effects.shake(5, 0.3);
       popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '왕의 사례금 +3000 G', t: 3, color: 'rgba(255,225,120,A)' });
-      startDialogs(KING_FIRST);
-      addMission(1, true); // 첫 의뢰: 곧바로 다시 말을 걸면 군단이 몰려온다
+      addMission(1, true); // 첫 의뢰: 곧바로 다시 말을 걸면 적군이 몰려온다
       missions.timer = rollMissionTimer();
+    });
+  }
+  function talkToKing() {
+    if (!story.kingMet) {
+      startThroneEvent();
+    } else if ((missions.owed || 0) > 0 && !invasion) { // 끝낸 의뢰의 보상을 한꺼번에
+      const n = Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin));
+      const cnt = missions.doneUnclaimed || 0;
+      missions.owed = 0; missions.doneUnclaimed = 0;
+      coins += n;
+      G.Audio.play('treasure');
+      effects.treasure(player.x + player.w / 2, player.y);
+      popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: `의뢰 보상 +${n} G`, t: 3, color: 'rgba(255,225,120,A)' });
+      startDialogs([`왕: "해냈구나! 의뢰 ${cnt}건을 모두 완수했네. 참으로 든든하군!"`, `왕: "약속한 보상일세. ${n} G를 받게. 어려운 의뢰일수록 더 후하게 쳤다네."`]);
     } else if (invasion) dialog = { text: '왕: "아직 적이 남았다! 성을 지켜 주게!"', t: 3 };
     else if (missions.pending > 0) {
-      dialog = { text: `왕: "몬스터 군단이 성을 노린다! 쌓인 의뢰가 ${missions.pending}건이네… 부탁하네, 용사여!"`, t: 3.5 };
-      startInvasion();
+      startDialogs([`왕: "적군이 성을 노린다! 쌓인 의뢰가 ${missions.pending}건이네… 부탁하네, 용사여!"`, '왕: "성문 밖에서 적을 막아 주게. 병사들도 함께 나갈 걸세!"'], () => { loadStage('kingdom', true, 'palace'); startInvasion(); });
     } else dialog = { text: KING_LINES[(story.kingTalk = (story.kingTalk || 0) + 1) % KING_LINES.length] + '  (다음 의뢰는 곧 도착할 걸세)', t: 4 };
   }
 
-  // ---- 왕의 의뢰와 몬스터 군단 ----
+  // ---- 왕의 의뢰와 적군 ----
   const MISSION_MIN = 60, MISSION_MAX = 1800; // 1분 ~ 30분마다 새 의뢰가 도착한다
   const rollMissionTimer = () => MISSION_MIN + Math.random() * (MISSION_MAX - MISSION_MIN);
   function addMission(n = 1, quiet = false) {
@@ -2937,10 +3272,11 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (missions.timer <= 0) { missions.timer = rollMissionTimer(); addMission(1); } // 의뢰는 처리하지 못해도 계속 쌓인다
   }
   const waveQueue = (w) => { // w번째(0부터) 웨이브의 군단: 뒤로 갈수록 종류가 늘고 수가 많다
-    const pool = ['spear', 'spear', 'rusher', 'shield'];
-    if (w >= 1) pool.push('archer', 'archer');
-    if (w >= 3) pool.push('shield', 'archer', 'rusher');
-    const n = Math.min(26, 6 + w * 3);
+    const pool = ['sword', 'sword', 'sword', 'sword', 'archer', 'archer', 'archer', 'archer']; // 검병과 궁수가 한꺼번에 떼로 몰려온다
+    if (w >= 1) pool.push('spear', 'rusher', 'archer');
+    if (w >= 2) pool.push('shield', 'sword', 'archer');
+    if (w >= 3) pool.push('shield', 'rusher');
+    const n = Math.min(80, 20 + w * 8);
     const out = [];
     let ogres = 0;
     for (let i = 0; i < n; i++) {
@@ -2949,60 +3285,158 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
     return out;
   };
+  // ---- 성의 병사들: 싸움이 시작되면 성문에서 3명이 나와 같이 싸운다 ----
+  function spawnAllies(n) {
+    const T = C.TILE;
+    const castle = terrain.castles[0];
+    for (let i = 0; i < n; i++) {
+      const p = terrain.placeOnTile(castle.col + (i - 1) * 2, 14, 26, 40); // 플레이어와 같은 바닥에 선다
+      allies.push({ variant: 'ally', ally: true, x: p.x, y: p.y, w: 26, h: 40, vx: 0, dir: i % 2 ? -1 : 1, hp: 5, maxHp: 5, cd: 0.4 + i * 0.2, hitCd: 0, swingT: 0, struck: false, time: Math.random() * 5, state: 'walk', flying: false, flightTime: 0, fx: 0, spawnT: 0.5 });
+      effects.spawn(p.x + 13, p.y + 40);
+    }
+    if (n > 0) { popups.push({ x: player.x + player.w / 2, y: player.y - 100, text: `성에서 병사 ${n}명이 나왔다! 같이 싸우자`, t: 2.5, color: 'rgba(140,200,255,A)' }); G.Audio.play('spawn'); }
+  }
+  function updateAllies(dt) {
+    if (!allies.length) return;
+    const T = C.TILE;
+    const castleX = terrain.castles[0].col * T + T / 2;
+    const foes = monsters.filter((m) => m.kind === 'raider' && m.alive && !m.flying && m.appear <= 0);
+    for (let k = allies.length - 1; k >= 0; k--) {
+      const a = allies[k];
+      a.time += dt;
+      a.cd = Math.max(0, a.cd - dt);
+      a.hitCd = Math.max(0, a.hitCd - dt);
+      a.fx = Math.max(0, a.fx - dt);
+      const cx = a.x + a.w / 2;
+      let tgt = null, best = 1e9;
+      for (const f of foes) { const d = Math.abs(f.x + f.w / 2 - cx); if (d < best) { best = d; tgt = f; } }
+      if (a.swingT > 0) { // 베는 중: 중간에 한 번 맞는다
+        a.swingT -= dt;
+        a.state = a.swingT > 0.15 ? 'windup' : 'strike';
+        a.vx = 0;
+        if (!a.struck && a.swingT <= 0.15) {
+          a.struck = true;
+          for (const f of foes) if (Math.abs(f.x + f.w / 2 - cx) < 62 && Math.abs(f.y - a.y) < 50 && Math.sign(f.x + f.w / 2 - cx) === a.dir) { f.byAlly = true; f.damage(1); f.x += a.dir * 6; effects.parryHit(f.x + f.w / 2, f.y + f.h / 2); G.Audio.play('parry'); }
+        }
+        if (a.swingT <= 0) a.state = 'walk';
+      } else if (tgt && best < 1000) {
+        a.dir = Math.sign(tgt.x + tgt.w / 2 - cx) || a.dir;
+        if (best < 54 && a.cd === 0) { a.swingT = 0.32; a.struck = false; a.cd = 0.75; a.vx = 0; }
+        else a.vx = best > 44 ? a.dir * 140 : 0;
+      } else { // 적이 없으면 성문 근처로 돌아가 기다린다
+        const home = castleX + ((k % 3) - 1) * 56;
+        a.vx = Math.abs(home - cx) > 8 ? Math.sign(home - cx) * 100 : 0;
+        if (a.vx) a.dir = Math.sign(a.vx);
+      }
+      { // 땅을 밟고 걷는다: 중력, 바닥에 서기, 벽(한 칸 턱은 뛰어 넘기), 벼랑에서는 떨어진다
+        const nx = Math.max(8, Math.min(terrain.width - 8 - a.w, a.x + a.vx * dt));
+        const frontCol = Math.floor((nx + (a.vx > 0 ? a.w : 0)) / T);
+        const blocked = a.vx !== 0 && (terrain.isSolid(frontCol, Math.floor((a.y + a.h - 6) / T)) || terrain.isSolid(frontCol, Math.floor((a.y + 6) / T)));
+        if (!blocked) a.x = nx; else if (a.onGround) a.vy = -520; // 막히면 뛰어 넘으려 한다
+        a.vy = (a.vy || 0) + 1900 * dt;
+        a.y += a.vy * dt;
+        const ccol = Math.floor((a.x + a.w / 2) / T), frow = Math.floor((a.y + a.h) / T);
+        a.onGround = false;
+        if (a.vy >= 0 && terrain.isSolid(ccol, frow) && !terrain.isSolid(ccol, frow - 1)) { a.y = frow * T - a.h; a.vy = 0; a.onGround = true; }
+        if (a.y > terrain.rows * T + 160) { a.hp = 0; effects.vanish(a.x + a.w / 2, terrain.rows * T); } // 구덩이에 떨어졌다
+      }
+      // 맞는다: 적 병사가 가까이 있으면 (궁수 제외) 일정 간격으로 피해, 화살에도 맞는다
+      if (a.hitCd === 0) {
+        const foe = foes.find((f) => f.variant !== 'archer' && Math.abs(f.x + f.w / 2 - cx) < 46 && Math.abs(f.y - a.y) < 50 && f.state !== 'walk');
+        if (foe) { a.hp -= 1; a.hitCd = 0.8; a.fx = 0.25; effects.parryHit(cx, a.y + 16); }
+      }
+      for (let s = enemyShots.length - 1; s >= 0; s--) {
+        const f = enemyShots[s];
+        if (f.reflected || !f.arrow) continue;
+        if (Math.abs(f.x - cx) < a.w / 2 + 6 && Math.abs(f.y - (a.y + a.h / 2)) < a.h / 2 + 6) { a.hp -= 1; a.fx = 0.25; effects.parryHit(f.x, f.y); enemyShots.splice(s, 1); }
+      }
+      if (a.hp <= 0) { effects.vanish(cx, a.y + a.h / 2); allies.splice(k, 1); }
+    }
+  }
+
+  // 미션 중에 쓰러지면: 게임오버 없이 미션을 시작한 자리에서 처음부터 다시 시작한다
+  function retryInvasion() {
+    const iv = invasion;
+    for (let k = monsters.length - 1; k >= 0; k--) if (monsters[k].kind === 'raider') monsters.splice(k, 1);
+    enemyShots.length = 0;
+    invasion = { waves: iv.waves, wave: 0, castleMax: iv.castleMax, castleHp: iv.castleMax, queue: [], spawnT: 0, state: 'intro', t: 3 };
+    terrain.invasion = invasion;
+    lives = maxLives();
+    if (startPos) player.placeAt(startPos.x, startPos.y);
+    player.invuln = 2.5;
+    camera.follow(player, terrain, C.DT, true);
+    allies = [];
+    spawnAllies(3);
+    popups.push({ x: player.x + player.w / 2, y: player.y - 90, text: '쓰러졌다… 미션을 처음부터 다시 시작한다', t: 3.5, color: 'rgba(255,170,150,A)' });
+    G.Audio.play('spawn');
+  }
   function startInvasion() {
     if (stageName !== 'kingdom' || invasion || missions.pending <= 0) return;
     const waves = Math.min(8, missions.pending);
-    invasion = { waves, wave: 0, castleMax: 15, castleHp: 15, queue: [], spawnT: 0, state: 'intro', t: 3 };
+    startPos = { x: player.x, y: player.y };
+    invasion = { waves, wave: 0, castleMax: 20, castleHp: 20, queue: [], spawnT: 0, state: 'intro', t: 3 };
     terrain.invasion = invasion;
-    popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `몬스터 군단이 몰려온다! (${waves}웨이브)`, t: 3, color: 'rgba(255,120,100,A)' });
+    for (const V of terrain.villagers) effects.vanish(V.col * C.TILE + C.TILE / 2, (V.row + 1) * C.TILE - 16); // 마을 사람들이 사라진다
+    for (const S of terrain.shops) effects.vanish(S.col * C.TILE + C.TILE / 2, (S.row + 1) * C.TILE - 30); // 가게 주인도 피신
+    allies = [];
+    spawnAllies(3);
+    popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `적군이 몰려온다! 가게는 문을 닫고 사람들은 피신했다 (${waves}웨이브)`, t: 3, color: 'rgba(255,120,100,A)' });
     G.Audio.play('spawn');
     effects.shake(6, 0.6);
   }
-  function spawnRaider(variant) {
+  function spawnRaider(variant, leftSide) {
     const T = C.TILE;
     const V = G.Raider.VARIANTS[variant];
-    const left = Math.random() < 0.5;
+    const left = leftSide === undefined ? Math.random() < 0.5 : leftSide;
     const castleCol = terrain.castles[0].col;
     const col = left ? castleCol - 62 - Math.floor(Math.random() * 4) : castleCol + 62 + Math.floor(Math.random() * 4); // 성에서 60칸쯤 떨어진 양쪽 거리에서 몰려온다
     const p = terrain.placeOnTile(col, 15, V.w, V.h);
     const mo = new G.Raider(p.x, p.y, variant);
     const castle = terrain.castles[0];
     mo.marchX = castle.col * T + T / 2;
-    mo.stageSpeed = 1.4 + Math.min(0.5, invasion.wave * 0.06); // 행진은 평소보다 빠르다
+    mo.stageSpeed = 1.5 + Math.min(0.7, invasion.wave * 0.08); // 행진은 평소보다 빠르다
     mo.dir = left ? 1 : -1;
-    mo.contactDmg = 1;
+    mo.contactDmg = 0.5; // 적 병사의 공격은 반 칸
     mo.temp = true;
     monsters.push(mo);
     effects.spawn(p.x + V.w / 2, p.y + V.h);
   }
-  const endInvasion = () => { invasion = null; if (terrain) terrain.invasion = null; };
+  const endInvasion = () => { allies = []; invasion = null; if (terrain) terrain.invasion = null; };
   function updateInvasion(dt) {
     const iv = invasion;
     if (!iv || stageName !== 'kingdom') return;
+    updateAllies(dt);
     const T = C.TILE;
     for (let k = monsters.length - 1; k >= 0; k--) if (monsters[k].kind === 'raider' && !monsters[k].alive && !monsters[k].vanished) monsters.splice(k, 1); // 쓰러진 군단병은 정리
     if (iv.state === 'intro' || iv.state === 'rest') {
       iv.t -= dt;
       if (iv.t <= 0) {
         iv.state = 'wave'; iv.queue = waveQueue(iv.wave); iv.spawnT = 0;
+        if (allies.length < 3) spawnAllies(3 - allies.length); // 쓰러진 병사는 다음 웨이브에 다시 나온다
         popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `${iv.wave + 1}웨이브 시작!`, t: 2, color: 'rgba(255,200,120,A)' });
         G.Audio.play('spawn');
       }
       return;
     }
     iv.spawnT -= dt;
-    if (iv.queue.length && iv.spawnT <= 0) { spawnRaider(iv.queue.shift()); iv.spawnT = 0.8 + Math.random() * 0.8; }
+    if (iv.queue.length && iv.spawnT <= 0) { // 한 번에 여럿이, 양쪽에서 동시에 나온다
+      const burst = Math.min(iv.queue.length, 4 + Math.floor(Math.random() * 4) + Math.floor(iv.wave / 2));
+      for (let b = 0; b < burst; b++) spawnRaider(iv.queue.shift(), b % 2 === 0);
+      iv.spawnT = 1.4 + Math.random() * 1.0;
+    }
     const castleX = terrain.castles[0].col * T + T / 2;
-    for (let k = monsters.length - 1; k >= 0; k--) { // 성문에 닿은 군단병은 성을 공격하고 사라진다
-      const m = monsters[k];
+    for (const m of monsters) { // 성문에 닿은 적은 사라지지 않고 그 자리에서 성을 계속 때린다 (많으면 피해가 쌓인다). 때려눕히거나 가까이 가면 나를 쫓는다
       if (m.kind !== 'raider' || !m.alive || m.flying) continue;
-      if (Math.abs(m.x + m.w / 2 - castleX) < 70 && m.onGround) {
-        iv.castleHp -= m.V.castle;
-        effects.vanish(m.x + m.w / 2, m.y + m.h / 2);
-        effects.shake(5, 0.2);
+      if (!m.siege && Math.abs(m.x + m.w / 2 - castleX) < 80 && m.onGround) { m.siege = true; m.siegeT = 0.5 + Math.random(); }
+      if (!m.siege) continue;
+      m.siegeT -= dt;
+      if (m.siegeT <= 0) {
+        m.siegeT = 2.0; m.siegeSwing = 0.5;
+        const dmg = m.V.castle * 0.5;
+        iv.castleHp -= dmg;
+        effects.shake(3, 0.12);
         G.Audio.play('hurt');
-        popups.push({ x: castleX, y: terrain.castles[0].row * T - 90, text: `성이 공격받고 있다! -${m.V.castle}`, t: 1.2, color: 'rgba(255,120,100,A)' });
-        monsters.splice(k, 1);
+        if (Math.random() < 0.5) popups.push({ x: castleX + (Math.random() - 0.5) * 120, y: terrain.castles[0].row * T - 90, text: `성이 공격받고 있다! -${dmg}`, t: 1.1, color: 'rgba(255,120,100,A)' });
       }
     }
     if (iv.castleHp <= 0) { // 성이 무너질 뻔했다: 의뢰는 그대로 남는다
@@ -3014,14 +3448,16 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (!iv.queue.length && !monsters.some((m) => m.kind === 'raider' && m.alive)) {
       iv.wave += 1;
       if (iv.wave >= iv.waves) { // 모두 막아냈다
-        const reward = Math.round((400 * iv.waves + 150 * iv.waves * (iv.waves - 1) / 2) * (1 + G.Shop.homeBonuses(inv).coin));
+        // 의뢰 하나(웨이브 하나)의 보상: 기본 300 G, 뒤로 갈수록(어려울수록) 150 G씩 더. 코인은 왕에게 가서 한꺼번에 받는다 (쌓인다)
+        const reward = 300 * iv.waves + 75 * iv.waves * (iv.waves - 1);
         const gainExp = 25 * iv.waves;
-        coins += reward; exp += gainExp;
+        missions.owed = (missions.owed || 0) + reward; missions.doneUnclaimed = (missions.doneUnclaimed || 0) + iv.waves;
+        exp += gainExp;
         missions.pending = Math.max(0, missions.pending - iv.waves);
         missions.done += iv.waves;
         let extra = '';
         for (let i = 0; i < iv.waves; i++) if (Math.random() < 0.3) { G.Shop.addMaterial(inv, 'darkshard'); extra = ' · 어둠의 크리스탈 조각 획득'; }
-        popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `성을 지켜냈다! +${reward} G, +${gainExp} EXP${extra}`, t: 4, color: 'rgba(255,225,120,A)' });
+        popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `성을 지켜냈다! 보상 ${reward} G는 왕에게서 받자 (+${gainExp} EXP)${extra}`, t: 4, color: 'rgba(255,225,120,A)' });
         G.Audio.play('treasure');
         effects.treasure(player.x + player.w / 2, player.y);
         effects.shake(6, 0.4);
@@ -3034,8 +3470,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
   }
 
-  function startDialogs(lines) {
-    dialog = { text: lines[0], t: 9999, queue: lines.slice(1) };
+  function startDialogs(lines, onEnd) {
+    dialog = { text: lines[0], t: 9999, queue: lines.slice(1), onEnd };
   }
 
   // 던진 검: 날아가며 몬스터를 쳐내고, 돌아오면 플레이어가 다시 잡는다
@@ -3069,6 +3505,28 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   const SETTING_KEYS = ['music', 'dmgNum', 'parrySound', 'sparkle', 'shake'];
   function changeSetting(i, dir) {
     const S = G.Settings;
+    if (i === 8) { // 게임 나가기: 저장하고 처음 화면(저장 칸 고르기)으로
+      if (dir !== 0 || settingsUI.fromTitle) return;
+      saveGame();
+      saveBlocked = true;
+      window.location.reload();
+      return;
+    }
+    if (i === 5) { if (dir === 0) { const ok = saveGame(); settingsUI.msg = ok ? `저장했어요! 다음에 켜면 여기(${(STAGES[stageName] && STAGES[stageName].label) || stageName})에서 이어져요` : '저장할 수 없어요'; settingsUI.msgT = 2; G.Audio.play(ok ? 'treasure' : 'deny'); } return; }
+    if (i === 6) { // 1분 전으로 돌아가기
+      if (dir !== 0) return;
+      const msg = rewindOneMinute();
+      settingsUI = null;
+      popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: msg, t: 3, color: 'rgba(160,220,255,A)' });
+      G.Audio.play('pickup');
+      return;
+    }
+    if (i === 7) { // 처음부터 다시하기: 두 번 눌러야 한다 (지금 칸을 지운다)
+      if (dir !== 0) return;
+      if (!settingsUI.confirm) { settingsUI.confirm = true; settingsUI.msg = '정말 처음부터? 한 번 더 누르면 모든 진행이 지워져요'; settingsUI.msgT = 4; G.Audio.play('deny'); }
+      else resetGame();
+      return;
+    }
     if (i === 0) { if (dir) G.Audio.setMusicVolume(Math.round((S.music + dir * 0.1) * 10) / 10); }
     else S[SETTING_KEYS[i]] = !S[SETTING_KEYS[i]];
     S.save();
@@ -3077,20 +3535,37 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function updateSettings() {
     const pressed = (...c) => c.some((k) => input.wasPressed(k));
     if (pressed('Escape', 'KeyO')) { settingsUI = null; return; }
-    if (pressed('ArrowUp')) settingsUI.cur = (settingsUI.cur + 4) % 5;
-    if (pressed('ArrowDown')) settingsUI.cur = (settingsUI.cur + 1) % 5;
+    const rowsN = settingsUI.fromTitle ? 5 : 9;
+    if (pressed('ArrowUp')) { settingsUI.cur = (settingsUI.cur + rowsN - 1) % rowsN; settingsUI.confirm = false; }
+    if (pressed('ArrowDown')) { settingsUI.cur = (settingsUI.cur + 1) % rowsN; settingsUI.confirm = false; }
     if (pressed('ArrowLeft')) changeSetting(settingsUI.cur, -1);
     else if (pressed('ArrowRight')) changeSetting(settingsUI.cur, 1);
     else if (pressed('Enter', 'Space')) changeSetting(settingsUI.cur, settingsUI.cur === 0 ? 1 : 0);
   }
 
   function step(dt) {
+    if (titleUI) { // 처음 화면이 떠 있는 동안 게임은 멈춰 있다 (O: 설정)
+      if (settingsUI) updateSettings();
+      else if (!titleUI.halted && !titleUI.del && !titleUI.quit && (titleUI.copy === null || titleUI.copy === undefined) && input.wasPressed('KeyO')) { settingsUI = { cur: 0, fromTitle: true }; G.Audio.play('pickup'); }
+      else updateTitle(dt);
+      input.endFrame();
+      return;
+    }
     if (G.Forge.tickJob(inv, dt, nearFurnace())) { // 합치기 작업 완성
       say('합치기 완료! 용광로에서 무기를 찾으세요', 'rgba(255,225,120,A)');
       G.Audio.play('treasure');
     }
-    if (!devUI && input.wasPressed('F1')) { // F1: 개발 메뉴 (모든 테스트 기능)
-      devUI = { tab: 0, cur: 0, scroll: 0, msg: '', msgT: 0, fresh: true };
+    if (pwUI) { updatePassword(dt); input.endFrame(); return; } // 비밀번호 입력 중에는 게임이 멈춘다
+    if (!adminUI && !devUI && input.wasPressed('F2')) { input.endFrame(); askPassword(openAdmin); return; } // F2: 관리자 무기 편집 (비밀번호)
+    if (adminUI) { // 편집 창이 열려 있는 동안 게임이 멈춘다
+      G.Admin.update(adminUI, input, dt, { onChange: applyEquipment });
+      if (adminUI.closed) adminUI = null;
+      input.endFrame();
+      return;
+    }
+    if (!devUI && input.wasPressed('F1')) { // F1: 개발 메뉴 (모든 테스트 기능, 비밀번호)
+      askPassword(() => { devUI = { tab: 0, cur: 0, scroll: 0, msg: '', msgT: 0, fresh: true }; });
+      if (pwUI) { input.endFrame(); return; }
       G.Audio.play('pickup');
     }
     if (devUI) { // 메뉴가 열려 있는 동안 게임이 멈춘다
@@ -3188,7 +3663,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           if (dialog.queue.length) dialog.text = dialog.queue.shift();
           else {
             if (story.pending && !story.revealed) { story.revealed = true; story.pending = false; effects.shake(8, 0.6); G.Audio.play('spawn'); }
+            const fin = dialog.onEnd;
             dialog = null;
+            if (fin) fin();
           }
         }
         input.endFrame();
@@ -3214,6 +3691,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           shop = { kind: near.shop.kind, def: G.Shop.SHOPS[near.shop.kind], tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
           G.Audio.play('pickup');
         }
+      } else if (near && near.type === 'palace') { // 성문
+        if (!story.kingMet) startGateEvent();
+        else { loadStage('palace', true); input.endFrame(); return; }
       } else if (near && near.type === 'king') {
         talkToKing();
       } else if (near && near.type === 'water') {
@@ -3225,7 +3705,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         shop = { kind: 'place', mode: 'place', slot: sl, def: { title: sl.kind === 'floor' ? '바닥 가구 놓기' : '벽 장식 걸기', tabs: G.Shop.placeTabs(inv, sl.kind) }, tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
         G.Audio.play('pickup');
       } else if (near && near.type === 'home') { // 마을의 내 집 터
-        if (inv.home.type) { loadStage('home', true); input.endFrame(); return; }
+        if (inv.home.type) { homeFrom = stageName; loadStage('home', true); input.endFrame(); return; }
         dialog = { text: '아직 집이 없다. 왼쪽 끝 부동산에서 집을 살 수 있다.', t: 3 };
       } else if (near && near.type === 'enter') { // 마을 동굴로
         enterMine();
@@ -3237,7 +3717,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         input.endFrame();
         return;
       } else if (near && near.type === 'exit') { // 마을로 (들어왔던 입구 앞에서 시작)
-        loadStage(STAGES[stageName].exitTo || 'village', true, STAGES[stageName].returnNear || 'D');
+        loadStage(stageName === 'home' && homeFrom ? homeFrom : (STAGES[stageName].exitTo || 'village'), true, STAGES[stageName].returnNear || 'D');
         input.endFrame();
         return;
       } else if (near) {
@@ -3364,6 +3844,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           effects.vanish(s.x + s.w / 2, s.y + s.h / 2);
           G.Audio.play('vanish');
         }
+        if (s.byAlly) { s.byAlly = false; continue; } // 성의 병사가 처치한 적은 코인과 경험치를 주지 않는다
         if (s.golden) effects.treasure(s.x + s.w / 2, s.y + s.h / 2); // 황금박쥐는 금화가 쏟아진다
         const base = s.coinVal !== undefined ? s.coinVal : s.kind === 'darkstone' ? C.DARKSTONE_COIN : s.kind === 'shade' ? C.SHADE_COIN : s.kind === 'crab' ? C.CRAB_COIN : s.kind === 'bat' ? (s.golden ? C.GOLDEN_BAT_COIN : C.BAT_COIN) : s.kind === 'golem' ? C.GOLEM_COIN : s.kind === 'slime' && !s.noCoin ? C.SLIME_COIN : 0; // 슬라임 5, 박쥐 6(황금 200), 꽃게 8
         const floorMul = STAGES[stageName].dark ? 1 + darkFloor * 0.05 : 1; // 던전은 올라갈수록 코인과 경험치가 늘어난다
@@ -3414,14 +3895,20 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         effects.parryHit((player.x + player.w / 2 + s.x + s.w / 2) / 2, (player.y + player.h / 2 + s.y + s.h / 2) / 2);
         effects.shake(finisher ? 8 : 6, 0.18);
         hitStop = C.HIT_STOP;
-      } else if (player.invuln === 0 && !player.dashing && !s.staggered && s.overlaps(player)) { // 기절한 몬스터는 해롭지 않다
+      } else if (player.invuln === 0 && !player.dashing && !s.staggered && !s.dummy && s.overlaps(player)) { // 기절한 몬스터는 해롭지 않다 (허수아비도)
         loseLife(player.x + player.w / 2, player.y + player.h / 2, s.contactDmg || 1); // 패링하지 못하고 닿으면 목숨 -1 (설산은 -2)
         armorHurtPerk(s);
         break;
       }
     }
     updateInvasion(dt);
+    if (stageName === 'palace' && !story.kingMet && !dialog && terrain.kings[0] && Math.abs(player.x + player.w / 2 - (terrain.kings[0].col * C.TILE + C.TILE / 2)) < C.TILE * 7) startThroneEvent(); // 왕에게 가까이 가면 왕이 먼저 말을 건다
+    if (stageName === 'home' && !gameOver) { // 집 안에서는 0.5초마다 피가 한 칸씩 찬다
+      if (lives < maxLives()) { homeHealT += dt; if (homeHealT >= 0.5) { homeHealT -= 0.5; lives = Math.min(maxLives(), lives + 1); effects.sparkle(player.x + player.w / 2, player.y + 6); G.Audio.play('pickup'); } } else homeHealT = 0;
+    } else homeHealT = 0;
     updateMissions(dt);
+    recordHistory(dt);
+    playSec += dt;
     if (boss && !boss.started && !boss.done && player.x > boss.left + 100) { // 경기장에 들어섰다: 용머리 등장, 화면과 길이 막힌다
       boss.started = true;
       if (boss.onStart) boss.onStart(terrain); // (침팬지 경기장: 입구가 벽으로 막힌다)
@@ -3565,9 +4052,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
 
   function drawFrame() {
     const st = STAGES[stageName];
-    const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
-    const near = !shop && !equipUI && !devUI && !mini && !ag && !sg && !wc && !fp && !dialog && !won && !cutscene ? nearbyInteract() : null;
-    const PROMPTS = { talk: 'E: 대화', king: 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
+    const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !adminUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
+    const near = !shop && !equipUI && !devUI && !adminUI && !mini && !ag && !sg && !wc && !fp && !dialog && !won && !cutscene ? nearbyInteract() : null;
+    const PROMPTS = { palace: 'E: 왕궁으로 들어가기', talk: 'E: 대화', king: (missions.owed || 0) > 0 ? `E: 왕에게 가서 보상 받기 (${Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin))} G)` : 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
     const prompt = near ? (near.type === 'shop' ? (near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
     const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }, isMergeTab() ? { merge: mergeView() } : {}) : null;
@@ -3584,6 +4071,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       weakText: analysisText(),
       hotbar: inv.hotbar, weaponId: inv.equipped.weapon,
       settings: settingsUI,
+      title: titleUI ? { cur: titleUI.cur, del: titleUI.del, copy: titleUI.copy, quit: titleUI.quit, halted: titleUI.halted, msg: (titleUI.msgT || 0) > 0 ? titleUI.msg : '', slots: titleUI.slots, t: titleUI.t } : null,
+      pw: pwUI ? { n: pwUI.buf.length, msg: pwUI.msgT > 0 ? pwUI.msg : '' } : null,
+      admin: adminUI ? Object.assign({}, adminUI, { me: { armorId: inv.equipped.armor, helmetId: inv.equipped.helmet, glovesId: inv.equipped.gloves, pantsId: inv.equipped.pants, bootsId: inv.equipped.boots } }) : null,
       dev: devUI ? (() => { const L = devLayout(); return Object.assign({}, devUI, { tabs: L.tabs.map((t) => t.name), photo: L.photo, items: L.items.map((q) => ({ label: q.label, hint: q.hint, img: q.img })) }); })() : null,
       home: stageName === 'home' ? Object.assign({ total: G.Home.houseDef(inv.home.type).floor + G.Home.houseDef(inv.home.type).wall }, G.Shop.homeBonuses(inv)) : null,
       slimeCount: monsters.filter((m) => m.kind === 'slime' && m.alive).length,
@@ -3591,9 +4081,10 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner, prompt, dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
-    }, sword, { cutscene, chest, ending, npcs, popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
+      won, cutscene: !!cutscene, goal: st.goal, banner: settingsUI || pwUI || titleUI ? null : banner, prompt: settingsUI || pwUI || titleUI ? null : prompt, dialog: settingsUI || pwUI || titleUI ? null : dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
+    }, sword, { cutscene, chest, ending, npcs, allies, popups: settingsUI || pwUI ? [] : popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, events: stageName === 'dungeon' ? dungeonEvents : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
+  if (!noSave()) { openTitle(); G.Audio.setMusic('title'); } // 처음 화면: 저장 칸 3개 + 타이틀 노래
   requestAnimationFrame(frame);
 
   // 테스트/디버그용 노출
@@ -3626,7 +4117,17 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get shop() { return shop; },
     get equip() { return equipUI; },
     get dev() { return devUI; },
+    get admin() { return adminUI; },
+    get allies() { return allies; },
+    openAdmin,
     get settings() { return settingsUI; },
+    get pw() { return pwUI; },
+    get title() { return titleUI; },
+    get slot() { return slot; },
+    startSlot, readSlot,
+    rewindOneMinute, applySave,
+    get adminUnlocked() { return adminUnlocked; },
+    saveGame, loadGame, resetGame, buildSave,
     get attachGame() { return ag; },
     get workChoice() { return wc; },
     get forgePick() { return fp; },

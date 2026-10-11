@@ -137,6 +137,7 @@
       this.dashTrail = this.dashTrail.filter((g) => g.t > 0);
       this.invuln = Math.max(0, this.invuln - dt);
       this.guardTimer = Math.max(0, this.guardTimer - dt);
+      this.chainT = Math.max(0, (this.chainT || 0) - dt);
       if (this.blocking) this.guardTimer = Math.max(this.guardTimer, 0.1); // 막는 동안은 검을 세운 자세
       this.shadowTime = Math.max(0, this.shadowTime - dt);
       this.animTime += dt;
@@ -175,6 +176,7 @@
 
     // 패링 성공: 쿨다운을 없애 바로 다음 패링을 이어갈 수 있게 한다 (슬라임이 줄지어 올 때 연속 패링)
     parrySucceeded() {
+      this.chainT = 0.7; // 맞혔으니 바로 2단 공격이 가능하다 (게이지에 표시)
       this.parryCooldown = 0;
       this.guardTimer = C.GUARD_TIME;
     }
@@ -206,7 +208,11 @@
       }
       this.parryTimer = Math.max(0, this.parryTimer - dt);
       this.parryCooldown = Math.max(0, this.parryCooldown - dt);
-      if (input.parryPressed && this.parryCooldown === 0 && !this.swordOut) { // 검이 없으면 패링 불가
+      // 2단 공격: 첫 번째를 휘두르고 쿨다운이 절반쯤 지나면, 아무것도 못 맞혔어도 한 번 더 휘두를 수 있다 (두 번째 뒤에는 끝까지 기다린다)
+      const comboReady = this.combo === 1 && this.parryCooldown > 0 && this.parryCooldown <= this.parryCooldownTime * 0.55;
+      if (this.parryCooldown === 0 && this.combo !== 0) this.combo = 0;
+      if (input.parryPressed && (this.parryCooldown === 0 || comboReady) && !this.swordOut) { // 검이 없으면 패링 불가
+        this.combo = this.parryCooldown === 0 ? 1 : 2; // 1 = 첫 번째 타 (2단 가능), 2 = 두 번째 타
         this.parryTimer = this.parryWindow + (this.slashFrame - C.SWING_SLASH_FRAME) / 60; // 늦게 맞는 무기는 맞는 순간까지 패링 판정이 이어진다
         this.parryCooldown = this.parryCooldownTime;
         this.swing = 0;

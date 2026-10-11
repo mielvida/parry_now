@@ -3,7 +3,7 @@
   const LEFT = ['ArrowLeft', 'KeyA'];
   const RIGHT = ['ArrowRight', 'KeyD'];
   const JUMP = ['Space', 'ArrowUp', 'KeyW', 'KeyZ'];
-  const PARRY = ['Enter', 'NumpadEnter'];
+  const PARRY = ['Enter', 'NumpadEnter', 'MouseLeft']; // 마우스 왼쪽 단추도 패링 (길게 누르면 게이지 충전)
   const DASH = ['ShiftLeft', 'ShiftRight', 'KeyX']; // Shift(또는 X). Windows는 Shift를 연타하면 고정키 창이 떠서 입력이 끊길 수 있어 X도 쓸 수 있게
   const PREVENT = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'F1', 'Tab', 'Backspace']);
 
@@ -25,6 +25,13 @@
         this.down.add(e.code);
       });
       target.addEventListener('keyup', (e) => this.down.delete(e.code));
+      target.addEventListener('mousedown', (e) => { // 게임 화면을 마우스 왼쪽으로 누르면 패링
+        if (e.button !== 0 || !e.target || e.target.tagName !== 'CANVAS') return;
+        this.pressedSet.add('MouseLeft');
+        this.parryPressedThisFrame = true;
+        this.down.add('MouseLeft');
+      });
+      target.addEventListener('mouseup', (e) => { if (e.button === 0) this.down.delete('MouseLeft'); });
       target.addEventListener('blur', () => this.down.clear());
     }
 

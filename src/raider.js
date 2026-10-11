@@ -1,4 +1,4 @@
-// 군단병(Raider): 왕국에 쳐들어오는 몬스터 군단. 한 클래스에 종류(variant) 다섯 가지.
+// 군단병(Raider): 왕국에 쳐들어오는 적군(검병·창병·방패병·궁수·돌격병·오우거).
 //  spear  창병   : 다가와 창을 뒤로 뺐다가 길게 "찌르기". 찌르는 창끝도 패링으로 쳐낼 수 있다
 //  shield 방패병 : 단단하고(두 번 쳐야 쓰러진다) 방패를 앞세워 부딪쳐 온다
 //  archer 궁수   : 멀찍이 서서 화살을 쏜다 (패링으로 쳐내면 되돌아간다)
@@ -9,6 +9,7 @@
   const C = G.Config;
 
   const VARIANTS = {
+    sword: { name: '검병', w: 26, h: 40, hp: 3, speed: 84, chase: 120, twoHit: false, coin: 14, exp: 3, castle: 1, reach: 54 },
     spear: { name: '창병', w: 26, h: 40, hp: 3, speed: 72, chase: 105, twoHit: false, coin: 14, exp: 3, castle: 1, reach: 70 },
     shield: { name: '방패병', w: 30, h: 42, hp: 5, speed: 52, chase: 80, twoHit: true, coin: 20, exp: 4, castle: 2 },
     archer: { name: '궁수', w: 24, h: 38, hp: 2, speed: 62, chase: 62, twoHit: false, coin: 16, exp: 3, castle: 1, keep: 250 },
@@ -40,12 +41,12 @@
       this.attackFx = false;
     }
 
-    knockback(dirX) { super.knockback(dirX); this.state = 'walk'; this.cooldown = 1.2; }
-    stagger(dirX) { super.stagger(dirX); this.state = 'walk'; this.cooldown = 1.2; }
+    knockback(dirX) { super.knockback(dirX); this.state = 'walk'; this.cooldown = 1.2; this.siege = false; }
+    stagger(dirX) { super.stagger(dirX); this.state = 'walk'; this.cooldown = 1.2; this.siege = false; }
 
     // 찌르는 창끝 (창병이 찌르는 동안)
     thrustBox() {
-      if (this.variant !== 'spear' || this.state !== 'strike') return null;
+      if ((this.variant !== 'spear' && this.variant !== 'sword') || this.state !== 'strike') return null;
       const len = this.V.reach;
       return { x: this.dir > 0 ? this.x + this.w : this.x - len, y: this.y + this.h * 0.38, w: len, h: 10 };
     }
@@ -59,6 +60,17 @@
     update(dt, player, terrain) {
       if (this.tickLifecycle(dt, terrain)) return;
       this.time += dt;
+      if (this.siege) { // 성문에 붙어서 성을 때린다 (플레이어가 가까이 오면 맞서 싸운다)
+        const near2 = Math.abs(player.x + player.w / 2 - (this.x + this.w / 2)) < 110 && Math.abs(player.y - this.y) < 90;
+        if (!near2) {
+          this.vx = 0;
+          this.dir = Math.sign(this.marchX - (this.x + this.w / 2)) || this.dir;
+          this.siegeSwing = Math.max(0, (this.siegeSwing || 0) - dt);
+          this.state = this.siegeSwing > 0.3 ? 'windup' : this.siegeSwing > 0 ? 'strike' : 'walk';
+          return;
+        }
+        this.siege = false;
+      }
       const pcx = player.x + player.w / 2;
       const cx = this.x + this.w / 2;
       const dx = pcx - cx;
@@ -75,19 +87,19 @@
         if (this.timer <= 0) {
           if (this.variant === 'archer') { // 발사
             const len = Math.hypot(dx, dy) || 1;
-            this.shot = { x: cx + this.dir * 14, y: this.y + this.h * 0.45, vx: (dx / len) * 340 * speed, vy: (dy / len) * 340 * speed, arrow: true };
+            this.shot = { x: cx + this.dir * 14, y: this.y + this.h * 0.45, vx: (dx / len) * 340 * speed, vy: (dy / len) * 340 * speed, arrow: true, dmg: 0.5 };
             this.state = 'walk';
-            this.cooldown = 2.4;
+            this.cooldown = 1.5;
           } else {
             this.state = 'strike';
-            this.timer = this.variant === 'spear' ? 0.22 : this.variant === 'ogre' ? 0.34 : 0.26;
+            this.timer = this.variant === 'spear' || this.variant === 'sword' ? 0.22 : this.variant === 'ogre' ? 0.34 : 0.26;
           }
         }
       } else if (this.state === 'strike') {
-        if (this.variant === 'spear') this.vx = 0;
+        if (this.variant === 'spear' || this.variant === 'sword') this.vx = 0;
         else this.vx = this.dir * (this.variant === 'ogre' ? 210 : 270) * speed; // 방패 돌진 / 오우거 몸던지기
         this.timer -= dt;
-        if (this.timer <= 0 || this.hitWall) { this.state = 'walk'; this.cooldown = this.variant === 'spear' ? 1.3 : 1.8; this.vx = 0; }
+        if (this.timer <= 0 || this.hitWall) { this.state = 'walk'; this.cooldown = this.variant === 'spear' ? 1.3 : this.variant === 'sword' ? 0.9 : 1.8; this.vx = 0; }
       } else {
         this._move(dt, dx, near, terrain, V, speed);
       }
@@ -109,8 +121,8 @@
         else if (absDx < V.keep + 40) v = 0;
         if (this.cooldown === 0 && absDx < 420) { this.state = 'windup'; this.timer = 0.55; this.attackFx = true; this.dir = Math.sign(dx) || this.dir; this.vx = 0; return; }
       } else if (near && this.cooldown === 0 && this.onGround) {
-        const range = this.variant === 'spear' ? V.reach - 6 : this.variant === 'ogre' ? 120 : this.variant === 'shield' ? 100 : 0;
-        if (range && absDx < range) { this.state = 'windup'; this.timer = this.variant === 'spear' ? 0.5 : this.variant === 'ogre' ? 0.7 : 0.4; this.attackFx = true; this.vx = 0; return; }
+        const range = this.variant === 'spear' || this.variant === 'sword' ? V.reach - 6 : this.variant === 'ogre' ? 120 : this.variant === 'shield' ? 100 : 0;
+        if (range && absDx < range) { this.state = 'windup'; this.timer = this.variant === 'sword' ? 0.32 : this.variant === 'spear' ? 0.5 : this.variant === 'ogre' ? 0.7 : 0.4; this.attackFx = true; this.vx = 0; return; }
       }
       this.vx = this.dir * v * speed;
       if (this.onGround && v && this._ledgeAhead(terrain)) this.vx = 0;

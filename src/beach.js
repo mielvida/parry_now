@@ -254,7 +254,7 @@
   }
 
   // 상점 가판대: baseX = 가운데, baseY = 땅 윗면. 뒤에 주인이 서 있고 앞에 계산대가 있다
-  function drawShop(ctx, shop, baseX, baseY, time) {
+  function drawShop(ctx, shop, baseX, baseY, time, closed) {
     if (shop.kind === 'furnace') { drawFurnace(ctx, baseX, baseY, time); return; }
     const potion = shop.kind === 'potion';
     const armor = shop.kind === 'armor';
@@ -272,9 +272,11 @@
     const mgDuel = shop.kind === 'mgduel';
     const mgGun = shop.kind === 'mggun';
     const food = shop.kind === 'food';
+    const train = shop.kind === 'train';
+    const inn = shop.kind === 'inn';
     const w = 140;
     const x = baseX - w / 2;
-    const stripeA = food ? '#e0803a' : potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
+    const stripeA = train ? '#b03a2a' : inn ? '#5a7ac0' : food ? '#e0803a' : potion ? '#8a4fb8' : armor ? '#c0504d' : mine ? '#d4a017' : estate ? '#3f9a6a' : decor ? '#d4608a' : dweapon ? '#5a2a8a' : ditem ? '#2a6a5a' : dupgrade ? '#a03030' : darmor ? '#3a3f6a' : pantsShop ? '#3a8fb0' : weapon2 ? '#8a3a6a' : mgShell ? '#d4a017' : mgTarget ? '#c0392b' : mgDuel ? '#3a6fb0' : '#4f7fd4';
     ctx.fillStyle = 'rgba(0,0,0,0.14)';
     ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒤쪽 벽 + 기둥
@@ -294,6 +296,19 @@
         ctx.fillStyle = '#e8f1ff'; ctx.fillRect(bx + 2, baseY - 82, 5, 6);
         ctx.fillStyle = '#9a6b3c'; ctx.fillRect(bx + 2, baseY - 84, 5, 3);
       });
+    } else if (train) { // 벽에 걸린 목검들과 훈련용 과녁, 모래주머니
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 72, 56, 4);
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = '#c9a86a'; ctx.fillRect(x + 16 + i * 18, baseY - 92, 5, 22); ctx.fillStyle = '#8a5a2b'; ctx.fillRect(x + 13 + i * 18, baseY - 72, 11, 3); }
+      ctx.fillStyle = '#f4f1e8'; ctx.beginPath(); ctx.arc(x + 98, baseY - 62, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d9473f'; ctx.beginPath(); ctx.arc(x + 98, baseY - 62, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f4f1e8'; ctx.beginPath(); ctx.arc(x + 98, baseY - 62, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b89a6a'; ctx.fillRect(x + 118, baseY - 76, 12, 30); ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 123, baseY - 84, 2, 8);
+    } else if (inn) { // 침대와 걸린 등불, 맥주잔
+      ctx.fillStyle = '#6a4423'; ctx.fillRect(x + 12, baseY - 50, 62, 30); ctx.fillStyle = '#e8e4da'; ctx.fillRect(x + 14, baseY - 56, 58, 10);
+      ctx.fillStyle = '#6a7ab0'; ctx.fillRect(x + 14, baseY - 46, 44, 12); ctx.fillStyle = '#fff'; ctx.fillRect(x + 16, baseY - 58, 14, 6);
+      ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 96, baseY - 84, 3, 16); ctx.fillStyle = '#ffd36a'; ctx.fillRect(x + 90, baseY - 68, 15, 18);
+      ctx.fillStyle = 'rgba(255,220,120,0.35)'; ctx.beginPath(); ctx.arc(x + 98, baseY - 60, 24, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d4a017'; ctx.fillRect(x + 118, baseY - 60, 12, 16);
     } else if (food) { // 매달린 소시지와 빵 바구니, 솥에서 피어오르는 김
       ctx.fillStyle = '#7a5530'; ctx.fillRect(x + 10, baseY - 66, w - 20, 4);
       for (let i = 0; i < 5; i++) { ctx.fillStyle = '#b0453a'; ctx.fillRect(x + 18 + i * 22, baseY - 62, 7, 18); ctx.fillStyle = '#e0a458'; ctx.fillRect(x + 20 + i * 22, baseY - 44, 3, 3); }
@@ -413,7 +428,7 @@
       }
     }
     // 주인
-    G.Npc.draw(ctx, { food: 'chef', potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
+    if (!closed) G.Npc.draw(ctx, { train: 'trainer', inn: 'innkeeper', food: 'chef', potion: 'potion', armor: 'armor', pants: 'designer', weapon2: 'thrower', mgshell: 'gambler', mgtarget: 'thrower', mgduel: 'rival', mggun: 'agent', sword: 'agent', mine: 'miner', estate: 'agent', decor: 'designer', dweapon: 'darksmith', ditem: 'darkmerchant', dupgrade: 'darksmith', darmor: 'darksmith' }[shop.kind], baseX, baseY - 16, 1, time);
     // 계산대
     ctx.fillStyle = '#8a5a2b';
     ctx.fillRect(x + 2, baseY - 28, w - 4, 28);
@@ -490,7 +505,14 @@
     ctx.fillRect(baseX - 34, topY - 26, 68, 22);
     ctx.fillStyle = '#e9d8a6';
     ctx.fillRect(baseX - 31, topY - 23, 62, 16);
-    G.TextLayer.add(food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
+    if (closed) { // 적군이 쳐들어오면 가게 문을 닫는다: 덧문을 내리고 주인은 피신했다
+      ctx.fillStyle = '#4a3320'; ctx.fillRect(x + 2, baseY - 98, w - 4, 98);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 2;
+      for (let sy = baseY - 90; sy < baseY; sy += 12) { ctx.beginPath(); ctx.moveTo(x + 2, sy); ctx.lineTo(x + w - 2, sy); ctx.stroke(); }
+      ctx.fillStyle = '#e8d8a8'; ctx.fillRect(x + w / 2 - 34, baseY - 62, 68, 22);
+      G.TextLayer.add('문 닫음', baseX, baseY - 51, 'bold 14px sans-serif', '#7a2a1a');
+    }
+    G.TextLayer.add(train ? '훈련소' : inn ? '여관' : food ? '음식점' : potion ? '물약' : armor ? '갑옷' : mine ? '보상' : estate ? '부동산' : decor ? '꾸밈' : dweapon ? '다크무기' : ditem ? '아이템' : dupgrade ? '강화' : darmor ? '다크갑옷' : pantsShop ? '바지' : weapon2 ? '특수무기' : mgShell ? '야바위' : mgTarget ? '맞추기' : mgDuel ? '결투' : mgGun ? '총게임' : '무기', baseX, topY - 15, 'bold 13px sans-serif', '#5a3d17');
     ctx.textAlign = 'start';
   }
 
@@ -782,9 +804,9 @@
       for (const S of terrain.shops) {
         const bx = S.col * TILE + TILE / 2;
         if (bx < camera.x - 150 || bx > camera.x + view) continue;
-        drawShop(ctx, S, bx, (S.row + 1) * TILE, time);
+        drawShop(ctx, S, bx, (S.row + 1) * TILE, time, !!terrain.invasion);
       }
-      terrain.villagers.forEach((V, i) => {
+      if (!terrain.invasion) terrain.villagers.forEach((V, i) => { // 적군이 쳐들어오면 마을 사람들은 사라진다
         const bx = V.col * TILE + TILE / 2;
         if (bx < camera.x - 60 || bx > camera.x + view) return;
         G.Npc.draw(ctx, 'villager', bx, (V.row + 1) * TILE, i % 2 ? -1 : 1, time + i);

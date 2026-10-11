@@ -66,6 +66,8 @@
           if (ch === 'L') this.luggage.push({ col: c, row: r });
           if (ch === 'K') this.shops.push({ col: c, row: r, kind: 'potion' });
           if (ch === 'r') this.shops.push({ col: c, row: r, kind: 'food' }); // 왕국의 음식점
+          if (ch === 't') this.shops.push({ col: c, row: r, kind: 'train' }); // 왕국의 훈련소
+          if (ch === 'i') this.shops.push({ col: c, row: r, kind: 'inn' }); // 왕국의 여관
           if (ch === 'W') this.shops.push({ col: c, row: r, kind: 'sword' });
           if (ch === 'f') this.shops.push({ col: c, row: r, kind: 'furnace' }); // 용광로: 광석을 녹여 주괴로
           if (ch === 'A') this.shops.push({ col: c, row: r, kind: 'armor' });

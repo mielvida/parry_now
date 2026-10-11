@@ -17,6 +17,7 @@
   //   gold 황금(처치 코인 +50%) / crystal 수정(주변에 파편 피해) / light 빛(주변 기절) / quake 대지(주변 기절)
   //   fire 화염(불타며 죽음) / ice 얼음(얼면서 부서짐) / thief 도둑(맞힐 때 코인) / cleave 관통(앞의 몬스터도) / shadow 그림자(잠시 무적)
   weapon('wood0', 'sword', '부서진 목검', 0, 0.25, 0, 0, ['#c9a86a', '#8a5a2b'], { wood: true, broken: true, note: '낡은 나무 칼. 끝이 부서졌다 — 대장간에서 제대로 된 검을 사 보자' });
+  weapon('admin', 'sword', '관리자 무기', 0, 1.5, 3, 0, ['#ffb0f0', '#c040a0'], { baseDmg: 100, oneHit: true, admin: true, note: '관리자: 모든 능력을 직접 정한다 (F2)' });
   weapon('sword0', 'sword', '기본 검', 80, 0.3, 0, 0, ['#e8f1ff', '#9db6d6']);
   weapon('sword1', 'sword', '황금 검', 300, 0.4, 1, 0, ['#ffe08a', '#d9a93a'], { elem: 'gold', note: '황금: 처치하면 코인 +50%' });
   weapon('sword2', 'sword', '수정 검', 600, 0.4, 2, 0, ['#9fe8ff', '#4fb5e0'], { elem: 'crystal', note: '수정: 맞은 주변에 파편 피해 1' });
@@ -291,6 +292,12 @@
   add({ id: 'mineup', name: '동굴 보상 업그레이드', upgrade: 'mine', look: ['#ffd54a', '#b8860b'] });
   add({ id: 'speedup', name: '마을 달리기 업그레이드', upgrade: 'speed', look: ['#7dffd0', '#2fa88a'] });
   //  crit  치명타: 치명타가 터지면 이 대미지를 준다 (0레벨 10 -> 20레벨 30). 치명타 확률은 집에 장식품을 놓을수록 오른다
+  add({ id: 'trn_str', name: '근력 훈련', upgrade: 'train', trainKey: 'str', look: ['#ff8a5a', '#a8301a'] });
+  add({ id: 'trn_foc', name: '집중 훈련', upgrade: 'train', trainKey: 'foc', look: ['#9fd8ff', '#3a78b0'] });
+  add({ id: 'trn_agi', name: '민첩 훈련', upgrade: 'train', trainKey: 'agi', look: ['#7dffa0', '#2f9a5a'] });
+  add({ id: 'trn_end', name: '인내 훈련', upgrade: 'train', trainKey: 'end', look: ['#ffd54a', '#a8801a'] });
+  add({ id: 'inn_rest', name: '하룻밤 묵기', price: 120, service: 'rest', desc: '푹 자고 일어나면 피와 스태미나가 가득 찬다. 자는 동안 저장도 된다', look: ['#8aa8e8', '#3a4a80'] });
+  add({ id: 'inn_tea', name: '따뜻한 차', price: 25, service: 'tea', desc: '한 잔 마시면 피가 한 칸 찬다', look: ['#d8b078', '#7a5030'] });
   add({ id: 'critup', name: '치명타 업그레이드', upgrade: 'crit', look: ['#ffd54a', '#e8334a'] });
   //  weapon / armor: 다크월드 강화소. 경험치(EXP)로 지금 낀 무기(Lv은 무기마다)와 갑옷(피 +1칸/레벨)을 강화한다
   add({ id: 'wup', name: '무기 강화', upgrade: 'weapon', expCost: true, look: ['#7dd0ff', '#2a6fb0'] });
@@ -318,13 +325,22 @@
   const mineReward = (level) => C.MINE_COINS + C.MINE_COINS_PER_LEVEL * (Math.min(level, C.MINE_MAX_LEVEL) - 1);
   const speedMult = (level) => 1 + ((C.VILLAGE_SPEED_MAX - 1) * Math.min(level, C.VILLAGE_SPEED_LEVELS)) / C.VILLAGE_SPEED_LEVELS;
   const critDamage = (inv) => C.CRIT_BASE_DAMAGE + Math.min(inv.critLevel, C.CRIT_MAX_LEVEL);
-  const levelOf = (item, inv) => (item.upgrade === 'stmax' ? inv.stMaxLevel || 0 : item.upgrade === 'stregen' ? inv.stRegenLevel || 0 : item.upgrade === 'holy' ? holyLevel(inv) : item.upgrade === 'weapon' ? weaponLevel(inv) : item.upgrade === 'armor' ? inv.armorLevel || 0 : item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
-  const maxLevelOf = (item) => (item.upgrade === 'stmax' ? C.STAMINA_MAX_LEVELS : item.upgrade === 'stregen' ? C.STAMINA_REGEN_LEVELS : item.upgrade === 'holy' ? HOLY_MAX : item.upgrade === 'weapon' ? WUP_MAX : item.upgrade === 'armor' ? AUP_MAX : item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
+  const levelOf = (item, inv) => (item.upgrade === 'train' ? trainLv(inv, item.trainKey) : item.upgrade === 'stmax' ? inv.stMaxLevel || 0 : item.upgrade === 'stregen' ? inv.stRegenLevel || 0 : item.upgrade === 'holy' ? holyLevel(inv) : item.upgrade === 'weapon' ? weaponLevel(inv) : item.upgrade === 'armor' ? inv.armorLevel || 0 : item.upgrade === 'mine' ? inv.mineLevel : item.upgrade === 'crit' ? inv.critLevel : inv.speedLevel);
+  const maxLevelOf = (item) => (item.upgrade === 'train' ? TRAIN[item.trainKey].max : item.upgrade === 'stmax' ? C.STAMINA_MAX_LEVELS : item.upgrade === 'stregen' ? C.STAMINA_REGEN_LEVELS : item.upgrade === 'holy' ? HOLY_MAX : item.upgrade === 'weapon' ? WUP_MAX : item.upgrade === 'armor' ? AUP_MAX : item.upgrade === 'mine' ? C.MINE_MAX_LEVEL : item.upgrade === 'crit' ? C.CRIT_MAX_LEVEL : C.VILLAGE_SPEED_LEVELS);
+  // 훈련소 (왕국): 코인으로 산 훈련은 영구히 강해진다
+  const TRAIN = {
+    str: { max: 15, base: 600, step: 350, unit: '근접·원거리 대미지 +1', per: (lv) => `대미지 +${lv}` },
+    foc: { max: 10, base: 500, step: 300, unit: '패링 지속 +0.015초', per: (lv) => `패링 +${(lv * 0.015).toFixed(3)}초` },
+    agi: { max: 10, base: 400, step: 250, unit: '이동 속도 +2%', per: (lv) => `이동 속도 +${lv * 2}%` },
+    end: { max: 10, base: 700, step: 400, unit: '피격 후 무적 +0.1초', per: (lv) => `무적 +${(lv * 0.1).toFixed(1)}초` },
+  };
+  const trainLv = (inv, k) => (inv.train && inv.train[k]) || 0;
   const upMaxed = (item, inv) => !!item.upgrade && levelOf(item, inv) >= maxLevelOf(item);
   // 다음 레벨로 올리는 가격 (최고 레벨이면 0). 업그레이드가 아닌 아이템은 원래 가격
   function priceOf(item, inv) {
     if (!item.upgrade) return item.price;
     if (upMaxed(item, inv)) return 0;
+    if (item.upgrade === 'train') { const t = TRAIN[item.trainKey]; return t.base + t.step * trainLv(inv, item.trainKey); }
     if (item.upgrade === 'stmax') return C.STAMINA_MAX_PRICE + C.STAMINA_MAX_PRICE_STEP * (inv.stMaxLevel || 0);
     if (item.upgrade === 'stregen') return C.STAMINA_REGEN_PRICE + C.STAMINA_REGEN_PRICE_STEP * (inv.stRegenLevel || 0);
     if (item.upgrade === 'holy') return 1;
@@ -340,6 +356,13 @@
   // 아이템 한 개의 이름/설명 (상점과 인벤토리 창이 보여준다)
   function describe(item, inv) {
     if (item.forge) return item.view(inv); // 대장간의 합치기/제련/부착 카드
+    if (item.upgrade === 'train') { // 훈련소
+      const t = TRAIN[item.trainKey];
+      const lv = inv ? trainLv(inv, item.trainKey) : 0;
+      const desc = lv >= t.max ? `최고 레벨! ${t.per(lv)}` : `${t.per(lv)} -> ${t.per(lv + 1)}`;
+      return { name: `${item.name}  Lv ${lv}/${t.max}`, desc, slotName: '훈련', note: `레벨마다 ${t.unit} (영구)` };
+    }
+    if (item.service) return { name: item.name, desc: item.desc, slotName: '서비스', note: item.note || '' };
     if (item.upgrade === 'stmax') {
       const lv = inv ? inv.stMaxLevel || 0 : 0;
       const desc = lv >= C.STAMINA_MAX_LEVELS ? `최고 레벨! 최대 스태미나 ${staminaMax(inv)}` : `최대 스태미나 ${staminaMax(inv)} -> ${staminaMax(inv) + C.STAMINA_MAX_STEP}`;
@@ -509,6 +532,14 @@
       exp: true,
       tabs: [{ name: '강화', items: ids('wup', 'aup') }],
     },
+    train: {
+      title: '훈련소',
+      tabs: [{ name: '훈련 (영구)', items: ids('trn_str', 'trn_foc', 'trn_agi', 'trn_end') }],
+    },
+    inn: {
+      title: '여관',
+      tabs: [{ name: '쉬기', items: ids('inn_rest', 'inn_tea') }],
+    },
     food: {
       title: '음식점',
       tabs: [
@@ -575,6 +606,7 @@
       stRegenLevel: 0, // 스태미나 회복 속도 업그레이드 레벨 (보상 상점)
       wlevel: {}, // 무기 강화 레벨 (무기 id마다)
       armorLevel: 0, // 갑옷 강화 레벨 (최대 피 +1칸 / 레벨)
+      train: {}, // 훈련소 훈련 레벨 {str, foc, agi, end}
       equipped: { weapon: 'wood0', helmet: null, armor: 'rags', gloves: null, pants: null, boots: null, pick: null },
     };
   }
@@ -589,12 +621,13 @@
     const pn = inv.equipped.pants ? ITEMS[inv.equipped.pants] : null;
     const wl = (inv.wlevel && inv.wlevel[inv.equipped.weapon]) || 0;
     const ab = attachOf(inv, w); // 붙인 주괴 보너스
+    const trn = { str: trainLv(inv, 'str'), foc: trainLv(inv, 'foc'), agi: trainLv(inv, 'agi'), end: trainLv(inv, 'end') }; // 훈련소 훈련
     const ai = armorInfo(inv);   // 방어구에 붙인 주괴 보너스
     return {
       reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl + ab.reach) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
-      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
+      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg + trn.str : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
       bossBonus: w.shot ? 0 : wBonus(wl) + ab.boss,  // 강화: 근접 무기는 보스에게 더 아프다 (레벨이 오를수록 더 크게)
-      baseDmg: w.shot ? 1 : meleeBase(w) + ab.dmg,
+      baseDmg: w.shot ? 1 : meleeBase(w) + ab.dmg + trn.str,
       hitPower: w.shot ? 1 : 1 + Math.floor(wBonus(wl) / 5) + Math.floor(meleeBase(w) / 4) + ab.hit + Math.floor(ab.dmg / 3), // 단단한 몬스터를 한 번에 깎는 횟수
       staminaAdd: ab.st,                              // 쏘는 무기: 한 번에 드는 스태미나 증감 (티타늄 등은 줄여 준다)
       radiusAdd: ab.radius,                           // 폭탄 폭발 범위 증가(칸)
@@ -606,12 +639,12 @@
       cooldownAdd: w.cd + (g && g.cdAdd ? g.cdAdd : 0) + ab.cd,
       dashCostAdd: b && b.dashCostAdd ? b.dashCostAdd : 0,
       hearts: (a ? a.hearts : 0) + (pn ? pn.hearts || 0 : 0) + (inv.armorLevel || 0) + ai.hp,
-      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0) + ai.inv, // 투구 + 그림자 갑옷
+      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0) + ai.inv + 0.1 * trn.end, // 투구 + 그림자 갑옷
       perk: a && a.perk ? a.perk : null,
       perks: ai.perks, perkLv: ai.lv,                   // 속성 능력들과 단계 (갑옷 자체 + 붙인 속성 광석)
       elemLv: ab.elemLv,                                // 무기에 붙인 원소 광석의 속성별 개수               // 속성 갑옷의 능력 (thorn/fire/ice/volt/toxic/regen/gold)
-      windowAdd: (g ? g.window : 0) + (w.windowAdd || 0),
-      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0) + ai.spd,
+      windowAdd: (g ? g.window : 0) + (w.windowAdd || 0) + 0.015 * trn.foc,
+      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0) + ai.spd + 0.02 * trn.agi,
     };
   }
 
@@ -651,6 +684,23 @@
       wallet.inv.materials.holycrystal -= 1;
       wallet.inv.holy[wd.id] = (wallet.inv.holy[wd.id] || 0) + 1;
       return { ok: true, msg: `${wd.name}에 신성 크리스탈을 붙였다! 탑의 보스에게 대미지 x${wallet.inv.holy[wd.id] + 1}` };
+    }
+    if (item.upgrade === 'train') { // 훈련소: 코인으로 영구 훈련
+      if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };
+      const cost = priceOf(item, wallet.inv);
+      if (wallet.coins < cost) return { ok: false, msg: '코인이 부족해요.' };
+      wallet.coins -= cost;
+      wallet.inv.train = wallet.inv.train || {};
+      const lv = (wallet.inv.train[item.trainKey] = trainLv(wallet.inv, item.trainKey) + 1);
+      return { ok: true, msg: `${item.name} Lv ${lv}! ${TRAIN[item.trainKey].per(lv)}` };
+    }
+    if (item.service) { // 여관: 바로 쓰는 서비스
+      if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
+      if (item.service === 'tea' && wallet.lives >= wallet.maxLives) return { ok: false, msg: '피가 가득 차 있어요.' };
+      wallet.coins -= item.price;
+      if (item.service === 'tea') { wallet.lives = Math.min(wallet.maxLives, wallet.lives + 1); return { ok: true, msg: '따뜻한 차를 마셨다. 피 +1' }; }
+      wallet.lives = wallet.maxLives;
+      return { ok: true, rested: true, msg: '푹 쉬었다! 피와 스태미나가 가득 찼고, 여기까지 저장했어요.' };
     }
     if (item.upgrade === 'weapon' || item.upgrade === 'armor') { // 강화소: 경험치로 강화
       if (upMaxed(item, wallet.inv)) return { ok: false, msg: '이미 최고 레벨이에요.' };

@@ -246,7 +246,41 @@
     ],
   };
 
+  // 타이틀: 느리고 웅장한 단조 -> 장조로 번지는 영웅의 노래 (긴 화음 + 느린 베이스 + 노래하는 멜로디)
+  const TITLE = {
+    step: 0.34,
+    prog: [ // Dm - Bb - F - C - Dm - Bb - A - Dm
+      [38, [50, 53, 57]], [34, [46, 50, 53]], [41, [53, 57, 60]], [36, [52, 55, 60]],
+      [38, [50, 53, 57]], [34, [46, 50, 53]], [33, [52, 57, 61]], [38, [50, 53, 57]],
+    ],
+    melody: [
+      [74, null, 77, null, 81, null, 79, 77],
+      [77, null, 74, null, 82, null, 81, 79],
+      [81, null, 79, null, 77, null, 74, 77],
+      [76, null, 79, null, 84, null, 81, 79],
+      [74, null, 77, null, 81, null, 84, 81],
+      [82, null, 81, null, 79, null, 77, 74],
+      [76, null, 81, null, 85, null, 84, 81],
+      [74, null, null, null, 77, null, 74, null],
+    ],
+  };
+
   const TRACKS = {
+    title: {
+      step: TITLE.step, bars: TITLE.prog.length, vol: 0.26,
+      play(bar, i, d, dest) {
+        const [root, chord] = TITLE.prog[bar];
+        const s = TITLE.step;
+        if (i === 0) for (const n of chord) tone('sine', midi(n), midi(n), s * 7.6, 0.07, d, dest); // 한 마디를 감싸는 긴 화음
+        if (i === 0 || i === 4) tone('triangle', midi(root), midi(root), s * 3.6, 0.5, d, dest);   // 느린 베이스
+        if (i === 2 || i === 6) tone('sine', midi(root + 19), midi(root + 19), s * 1.6, 0.05, d, dest); // 반짝이는 높은 음
+        const m = TITLE.melody[bar][i];
+        if (m) {
+          tone('triangle', midi(m), midi(m), s * 2.2, 0.2, d, dest);
+          tone('sine', midi(m + 12), midi(m + 12), s * 1.6, 0.05, d, dest);
+        }
+      },
+    },
     cave: {
       step: CAVE.step, bars: CAVE.prog.length, vol: 0.22,
       play(bar, i, d, dest) {

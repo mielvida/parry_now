@@ -17,6 +17,8 @@
     designer: { robe: '#d4608a', trim: '#ffc0d8', hat: '#8a2a5a', beard: null, hair: '#6b4423', skin: '#e8b98a' },
     gambler: { robe: '#2a2a3a', trim: '#d4a017', hat: '#1a1a1a', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
     thrower: { robe: '#c0392b', trim: '#ffd0c0', hat: '#f4f1e8', beard: null, hair: '#6b4423', skin: '#e8b98a' },
+    trainer: { robe: '#a8402a', trim: '#ffd0a0', hat: '#f4f1e8', beard: '#3a2f22', hair: '#3a2f22', skin: '#d9a070' },
+    innkeeper: { robe: '#6a7ab0', trim: '#e8e0c8', hat: '#f4f1e8', beard: null, hair: '#8a5a2b', skin: '#e8b98a', apron: '#f4f1e8' },
     rival: { robe: '#2a4a8a', trim: '#9fc8ff', hat: null, beard: null, hair: '#c0392b', skin: '#e8b98a' },
     miner: { robe: '#8a6a2b', trim: '#d4a017', hat: '#e0b12f', beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070' },
     king: { robe: '#a01830', trim: '#ffd54a', hat: '#ffd54a', beard: '#f2f2f2', hair: '#f2f2f2', skin: '#e8b98a', staff: true },
