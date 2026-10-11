@@ -284,7 +284,7 @@
     return out;
   }
   const goldBonus = (info) => (info.lv.gold ? 0.3 + 0.15 * (info.lv.gold - 1) : 0); // 탐욕: 첫 번째 +30%, 같은 속성이 늘 때마다 +15%
-  const homeBonuses = (inv) => { const n = placedTotal(inv); const ab = attachOf(inv, ITEMS[inv.equipped.weapon]); return { n, coin: n * C.DECOR_COIN_BONUS + (() => { const ai = armorInfo(inv); return goldBonus(ai) + ai.coin; })() + (inv.equipped.pants && ITEMS[inv.equipped.pants].coinAdd ? ITEMS[inv.equipped.pants].coinAdd : 0) + ab.coin, crit: Math.min(1, C.CRIT_BASE_CHANCE + n * C.DECOR_CRIT_BONUS + (ITEMS[inv.equipped.helmet] && ITEMS[inv.equipped.helmet].critAdd ? ITEMS[inv.equipped.helmet].critAdd : 0) + ab.crit) }; };
+  const homeBonuses = (inv) => { const n = placedTotal(inv); const ab = attachOf(inv, ITEMS[inv.equipped.weapon]); return { n, coin: buffVal(inv, 'coin') + n * C.DECOR_COIN_BONUS + (() => { const ai = armorInfo(inv); return goldBonus(ai) + ai.coin; })() + (inv.equipped.pants && ITEMS[inv.equipped.pants].coinAdd ? ITEMS[inv.equipped.pants].coinAdd : 0) + ab.coin, crit: Math.min(1, C.CRIT_BASE_CHANCE + buffVal(inv, 'crit') + n * C.DECOR_CRIT_BONUS + (ITEMS[inv.equipped.helmet] && ITEMS[inv.equipped.helmet].critAdd ? ITEMS[inv.equipped.helmet].critAdd : 0) + ab.crit) }; };
   const decorLeft = (inv, id) => (inv.home.owned[id] || 0) - placedCount(inv, id); // 아직 안 놓은 개수
   // 방의 자리(kind, index)에 장식품을 놓는다 (id가 null이면 치우기). 결과 { ok, msg }
   function placeDecor(inv, kind, index, id) {
@@ -376,8 +376,13 @@
   const HOLY_TYPES = ['sword', 'great', 'dagger', 'scythe']; // 칼 종류
   const holyLevel = (inv) => (inv.holy && inv.holy[inv.equipped.weapon]) || 0;
   const holyMult = (inv) => 1 + holyLevel(inv); // 탑의 보스에게 주는 대미지 배율
+  // 음식 효과(버프): inv.buffs = [{kind, val, until(ms), n}]. 종류마다 한 개만 걸리고 시간이 지나면 사라진다
+  const buffList = (inv) => (inv.buffs || []).filter((b) => b.until > Date.now());
+  const buffVal = (inv, kind) => buffList(inv).filter((b) => b.kind === kind).reduce((a, b) => a + (b.val || 0), 0);
+  function addBuff(inv, kind, val, durSec, n) { inv.buffs = buffList(inv).filter((b) => b.kind !== kind); inv.buffs.push({ kind, val, until: Date.now() + durSec * 1000, n: n || 0 }); }
+  function takeShield(inv) { const b = buffList(inv).find((q) => q.kind === 'shield' && q.n > 0); if (!b) return false; b.n -= 1; if (b.n <= 0) inv.buffs = buffList(inv).filter((q) => q !== b); return true; }
   const staminaMax = (inv) => C.STAMINA_MAX + C.STAMINA_MAX_STEP * Math.min(inv.stMaxLevel || 0, C.STAMINA_MAX_LEVELS);
-  const staminaRegen = (inv) => C.STAMINA_REGEN + C.STAMINA_REGEN_STEP * Math.min(inv.stRegenLevel || 0, C.STAMINA_REGEN_LEVELS) + (inv.equipped.pants && ITEMS[inv.equipped.pants].stamRegen ? ITEMS[inv.equipped.pants].stamRegen : 0);
+  const staminaRegen = (inv) => (1 + buffVal(inv, 'stamina')) * (C.STAMINA_REGEN + C.STAMINA_REGEN_STEP * Math.min(inv.stRegenLevel || 0, C.STAMINA_REGEN_LEVELS)) + (inv.equipped.pants && ITEMS[inv.equipped.pants].stamRegen ? ITEMS[inv.equipped.pants].stamRegen : 0);
   const mineReward = (level) => C.MINE_COINS + C.MINE_COINS_PER_LEVEL * (Math.min(level, C.MINE_MAX_LEVEL) - 1);
   const speedMult = (level) => 1 + ((C.VILLAGE_SPEED_MAX - 1) * Math.min(level, C.VILLAGE_SPEED_LEVELS)) / C.VILLAGE_SPEED_LEVELS;
   const critDamage = (inv) => C.CRIT_BASE_DAMAGE + Math.min(inv.critLevel, C.CRIT_MAX_LEVEL);
@@ -720,9 +725,9 @@
     const ai = armorInfo(inv);   // 방어구에 붙인 주괴 보너스
     return {
       reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl + ab.reach) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
-      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg + trn.str + 0.05 * (inv.xmUsed || 0) : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
+      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg + trn.str + 0.05 * (inv.xmUsed || 0) + buffVal(inv, 'power') : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
       bossBonus: w.shot ? 0 : wBonus(wl) + ab.boss,  // 강화: 근접 무기는 보스에게 더 아프다 (레벨이 오를수록 더 크게)
-      baseDmg: (w.shot ? 1 : meleeBase(w) + ab.dmg + trn.str) + 0.05 * (inv.xmUsed || 0), // 경험돈으로 올린 영구 대미지(개당 0.05)
+      baseDmg: (w.shot ? 1 : meleeBase(w) + ab.dmg + trn.str) + 0.05 * (inv.xmUsed || 0) + (w.shot ? 0 : buffVal(inv, 'power')), // 경험돈으로 올린 영구 대미지(개당 0.05) + 음식 효과
       hitPower: w.shot ? 1 : 1 + Math.floor(wBonus(wl) / 5) + Math.floor(meleeBase(w) / 4) + ab.hit + Math.floor(ab.dmg / 3), // 단단한 몬스터를 한 번에 깎는 횟수
       staminaAdd: ab.st,                              // 쏘는 무기: 한 번에 드는 스태미나 증감 (티타늄 등은 줄여 준다)
       radiusAdd: ab.radius,                           // 폭탄 폭발 범위 증가(칸)
@@ -734,12 +739,12 @@
       cooldownAdd: w.cd + (g && g.cdAdd ? g.cdAdd : 0) + ab.cd,
       dashCostAdd: b && b.dashCostAdd ? b.dashCostAdd : 0,
       hearts: (a ? a.hearts : 0) + (pn ? pn.hearts || 0 : 0) + (inv.armorLevel || 0) + ai.hp,
-      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0) + ai.inv + 0.1 * trn.end, // 투구 + 그림자 갑옷
+      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0) + ai.inv + 0.1 * trn.end + buffVal(inv, 'invuln'), // 투구 + 그림자 갑옷 + 음식 효과
       perk: a && a.perk ? a.perk : null,
       perks: ai.perks, perkLv: ai.lv,                   // 속성 능력들과 단계 (갑옷 자체 + 붙인 속성 광석)
       elemLv: ab.elemLv,                                // 무기에 붙인 원소 광석의 속성별 개수               // 속성 갑옷의 능력 (thorn/fire/ice/volt/toxic/regen/gold)
       windowAdd: (g ? g.window : 0) + (w.windowAdd || 0) + 0.015 * trn.foc,
-      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0) + ai.spd + 0.02 * trn.agi,
+      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0) + ai.spd + 0.02 * trn.agi + buffVal(inv, 'speed'),
     };
   }
 
@@ -1037,5 +1042,5 @@
   for (const k of ['dweapon', 'darmor', 'dupgrade', 'ditem']) for (const t of SHOPS[k].tabs) for (const it of t.items) darkIds.add(it.id);
   for (const it of Object.values(ITEMS)) if (it.price > 0 && !it.upgrade && !it.noMult && !it.catch && !darkIds.has(it.id)) it.price = Math.round((it.price * (C.PRICE_MULT || 1)) / 10) * 10;
 
-  G.Shop = { CONSUMABLE_IDS, DARK_CONS_IDS, abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
+  G.Shop = { buffList, buffVal, addBuff, takeShield, CONSUMABLE_IDS, DARK_CONS_IDS, abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
 })(window.Game);

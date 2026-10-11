@@ -321,6 +321,8 @@
   const curSeaLv = () => (stageName === 'seacave' ? seaCaveLv : seaLv);
   const seaCaveCoins = () => Math.round((6000 + 2500 * ((story.seaCaveRun || 1) - 1)) * (1 + G.Shop.homeBonuses(inv).coin)); // 들어갈수록 더 많이 준다
   let seaLv = null, seaSt = null, seaO2 = 45, seaDepth = 0, seaDrown = 0, seaInTown = false; // 바다: 지형, 해산물/거품, 산소, 수심
+  let blue = 0; // 파란 피: 빨간 피가 가득일 때 넘치게 먹은 음식, 또는 파란 피를 주는 음식. 맞으면 빨간 피보다 먼저 닳고, 최대 피 칸 수까지만 찬다
+  let buffRegenT = 0, buffT = 0, chefHomeCheck = false; // 음식 효과(재생) 시간, 요리사 확인
   let cookUI = null;           // 가스레인지 요리 창
   let achUI = null;            // 업적 모음집 {page}
   let floorUI = null;          // 던전 문: 가고 싶은 층 고르기 {sel, max}
@@ -1220,13 +1222,15 @@
     if (!inv.homes) inv.homes = { village: inv.home && inv.home.placed ? inv.home : newHome(), kingdom: newHome() }; // 예전 저장: 지금까지의 집은 마을 집
     if (!inv.homes.village) inv.homes.village = newHome();
     if (!inv.homes.kingdom) inv.homes.kingdom = newHome();
+    if (!inv.homes.harbor) inv.homes.harbor = newHome();
     inv.home = inv.homes[homeTown];
   }
   function loadStage(name, keepLives = false, near = null) {
     if (name === 'harbor') name = 'sea'; // 항구 마을은 바다와 하나로 이어졌다 (옛 저장 호환)
     stageName = name;
     if (name === 'village' || name === 'kingdom') homeTown = name;
-    else if (name === 'home') homeTown = homeFrom === 'kingdom' ? 'kingdom' : 'village';
+    else if (name === 'sea') homeTown = 'harbor'; // 항구 마을도 내 집을 지을 수 있다
+    else if (name === 'home') homeTown = homeFrom === 'kingdom' ? 'kingdom' : homeFrom === 'sea' ? 'harbor' : 'village';
     bindHome();
     skipBanner = name === 'village' && !!seenStages.village;
     if (name === 'kingdom' && !seenStages.kingdom) fanfare = true; // 처음 왕국에 들어서면 웅장하게
@@ -1255,6 +1259,7 @@
     terrain.exitLabel = st.exitLabel || (st.exitTo === 'kingdom' ? '왕국' : null); // 출구 문에 쓰이는 이름
     terrain.home = inv.home; // 마을 터와 집 안이 산 집/놓은 장식을 그린다
     if (name === 'home') {
+      chefHomeCheck = true;
       G.HomeTheme.setHouse(inv.home.type);
       terrain.homeSlots = G.Home.slots(inv.home.type || 'house1', terrain);
     }
@@ -1337,7 +1342,8 @@
     baseMonsterCount = monsters.length;
     spots = terrain.standingSpots();
 
-    if (!keepLives || lives <= 0) lives = maxLives();
+    if (!keepLives || lives <= 0) { lives = maxLives(); blue = 0; }
+    blue = Math.min(blue, maxLives());
     gameOver = false;
     won = false;
     ending = null;
@@ -1641,9 +1647,16 @@
       popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '막았다!', t: 0.8, color: 'rgba(160,220,255,A)' });
       return;
     }
+    if (G.Shop.takeShield(inv)) { // 요리 효과: 보호막이 한 번 막아 준다
+      player.invuln = Math.max(player.invuln, 0.5);
+      effects.shake(3, 0.1); G.Audio.play('catch');
+      popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '보호막이 막았다!', t: 0.9, color: 'rgba(160,220,255,A)' });
+      return;
+    }
     if (player.cancelCharge()) effects.chargeBreak(cx, cy); // 맞으면 충전 게이지가 풀린다
     effects.playerHit(cx, cy);
     effects.shake(9, 0.3);
+    if (blue > 0) { const a = Math.min(blue, dmg); blue -= a; dmg -= a; if (a > 0) popups.push({ x: player.x + player.w / 2, y: player.y - 30, text: '파란 피가 막았다!', t: 0.9, color: 'rgba(120,190,255,A)' }); } // 파란 피가 먼저 닳는다 (닳은 칸은 원래의 빨간 하트로 보인다)
     lives -= dmg;
     G.Audio.play('hurt');
     if (lives <= 0 && duelRun) { duelLose(); return; }
@@ -3392,17 +3405,22 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   }
 
   // 소모품 하나를 쓴다 (스태미나 회복 / 음식으로 피 회복). 결과 { ok, msg }
-  function useConsumable(id) {
+  function useConsumable(id, auto = false) {
     const it = G.Shop.ITEMS[id];
     if (!(inv.consumables[id] > 0)) return { ok: false, msg: '없어요.' };
     if (it.bomb) return { ok: false, msg: 'B 키로 던져서 쓰는 폭탄이에요.' };
+    const room = it.food ? Math.max(0, maxLives() - lives) : 0;
     const needLife = it.food && lives < maxLives();
+    const blueGain = Math.max(0, Math.min(maxLives() - blue, (it.food ? Math.max(0, it.food - room) : 0) + (it.blue || 0))); // 빨간 피가 넘치는 만큼 + 파란 피 음식은 파란 피로
+    const needBlue = !auto && blueGain > 0; // 자동으로 먹을 때(V)는 파란 피만 채우려고 먹지 않는다
     const needSt = it.stamina && stamina < stMax();
-    if (!needLife && !needSt) return { ok: false, msg: it.food && it.stamina ? '피도 스태미나도 가득이에요.' : it.food ? '피가 가득 차 있어요.' : '스태미나가 가득 차 있어요.' };
+    if (!needLife && !needSt && !it.buffs && !needBlue) return { ok: false, msg: it.food && it.stamina ? '피도 스태미나도 가득이에요.' : it.food ? '피가 가득 차 있어요.' : '스태미나가 가득 차 있어요.' };
     inv.consumables[id] -= 1;
     const parts = [];
     if (needLife) { const before = lives; lives = Math.min(maxLives(), lives + it.food); parts.push(`피 +${lives - before}`); }
+    if (needBlue) { blue = Math.min(maxLives(), blue + blueGain); parts.push(`파란 피 +${blueGain}`); }
     if (needSt) { const before = stamina; stamina = Math.min(stMax(), stamina + it.stamina); parts.push(`스태미나 +${Math.round(stamina - before)}`); }
+    if (it.buffs) { for (const b of it.buffs) G.Shop.addBuff(inv, b.kind, b.val, b.dur, b.n); applyEquipment(); applySpeed(); parts.push(`효과 ${it.buffs.map((b) => G.Cook.EFF[b.kind].name).join('·')}`); } // 요리 효과
     G.Audio.play('pickup');
     return { ok: true, msg: `${it.name}: ${parts.join(', ')}` };
   }
@@ -3418,7 +3436,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const order = lives < maxLives() ? foods.concat(['st30', 'st70'], dkSt) : ['st30', 'st70'].concat(dkSt, foods); // 다치면 요리 먼저, 아니면 스태미나 물약부터
     for (const id of order) {
       if (!has(id)) continue;
-      const r = useConsumable(id);
+      const r = useConsumable(id, true);
       if (r.ok) { popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: r.msg, t: 1.4, color: 'rgba(125,255,160,A)' }); return; }
     }
     popups.push({ x: player.x + player.w / 2, y: player.y - 14, text: '먹을 것이 없어요', t: 1, color: 'rgba(255,170,170,A)' });
@@ -3575,8 +3593,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
 
   // ---- 바다: 산소, 헤엄, 해산물 잡기, 해산물 팔기 ----
   const diveLv = (k) => (inv.dive && inv.dive[k]) || 0;
-  const diveMax = () => 45 + 20 * diveLv('tank') + G.Sea.diveBonus(inv).o2; // 산소통 Lv + 붙인 광석
-  const diveSpeed = () => 140 + 16 * diveLv('fins') + G.Sea.diveBonus(inv).spd; // 오리발 Lv + 붙인 광석
+  const diveMax = () => 45 + 20 * diveLv('tank') + G.Sea.diveBonus(inv).o2 + G.Shop.buffVal(inv, 'oxygen'); // 산소통 Lv + 붙인 광석
+  const diveSpeed = () => 140 + 16 * diveLv('fins') + G.Sea.diveBonus(inv).spd + G.Shop.buffVal(inv, 'swim'); // 오리발 Lv + 붙인 광석
   function seaPre() { // 플레이어 갱신 전: 수면 아래면 헤엄 모드
     const py = player.y + player.h / 2;
     const was = player.swim;
@@ -3597,7 +3615,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const max = diveMax();
     if ((!player.swim && stageName === 'sea') || seaInTown) seaO2 = Math.min(max, seaO2 + 45 * dt); // 수면 위나 수중 마을에서는 숨을 쉰다
     else seaO2 = Math.max(0, seaO2 - (1 + seaDepth / 2500) * Math.max(0.2, 1 - 0.05 * diveLv('suit') - G.Sea.diveBonus(inv).use) * dt);
-    G.Sea.Theme.setLamp(Math.min(12, diveLv('lamp') + G.Sea.diveBonus(inv).lamp));
+    G.Sea.Theme.setLamp(Math.min(12, diveLv('lamp') + G.Sea.diveBonus(inv).lamp + G.Shop.buffVal(inv, 'light')));
     if (seaInTown && !story.seaTownVisited) { story.seaTownVisited = true; G.Sea.Theme.setVisited(true); popups.push({ x: px, y: player.y - 70, text: '수중 마을에 처음 왔다! 이제 항구 마을의 포털로도 올 수 있어요', t: 4, color: 'rgba(160,240,255,A)' }); G.Audio.play('treasure'); }
     if (player.swim && !seaInTown && seaO2 <= 0) {
       seaDrown += dt;
@@ -4310,7 +4328,28 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       u.t += dt;
       const list = G.Cook.ingredients(inv);
       const pressed = (...c) => c.some((k) => input.wasPressed(k));
-      if (u.result) { if (pressed('Enter', 'Space', 'Escape', 'KeyE')) u.result = null; }
+      G.Cook.chefProduce(inv); // 흐른 시간만큼 요리사가 요리한다
+      if (!u.result && pressed('Tab')) { u.tab = u.tab ? 0 : 1; u.msg = ''; u.cur = 0; G.Audio.play('catch'); }
+      else if (!u.result && u.tab === 1) { // 요리사 탭
+        const c = G.Cook.chefOf(inv);
+        if (pressed('Escape', 'KeyE')) cookUI = null;
+        else {
+          if (pressed('ArrowDown', 'KeyS')) u.cur = Math.min(list.length - 1, u.cur + 1);
+          if (pressed('ArrowUp', 'KeyW')) u.cur = Math.max(0, u.cur - 1);
+          if (pressed('PageDown')) u.cur = Math.min(list.length - 1, u.cur + 6);
+          if (pressed('PageUp')) u.cur = Math.max(0, u.cur - 6);
+          if (pressed('Enter', 'Space', 'KeyF') && list[u.cur]) {
+            if (!c.hired) { u.msg = '먼저 요리사를 고용하세요 (H).'; G.Audio.play('deny'); }
+            else { const n = G.Cook.chefDeposit(inv, list[u.cur], pressed('KeyF') ? list[u.cur].count : 1); u.msg = `${list[u.cur] ? '' : ''}요리사에게 맡겼어요 (+${n})`; G.Audio.play('pickup'); }
+          }
+          if (pressed('KeyH')) { if (c.hired) { u.msg = '이미 고용했어요.'; } else if (coins < G.Cook.CHEF_HIRE) { u.msg = `코인이 모자라요 (${G.Cook.CHEF_HIRE} G)`; G.Audio.play('deny'); } else { coins -= G.Cook.CHEF_HIRE; c.hired = true; c.last = Date.now(); u.msg = '요리사를 고용했어요! 재료를 맡겨 보세요.'; G.Audio.play('treasure'); } }
+          if (pressed('KeyU')) { if (!c.hired) u.msg = '먼저 요리사를 고용하세요.'; else if (c.lv >= G.Cook.CHEF_MAX) u.msg = '이미 가장 빨라요 (30초).'; else { const cost = G.Cook.chefUpCost(inv); if (coins < cost) { u.msg = `코인이 모자라요 (${cost} G)`; G.Audio.play('deny'); } else { coins -= cost; c.lv += 1; u.msg = `요리 속도 업! 이제 ${G.Cook.chefInterval(inv)}초에 1개`; G.Audio.play('treasure'); } } }
+          if (pressed('KeyM')) { c.m = (c.m + 1) % 13; u.msg = ''; G.Audio.play('catch'); }
+          if (pressed('KeyN')) { c.k = c.k % 5 + 1; u.msg = ''; G.Audio.play('catch'); }
+          if (pressed('KeyG')) { const r = G.Cook.chefCollect(inv); u.msg = r.n ? `요리 ${r.n}개를 받았어요! (${r.names.join(', ')})` : '아직 받을 요리가 없어요.'; G.Audio.play(r.n ? 'treasure' : 'deny'); }
+        }
+      }
+      else if (u.result) { if (pressed('Enter', 'Space', 'Escape', 'KeyE')) u.result = null; }
       else {
         if (pressed('Escape', 'KeyE')) cookUI = null;
         else {
@@ -4535,7 +4574,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         G.Audio.play('pickup');
       } else if (near && near.type === 'home') { // 마을의 내 집 터
         if (inv.home.type) { homeFrom = stageName; loadStage('home', true); input.endFrame(); return; }
-        dialog = { text: `아직 집이 없다. ${homeTown === 'kingdom' ? '왕국의' : '마을의'} 부동산에서 집을 살 수 있다. (마을과 왕국은 집이 따로 있다)`, t: 3.5 };
+        dialog = { text: `아직 집이 없다. ${homeTown === 'kingdom' ? '왕국의' : homeTown === 'harbor' ? '항구 마을의' : '마을의'} 부동산에서 집을 살 수 있다. (마을과 왕국은 집이 따로 있다)`, t: 3.5 };
       } else if (near && near.type === 'enter') { // 마을 동굴로
         enterMine();
         input.endFrame();
@@ -4558,6 +4597,13 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       }
     }
     updateQuest(dt);
+    buffT -= dt; // 음식 효과: 시간이 다 된 것은 지우고, 재생은 5초마다 피 ½칸
+    if (buffT <= 0) { buffT = 1; const act = G.Shop.buffList(inv); if (act.length !== (inv.buffs || []).length) { inv.buffs = act; applyEquipment(); applySpeed(); popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '음식 효과가 끝났어요', t: 1.6, color: 'rgba(255,225,160,A)' }); } }
+    if (G.Shop.buffVal(inv, 'regen') > 0) { buffRegenT += dt; if (buffRegenT >= 5) { buffRegenT = 0; if (lives < maxLives()) { lives = Math.min(maxLives(), lives + 0.5); popups.push({ x: player.x + player.w / 2, y: player.y - 30, text: '재생 +½', t: 1.1, color: 'rgba(255,140,170,A)' }); } } } else buffRegenT = 0;
+    if (stageName === 'home' && chefHomeCheck && stageTime > 0.5) { // 집에 돌아왔다: 요리사가 만들어 둔 요리를 받는다
+      chefHomeCheck = false;
+      if (G.Cook.chefOf(inv).hired) { G.Cook.chefProduce(inv); const r = G.Cook.chefCollect(inv); if (r.n > 0) { popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `요리사가 요리 ${r.n}개를 만들어 뒀어요! (가방에 넣었어요)`, t: 4, color: 'rgba(255,225,120,A)' }); G.Audio.play('treasure'); } else if (G.Cook.chefStockUnits(inv) > 0) popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: '요리사가 열심히 요리 중이에요…', t: 3, color: 'rgba(255,225,160,A)' }); }
+    }
     if (input.wasPressed('KeyQ')) { // 게임 중 바로 물약 마시기
       const id = G.Shop.bestPotion(inv, lives, maxLives());
       let text = lives >= maxLives() ? '피가 가득 차 있어요' : '마실 물약이 없어요';
@@ -4912,7 +4958,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     terrain.fishingActive = !!fishUI;
     G.bossSign = stageName === 'darkhub' ? bossSignFor() : null;
     renderer.draw(terrain, player, camera, monsters, effects, {
-      lives, maxLives: maxLives(), coins, exp, potions: inv.potions, gameOver,
+      lives, blue, maxLives: maxLives(), coins, exp, potions: inv.potions, gameOver,
       stamina, staminaMax: stMax(), consumables: inv.consumables,
       mini: mini ? Object.assign({}, mini, { coins, me: { weaponId: inv.equipped.weapon, armorId: inv.equipped.armor, helmetId: inv.equipped.helmet, glovesId: inv.equipped.gloves, pantsId: inv.equipped.pants, bootsId: inv.equipped.boots } }) : null,
       caveInfo: stageName === 'mine' ? { level: mineRun, coins: Math.round(STAGES.mine.chest.coins * (1 + G.Shop.homeBonuses(inv).coin)) } : null,
@@ -4926,6 +4972,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       dex: dexUI ? Object.assign({}, dexUI, { inv }) : null,
       gacha: gachaUI ? Object.assign({}, gachaUI, { board: inv.gacha, coins }) : null,
       cook: cookUI ? { ui: cookUI, inv } : null,
+      buffs: G.Shop.buffList(inv).map((b) => ({ name: G.Cook.EFF[b.kind] ? G.Cook.EFF[b.kind].name : b.kind, text: G.Cook.EFF[b.kind] ? G.Cook.EFF[b.kind].fmt(b.val, b.n) : '', left: Math.ceil((b.until - Date.now()) / 1000), n: b.n })),
       ach: achUI ? { page: achUI.page, ctx: Object.assign(questCtx(), { playSec }) } : null,
       floorSel: floorUI ? { sel: floorUI.sel, max: floorUI.max, buf: floorUI.buf, best: darkBest, cleared: story.cleared } : null,
       map: mapUI ? { terrain, markers: mapUI.markers, player, title: stageName === 'kingdom' ? '왕이 다스리는 도시 지도' : '해변 마을 지도' } : null,
@@ -4991,6 +5038,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     questTick() { questT = 0; updateQuest(0.01); },
     get floorUI() { return floorUI; },
     get achUI() { return achUI; },
+    get blue() { return blue; },
+    set blue(v) { blue = v; },
+    useConsumable, loseLife,
     get cookUI() { return cookUI; },
     get seaLv() { return seaLv; },
     get seaO2() { return seaO2; },

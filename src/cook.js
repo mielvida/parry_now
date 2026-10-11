@@ -5,7 +5,7 @@
   const ITEMS = G.Shop.ITEMS;
   const METHODS = ['구이', '튀김', '찜', '탕', '회', '조림', '볶음', '스튜', '샐러드', '꼬치', '덮밥', '스파게티'];
   // 조리법마다 이름 꼴 3가지 (모두 다른 낱말이라 요리 이름이 겹치지 않는다)
-  const METHOD_NAMES = [['구이', '직화구이', '그릴'], ['튀김', '바삭튀김', '가라아게'], ['찜', '수증기찜', '약선찜'], ['탕', '매운탕', '맑은탕'], ['회', '사시미', '카르파초'], ['조림', '간장조림', '졸임'], ['볶음', '웍볶음', '철판볶음'], ['스튜', '크림스튜', '토마토스튜'], ['샐러드', '냉채', '오션볼'], ['꼬치', '꼬치구이', '스커워'], ['덮밥', '돈부리', '솥밥'], ['스파게티', '파스타', '링귀니']];
+  const METHOD_NAMES = [['구이', '숯불구이', '소금구이'], ['튀김', '바삭튀김', '황금튀김'], ['찜', '맑은찜', '매운찜'], ['탕', '매운탕', '맑은탕'], ['회', '생선회', '한입회'], ['조림', '간장조림', '매콤조림'], ['볶음', '센불볶음', '양념볶음'], ['스튜', '토마토스튜', '크림스튜'], ['샐러드', '무침', '냉채'], ['꼬치', '꼬치구이', '꼬치튀김'], ['덮밥', '솥밥', '비빔밥'], ['스파게티', '국수', '볶음국수']];
   const COUNT_NAME = ['', '모둠 ', '특선 ', '왕실 ', '대형 특선 ']; // 재료 수 1~5
   const GARNISH = ['', '허브 ', '매콤 ', '고소한 ', '상큼한 ', '향긋한 ', '달콤 '];
   const GCOL = ['#ffffff', '#4fae45', '#d02a2a', '#e8d8a0', '#f0e060', '#7ad0a0', '#ff9ac0'];
@@ -59,16 +59,51 @@
     return out.sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || b.val - a.val);
   }
 
+  // ---- 요리 효과: 먹으면 한동안 능력이 오른다. 요리마다 효과가 다르다 (같거나 비슷한 것도 있다) ----
+  const EFFECTS = [
+    { k: 'speed', name: '달리기 속도', mag: (q) => Math.round((0.08 + 0.3 * q) * 100) / 100, fmt: (v) => `+${Math.round(v * 100)}%` },
+    { k: 'power', name: '공격력', mag: (q) => Math.round(1 + 11 * q), fmt: (v) => `+${v}` },
+    { k: 'crit', name: '치명타 확률', mag: (q) => Math.round((0.04 + 0.2 * q) * 100) / 100, fmt: (v) => `+${Math.round(v * 100)}%` },
+    { k: 'coin', name: '코인 획득', mag: (q) => Math.round((0.1 + 0.5 * q) * 100) / 100, fmt: (v) => `+${Math.round(v * 100)}%` },
+    { k: 'invuln', name: '피격 후 무적', mag: (q) => Math.round((0.15 + 0.6 * q) * 10) / 10, fmt: (v) => `+${v}초` },
+    { k: 'regen', name: '재생', mag: () => 1, fmt: () => '5초마다 피 ½칸' },
+    { k: 'shield', name: '보호막', mag: () => 1, n: (q) => Math.round(1 + 4 * q), fmt: (v, n) => `${n}번 막아 준다` },
+    { k: 'stamina', name: '스태미나 회복', mag: (q) => Math.round((0.4 + 1.6 * q) * 100) / 100, fmt: (v) => `+${Math.round(v * 100)}%` },
+    { k: 'oxygen', name: '산소 (잠수)', mag: (q) => Math.round(10 + 50 * q), fmt: (v) => `+${v}초` },
+    { k: 'swim', name: '헤엄 속도', mag: (q) => Math.round(15 + 75 * q), fmt: (v) => `+${v}` },
+    { k: 'light', name: '랜턴 밝기 (잠수)', mag: (q) => Math.round(1 + 2 * q), fmt: (v) => `+${v}단계` },
+  ];
+  const EFF = {}; EFFECTS.forEach((e) => { EFF[e.k] = e; });
+  const BY_ELEM = { fire: 'power', ice: 'shield', poison: 'crit', quake: 'invuln', light: 'speed', shadow: 'oxygen' }; // 원소 재료의 효과
+  const BY_SHAPE = { fish: 'speed', eel: 'swim', crab: 'invuln', shell: 'coin', squid: 'crit', octo: 'stamina', jelly: 'regen', star: 'light', urchin: 'shield', shrimp: 'stamina', ray: 'swim', seahorse: 'oxygen', turtle: 'regen', whale: 'power', shark: 'power', angler: 'light', flat: 'coin', cat: 'invuln' };
+  const elemOf = (id) => { const s2 = G.Sea.BY_ID[id]; if (s2) return s2.elem || null; const it = ITEMS[id]; return it && it.elem ? it.elem : null; };
+  function effectsFor(key, base, shape) {
+    const h = hashStr(`${key.m}|${key.main}|${key.g}|${key.n}`);
+    const count = key.n >= 5 ? 3 : key.n >= 3 ? 2 : 1;
+    const order = [];
+    const el = elemOf(key.main);
+    const first = (el && BY_ELEM[el]) || BY_SHAPE[shape] || EFFECTS[h % EFFECTS.length].k;
+    order.push(first);
+    for (let i = 0; order.length < count && i < 40; i++) { const k = EFFECTS[(h >>> (3 + i)) % EFFECTS.length].k; if (!order.includes(k)) order.push(k); }
+    const q = clamp(base / 2500, 0.15, 1) * clamp(0.7 + 0.1 * key.n, 0.8, 1.2);
+    const dur = Math.round(clamp(60 + base / 80 + 15 * key.n, 60, 300));
+    return order.map((k) => { const e = EFF[k]; return { kind: k, val: e.mag(Math.min(1, q)), n: e.n ? e.n(Math.min(1, q)) : 0, dur }; });
+  }
+  const effText = (list) => list.map((b) => `${EFF[b.kind].name} ${EFF[b.kind].fmt(b.val, b.n)} (${b.dur}초)`).join(' / ');
+
   // 요리 항목을 만든다(이미 있으면 그대로). key = {m, main, g, n}
   function dishItem(key, mainSp) {
     const id = `cook_${key.m}_${key.main}_${key.g}_${key.n}`;
     if (ITEMS[id]) return ITEMS[id];
     const base = baseValue(key.main);
-    const food = clamp(Math.round((0.5 + (base * (0.55 + 0.3 * key.n)) / 1400 + key.g * 0.08) * 2) / 2, 0.5, 6);
+    const food = clamp(Math.round((0.5 + (base * (0.55 + 0.3 * key.n)) / 1000 + key.g * 0.08) * 2) / 2, 0.5, 10); // 희귀한 재료일수록 많이 채운다 (최대 피 10칸)
     const st = Math.round(clamp(20 + (base * (0.5 + 0.25 * key.n)) / 30 + key.g * 3, 20, 260));
     const variant = hashStr(`${key.main}|${key.g}|${key.n}`) % 3; // 같은 재료여도 조리법 이름이 가지가지
     const nm = `${COUNT_NAME[key.n - 1] || ''}${GARNISH[key.g]}${mainSp.name} ${METHOD_NAMES[key.m][variant]}`; // 재료 수 x 곁들임 x 재료 x 조리법이 모두 달라 이름이 겹치지 않는다
-    ITEMS[id] = { id, name: nm, price: Math.round(base * 0.6 * (0.8 + 0.2 * key.n)), consumable: true, food, stamina: st, look: mainSp.look, cookKey: Object.assign({ id, shape: mainSp.shape, look: mainSp.look }, key), desc: `직접 만든 요리 - 피 ${food}칸, 스태미나 ${st} 회복` };
+    const buffs = effectsFor(key, base, mainSp.shape);
+    const blueShape = ['jelly', 'turtle', 'whale', 'seahorse'].includes(mainSp.shape) || elemOf(key.main) === 'ice'; // 해파리·거북·고래·해마·얼음 재료는 파란 피를 채운다
+    const blue = blueShape ? Math.round(clamp(food * 0.4, 0.5, 5) * 2) / 2 : 0;
+    ITEMS[id] = { id, name: nm, blue, price: Math.round(base * 0.6 * (0.8 + 0.2 * key.n)), consumable: true, food, stamina: st, buffs, look: mainSp.look, cookKey: Object.assign({ id, shape: mainSp.shape, look: mainSp.look }, key), desc: `직접 만든 요리 - 피 ${food}칸${blue ? `, 파란 피 ${blue}칸` : ''}, 스태미나 ${st} 회복 · 효과: ${effText(buffs)}` };
     if (G.Shop.CONSUMABLE_IDS.indexOf(id) < 0) G.Shop.CONSUMABLE_IDS.push(id);
     if (G.Shop.DARK_CONS_IDS.indexOf(id) < 0) G.Shop.DARK_CONS_IDS.push(id);
     return ITEMS[id];
@@ -82,26 +117,79 @@
       if (sp) dishItem({ m: k.m, main: k.main, g: k.g, n: k.n }, sp);
     }
   }
-  // 요리하기: picks = 재료 id 배열(1~3개, 같은 걸 여러 번 가능), m = 조리법. 결과 {ok, msg, item, first}
+  // 재료 항목들 -> 요리 하나 (cook과 요리사가 함께 쓴다). entries = [{id, name, val, shape, look}]
+  function makeDish(inv, entries, m) {
+    const main = entries.reduce((a, b) => (b.val > a.val ? b : a), entries[0]);
+    const others = entries.filter((x) => x !== main).map((x) => x.id).sort();
+    const g = others.length ? 1 + (hashStr(others.join(',') + '|' + m) % 6) : 0;
+    const item = dishItem({ m, main: main.id, g, n: entries.length }, main);
+    inv.cookbook = inv.cookbook || {};
+    const first = !inv.cookbook[item.id];
+    inv.cookbook[item.id] = { m, main: main.id, g, n: entries.length };
+    return { item, first };
+  }
+  // 요리하기: picks = 재료 id 배열(1~5개, 같은 걸 여러 번 가능), m = 조리법. 결과 {ok, msg, item, first}
   function cook(inv, picks, m) {
     if (!picks.length) return { ok: false, msg: '재료를 하나 이상 넣어 주세요.' };
+    if (picks.length > 5) return { ok: false, msg: '재료는 최대 5개예요.' };
     const list = ingredients(inv);
     const byId = {}; list.forEach((x) => { byId[x.id] = x; });
     const need = {}; picks.forEach((id) => { need[id] = (need[id] || 0) + 1; });
     for (const id of Object.keys(need)) if (!byId[id] || byId[id].count < need[id]) return { ok: false, msg: '재료가 모자라요.' };
     const ing = picks.map((id) => byId[id]);
-    const main = ing.reduce((a, b) => (b.val > a.val ? b : a), ing[0]);
-    const others = ing.filter((x) => x !== main).map((x) => x.id).sort();
-    const g = others.length ? 1 + (hashStr(others.join(',') + '|' + m) % 6) : 0;
-    const item = dishItem({ m, main: main.id, g, n: picks.length }, main);
-    // 재료를 쓴다 (값도 같이 줄인다)
-    for (const x of ing) x.src.take(inv, x.id, x.val);
-    inv.consumables[item.id] = (inv.consumables[item.id] || 0) + 1;
-    inv.cookbook = inv.cookbook || {};
-    const first = !inv.cookbook[item.id];
-    inv.cookbook[item.id] = { m, main: main.id, g, n: picks.length };
-    return { ok: true, item, first, msg: `${item.name} 완성!` };
+    const r = makeDish(inv, ing, m);
+    for (const x of ing) x.src.take(inv, x.id, x.val); // 재료를 쓴다 (값도 같이 줄인다)
+    inv.consumables[r.item.id] = (inv.consumables[r.item.id] || 0) + 1;
+    return { ok: true, item: r.item, first: r.first, msg: `${r.item.name} 완성!` };
   }
+
+  // ---- 요리사: 고용해서 재료를 맡겨 두면 알아서 요리해 쌓아 둔다 (집에 돌아오면 만든 만큼 받는다) ----
+  //  처음엔 2분에 1개, 업그레이드할 때마다 10초씩 빨라져 최대 30초까지. 맡긴 재료가 떨어지면 멈춘다
+  const CHEF_BASE = 120, CHEF_STEP = 10, CHEF_MAX = 9, CHEF_HIRE = 5000;
+  const chefOf = (inv) => inv.chef || (inv.chef = { hired: false, lv: 0, last: 0, m: 12, k: 3, stock: {}, out: {} });
+  const chefInterval = (inv) => CHEF_BASE - CHEF_STEP * chefOf(inv).lv; // 초
+  const chefUpCost = (inv) => Math.round((2500 * Math.pow(1.6, chefOf(inv).lv)) / 10) * 10;
+  const chefStockUnits = (inv) => Object.values(chefOf(inv).stock).reduce((a, b) => a + b, 0);
+  const chefPending = (inv) => Object.values(chefOf(inv).out).reduce((a, b) => a + b, 0);
+  function chefDeposit(inv, ing, n) { // 내 재료를 요리사에게 맡긴다
+    const c = chefOf(inv);
+    const k = Math.min(n, ing.count);
+    for (let i = 0; i < k; i++) ing.src.take(inv, ing.id, ing.val);
+    c.stock[ing.id] = (c.stock[ing.id] || 0) + k;
+    if (c.hired && !c.last) c.last = Date.now();
+    return k;
+  }
+  function chefProduce(inv, now = Date.now()) { // 흐른 시간만큼 요리를 만든다. 만든 개수를 돌려준다
+    const c = chefOf(inv);
+    if (!c.hired) return 0;
+    const iv = chefInterval(inv) * 1000;
+    if (!c.last) c.last = now;
+    let made = 0;
+    while (now - c.last >= iv && chefStockUnits(inv) > 0) {
+      const ids = [];
+      for (const id of Object.keys(c.stock)) for (let i = 0; i < c.stock[id]; i++) ids.push(id);
+      const k = Math.min(Math.max(1, c.k), ids.length);
+      const picks = [];
+      for (let i = 0; i < k; i++) picks.push(ids.splice(Math.floor(Math.random() * ids.length), 1)[0]);
+      const entries = [];
+      for (const id of picks) { const sp = specOf(id); if (!sp) continue; entries.push({ id, name: sp.name, shape: sp.shape, look: sp.look, val: sp.base }); c.stock[id] -= 1; if (c.stock[id] <= 0) delete c.stock[id]; }
+      if (!entries.length) break;
+      const m = c.m >= 12 ? Math.floor(Math.random() * 12) : c.m;
+      const r = makeDish(inv, entries, m);
+      c.out[r.item.id] = (c.out[r.item.id] || 0) + 1;
+      c.last += iv; made++;
+    }
+    if (chefStockUnits(inv) <= 0) c.last = now; // 재료가 없는 동안은 시간이 쌓이지 않는다
+    return made;
+  }
+  function chefCollect(inv) { // 만들어 둔 요리를 가방으로. {n, names}
+    const c = chefOf(inv);
+    let n = 0; const names = [];
+    for (const id of Object.keys(c.out)) { const cnt = c.out[id]; if (!cnt) continue; inv.consumables[id] = (inv.consumables[id] || 0) + cnt; n += cnt; if (names.length < 3 && ITEMS[id]) names.push(`${ITEMS[id].name} x${cnt}`); }
+    c.out = {};
+    return { n, names };
+  }
+  function chefNextSec(inv) { const c = chefOf(inv); if (!c.hired || chefStockUnits(inv) <= 0) return null; return Math.max(0, Math.ceil((c.last + chefInterval(inv) * 1000 - Date.now()) / 1000)); }
 
   // ---- 가스레인지 ----
   ITEMS.d_gas = { id: 'd_gas', name: '가스레인지', price: 2400, decor: true, place: 'floor' };
@@ -150,7 +238,7 @@
   }
 
   // ---- 요리 창 ----
-  function open(inv, slot) { return { slot, cur: 0, picks: [], m: 0, result: null, msg: '', t: 0 }; }
+  function open(inv, slot) { return { slot, cur: 0, picks: [], m: 0, result: null, msg: '', t: 0, tab: 0 }; }
   const geometry = (W, H) => ({ x: 70, y: 40, w: W - 140, h: H - 80 });
   function draw(ctx, W, H, ui, inv) {
     const g = geometry(W, H);
@@ -160,7 +248,8 @@
     ctx.fillStyle = '#2a2230'; ctx.fillRect(g.x, g.y, g.w, g.h);
     ctx.strokeStyle = '#ffa84a'; ctx.lineWidth = 4; ctx.strokeRect(g.x, g.y, g.w, g.h);
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffa84a'; ctx.fillText('가스레인지 요리', g.x + 24, g.y + 32);
+    ctx.font = 'bold 26px sans-serif'; ctx.fillStyle = '#ffa84a'; ctx.fillText(ui.tab === 1 ? '요리사' : '가스레인지 요리', g.x + 24, g.y + 32);
+    ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#e8c890'; ctx.fillText(ui.tab === 1 ? '[Tab] 직접 요리로' : '[Tab] 요리사 탭 (맡겨 두면 알아서 요리해요)', g.x + 250, g.y + 32);
     const total = Object.keys(inv.cookbook || {}).length;
     ctx.textAlign = 'right'; ctx.font = '14px sans-serif'; ctx.fillStyle = '#c8b8a0'; ctx.fillText(`만든 요리 종류 ${total}가지`, g.x + g.w - 24, g.y + 32);
     if (ui.result) { // 완성!
@@ -173,6 +262,7 @@
       ctx.font = '14px sans-serif'; ctx.fillStyle = '#9a8a78'; ctx.fillText('Enter: 계속', g.x + g.w / 2, g.y + g.h - 28);
       ctx.restore(); return;
     }
+    if (ui.tab === 1) { drawChefTab(ctx, g, ui, inv, list); ctx.restore(); return; }
     // 왼쪽: 재료 목록
     const lx = g.x + 24, ly = g.y + 64, rowH = 34, rows = 10;
     ctx.textAlign = 'left'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#e8c890'; ctx.fillText(`가진 재료 (${list.length}종)`, lx, ly);
@@ -211,5 +301,46 @@
     ctx.restore();
   }
 
-  G.Cook = { addSource, addPantry, SOURCES, specOf, METHODS, ingredients, cook, registerAll, drawDish, open, draw, hashStr };
+  // 요리사 탭: 왼쪽 = 내 재료(맡길 것), 오른쪽 = 요리사 상태
+  function drawChefTab(ctx, g, ui, inv, list) {
+    const c = chefOf(inv);
+    const lx = g.x + 24, ly = g.y + 64, rowH = 34, rows = 10;
+    ctx.textAlign = 'left'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#e8c890'; ctx.fillText(`맡길 재료를 고르세요 (Enter 1개 · F 전부)`, lx, ly);
+    const start = clamp(ui.cur - 4, 0, Math.max(0, list.length - rows));
+    for (let i = 0; i < rows && start + i < list.length; i++) {
+      const it = list[start + i], y = ly + 18 + i * rowH, sel = start + i === ui.cur;
+      ctx.fillStyle = sel ? 'rgba(255,168,74,0.25)' : 'rgba(255,255,255,0.05)'; ctx.fillRect(lx, y, 360, rowH - 4);
+      if (sel) { ctx.strokeStyle = '#ffa84a'; ctx.lineWidth = 2; ctx.strokeRect(lx, y, 360, rowH - 4); }
+      ctx.save(); ctx.translate(lx + 22, y + 14); ctx.scale(0.55, 0.55); G.Sea.drawCritter(ctx, { sp: { shape: it.shape, c1: it.look[0], c2: it.look[1], size: 34, zone: 0, elem: null, idx: 0 }, x: 0, y: 0, vx: 1, vy: 0, t: 0, size: 1 }, ui.t); ctx.restore();
+      ctx.textAlign = 'left'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(it.name, lx + 48, y + 13);
+      ctx.font = '12px sans-serif'; ctx.fillStyle = '#b8a890'; ctx.fillText(`${it.label}${it.elem ? ' · 원소' : ''}`, lx + 200, y + 13);
+      ctx.textAlign = 'right'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#e8d8b8'; ctx.fillText(`x${it.count}`, lx + 352, y + 13);
+    }
+    if (!list.length) { ctx.textAlign = 'left'; ctx.font = '16px sans-serif'; ctx.fillStyle = '#b8a890'; ctx.fillText('맡길 재료가 없어요.', lx, ly + 40); }
+    const rx = g.x + 430, ry = g.y + 64;
+    ctx.textAlign = 'left'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = c.hired ? '#7dffa0' : '#ffb0a0';
+    ctx.fillText(c.hired ? `요리사 고용 중 (속도 Lv ${c.lv}/${CHEF_MAX})` : `요리사를 고용하세요 (H · ${CHEF_HIRE} G)`, rx, ry);
+    ctx.font = '15px sans-serif'; ctx.fillStyle = '#e8d8b8';
+    const iv = chefInterval(inv);
+    const next = chefNextSec(inv);
+    const lines = [
+      `요리 속도: ${iv}초에 1개${c.lv >= CHEF_MAX ? ' (최고!)' : `   -   U: 업그레이드 (${chefUpCost(inv)} G) -> ${iv - CHEF_STEP}초`}`,
+      `맡겨 둔 재료: ${chefStockUnits(inv)}개 (${Object.keys(c.stock).length}종)${next !== null ? `   다음 요리까지 ${next}초` : c.hired ? '   (재료가 없어서 쉬는 중)' : ''}`,
+      `조리법: ${c.m >= 12 ? '요리사가 알아서' : G.Cook.METHODS[c.m]}   (M 바꾸기)`,
+      `한 접시에 넣는 재료: ${c.k}개   (N 바꾸기)`,
+      `만들어 둔 요리: ${chefPending(inv)}개   (G: 받기 · 집에 오면 자동으로 받아요)`,
+    ];
+    lines.forEach((t, i) => ctx.fillText(t, rx, ry + 34 + i * 28));
+    const outList = Object.keys(c.out).filter((id) => c.out[id] > 0).slice(0, 5);
+    ctx.font = '13px sans-serif'; ctx.fillStyle = '#b8e8b8';
+    outList.forEach((id, i) => ctx.fillText(`· ${ITEMS[id] ? ITEMS[id].name : id} x${c.out[id]}`, rx + 8, ry + 190 + i * 20));
+    ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = ui.msg ? '#ffb0a0' : 'rgba(0,0,0,0)'; ctx.fillText(ui.msg || ' ', rx, g.y + g.h - 70);
+    ctx.font = '14px sans-serif'; ctx.fillStyle = '#9a8a78'; ctx.textAlign = 'center';
+    ctx.fillText('Enter 재료 맡기기 · F 전부 맡기기 · H 고용 · U 속도 업그레이드 · M 조리법 · N 재료 수 · G 받기 · Tab 직접 요리 · Esc 닫기', g.x + g.w / 2, g.y + g.h - 28);
+  }
+
+  // 파란 피를 채워 주는 기존 음식들 (빨간 피가 넘치면 파란 피가 되는 건 모든 음식이 같다)
+  [['d_phoenix', 1], ['d_holy', 2], ['d_heart', 3], ['f_feast', 1], ['sd_clam', 1], ['sd_feast', 2]].forEach(([id, v]) => { const it = ITEMS[id]; if (it) { it.blue = v; it.desc = `${it.desc} · 파란 피 ${v}칸`; } });
+
+  G.Cook = { chefOf, chefInterval, chefUpCost, chefProduce, chefCollect, chefDeposit, chefStockUnits, chefPending, CHEF_MAX, CHEF_HIRE, EFFECTS, EFF, effText, addSource, addPantry, SOURCES, specOf, METHODS, ingredients, cook, registerAll, drawDish, open, draw, hashStr };
 })(window.Game);

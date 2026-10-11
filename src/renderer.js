@@ -3965,7 +3965,7 @@
       return o.x + o.w > camera.x - m && o.x < camera.x + this.viewW + m && o.y + o.h > camera.y - m && o.y < camera.y + this.viewH + m;
     }
 
-    _drawHeart(ctx, x, y, size, filled) {
+    _drawHeart(ctx, x, y, size, filled, blue = false) {
       const s = size;
       ctx.beginPath();
       ctx.moveTo(x, y + s * 0.35);
@@ -3974,10 +3974,10 @@
       ctx.bezierCurveTo(x, y + s * 0.8, x + s * 0.55, y + s * 0.6, x + s * 0.55, y + s * 0.25);
       ctx.bezierCurveTo(x + s * 0.55, y - s * 0.1, x, y - s * 0.1, x, y + s * 0.35);
       ctx.closePath();
-      ctx.fillStyle = filled ? '#e8334a' : 'rgba(0,0,0,0.25)';
+      ctx.fillStyle = filled ? (blue ? '#3a9aff' : '#e8334a') : 'rgba(0,0,0,0.25)';
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = filled ? '#8f1427' : 'rgba(0,0,0,0.4)';
+      ctx.strokeStyle = filled ? (blue ? '#154a9a' : '#8f1427') : 'rgba(0,0,0,0.4)';
       ctx.stroke();
     }
 
@@ -4012,6 +4012,13 @@
           ctx.save();
           ctx.beginPath(); ctx.rect(hx - 15, 0, 30 * frac, 60); ctx.clip();
           this._drawHeart(ctx, hx, 10, 26, true);
+          ctx.restore();
+        }
+        const bf = (hud.blue || 0) - i; // 파란 피: 왼쪽 하트부터 파랗게 덮인다
+        if (bf > 0) {
+          ctx.save();
+          if (bf < 1) { ctx.beginPath(); ctx.rect(hx - 15, 0, 30 * bf, 60); ctx.clip(); }
+          this._drawHeart(ctx, hx, 10, 26, true, true);
           ctx.restore();
         }
       }
@@ -4057,6 +4064,17 @@
         ctx.restore();
       }
       if (hud.dive && !hud.shop && !hud.equip && !hud.dev && !hud.settings && !hud.mini && !hud.admin && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.ach) G.Sea.drawHud(ctx, this.viewW, this.viewH, hud.dive); // 수심과 산소 게이지
+      if (hud.buffs && hud.buffs.length && !hud.shop && !hud.equip && !hud.dev && !hud.settings && !hud.mini && !hud.admin && !hud.pw && !hud.fishing && !hud.dex && !hud.map && !hud.gacha && !hud.floorSel && !hud.ach && !hud.cook) { // 음식 효과 표시 (왼쪽 아래)
+        ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        hud.buffs.forEach((b, i) => {
+          const y = this.viewH - 78 - i * 22;
+          ctx.fillStyle = 'rgba(30,20,10,0.7)'; ctx.fillRect(12, y - 10, 200, 20);
+          ctx.strokeStyle = '#ffa84a'; ctx.lineWidth = 1; ctx.strokeRect(12, y - 10, 200, 20);
+          ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#ffd9a0'; ctx.fillText(`${b.name} ${b.text}`, 18, y);
+          ctx.textAlign = 'right'; ctx.fillStyle = '#b8e8b8'; ctx.fillText(`${Math.floor(b.left / 60)}:${String(b.left % 60).padStart(2, '0')}`, 206, y); ctx.textAlign = 'left';
+        });
+        ctx.restore();
+      }
       if (hud.cook) G.Cook.draw(ctx, this.viewW, this.viewH, hud.cook.ui, hud.cook.inv); // 가스레인지 요리 창
       if (hud.gacha) this._drawGacha(ctx, hud.gacha);
       if (hud.floorSel) this._drawFloorSelect(ctx, hud.floorSel);

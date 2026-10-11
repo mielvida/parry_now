@@ -167,6 +167,7 @@
       put(2, 'X'); put(5, 'P');
       for (const c of [16, 30, 46, 62, 80, 98]) put(c, 'V');
       for (const c of [11, 22, 52, 70, 88]) put(c, 'H');
+      put(104, 'Y'); put(110, 'R'); // 항구 마을의 내 집 터와 부동산
     }
     return { rows: rowsOut, left: L, townTop: top, townFloor: F, townX0: x0 + L, townX1: x1 + L, shaft0: sc - 3 + L, shaft1: sc + 3 + L, extraShops, portals, caveEntrance: { col: ce.col, row: ce.row } };
   }
