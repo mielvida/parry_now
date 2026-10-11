@@ -252,6 +252,7 @@
     { id: 'd_stove', name: '난로', price: 400, place: 'floor' },
     { id: 'd_tank', name: '어항', price: 450, place: 'floor' },
     { id: 'd_trophy', name: '진열장', price: 600, place: 'floor' },
+    { id: 'd_rack', name: '선반', price: 260, place: 'wall' }, // 벽에 다는 선반: 위에 작은 바닥 가구를 올려 놓을 수 있다 (자리 'top')
     { id: 'd_painting', name: '풍경 그림', price: 150, place: 'wall' },
     { id: 'd_clock', name: '벽시계', price: 180, place: 'wall' },
     { id: 'd_swords', name: '검 장식', price: 300, place: 'wall' },
@@ -262,9 +263,10 @@
     { id: 'd_mirror', name: '거울', price: 220, place: 'wall' },
   ];
   DECOR.forEach((d) => add(Object.assign({ decor: true }, d, { price: d.price * 4 }))); // 가구 하나가 코인 +8%라서 값이 비싸다 (원래의 4배)
-  const placedCount = (inv, id) => ['floor', 'wall'].reduce((n, k) => n + inv.home.placed[k].filter((x) => x === id).length, 0);
+  const TOP_BAN = ['d_rack', 'd_bed', 'd_shelf', 'd_trophy', 'd_smoker', 'd_pizza']; // 키가 크거나 선반인 것은 선반 위에 못 놓는다
+  const placedCount = (inv, id) => ['floor', 'wall', 'top'].reduce((n, k) => n + (inv.home.placed[k] || []).filter((x) => x === id).length, 0);
   // 집에 놓은 장식품 수에 따른 보너스: 놓을 때마다 코인 획득량과 치명타 확률이 오른다
-  const placedOf = (h) => h.placed.floor.filter(Boolean).length + h.placed.wall.filter(Boolean).length;
+  const placedOf = (h) => h.placed.floor.filter(Boolean).length + h.placed.wall.filter(Boolean).length + (h.placed.top || []).filter(Boolean).length;
   const placedTotal = (inv) => (inv.homes ? Object.values(inv.homes).reduce((a, h) => a + placedOf(h), 0) : placedOf(inv.home)); // 마을 집과 왕국 집의 장식을 모두 센다
   // 지금 든 무기에 붙인 주괴가 주는 보너스 (대장간 forge.js). 없으면 모두 0
   const NO_ATTACH = { dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false, crack: false, elems: [], elemLv: {}, hp: 0, inv: 0, spd: 0, perkList: [] };
@@ -288,20 +290,27 @@
   const decorLeft = (inv, id) => (inv.home.owned[id] || 0) - placedCount(inv, id); // 아직 안 놓은 개수
   // 방의 자리(kind, index)에 장식품을 놓는다 (id가 null이면 치우기). 결과 { ok, msg }
   function placeDecor(inv, kind, index, id) {
-    const cur = inv.home.placed[kind][index];
+    const pl = inv.home.placed; pl.top = pl.top || [];
+    const cur = pl[kind][index];
     if (id === null) {
-      if (!cur) return { ok: false, msg: '치울 것이 없어요.' };
-      inv.home.placed[kind][index] = null;
+      if (!cur) {
+        if (kind === 'top' && pl.wall[index] === 'd_rack') { pl.wall[index] = null; return { ok: true, msg: '선반을 치웠다.' }; } // 선반 위가 비어 있으면 선반을 치운다
+        return { ok: false, msg: '치울 것이 없어요.' };
+      }
+      pl[kind][index] = null;
+      if (kind === 'wall' && cur === 'd_rack') pl.top[index] = null; // 선반을 치우면 위의 것도 가방으로
       return { ok: true, msg: `${ITEMS[cur].name}을(를) 치웠다.` };
     }
+    if (kind === 'top' && (TOP_BAN.includes(id) || ITEMS[id].place !== 'floor')) return { ok: false, msg: '그건 선반 위에 놓을 수 없어요.' };
     if (cur === id) return { ok: false, msg: '이미 놓여 있어요.' };
     if (decorLeft(inv, id) <= 0) return { ok: false, msg: '남은 것이 없어요. 가게에서 더 살 수 있어요.' };
-    inv.home.placed[kind][index] = id;
+    if (kind === 'wall' && cur === 'd_rack') pl.top[index] = null;
+    pl[kind][index] = id;
     return { ok: true, msg: `${ITEMS[id].name}을(를) 놓았다.` };
   }
   // 꾸미기 창의 물품 목록: 가진 장식품(그 자리에 놓을 수 있는 종류) + 치우기. 5개 넘으면 4개씩 쪽으로 나눈다
   function placeTabs(inv, kind) {
-    const list = [{ id: 'clear', clear: true, name: '치우기' }].concat(Object.values(ITEMS).filter((d) => d.decor && d.place === kind && (inv.home.owned[d.id] || 0) > 0)); // 바다·주방 장식도 모두 놓을 수 있다
+    const list = [{ id: 'clear', clear: true, name: '치우기', top: kind === 'top' }].concat(Object.values(ITEMS).filter((d) => d.decor && d.place === (kind === 'top' ? 'floor' : kind) && !(kind === 'top' && TOP_BAN.includes(d.id)) && (inv.home.owned[d.id] || 0) > 0)); // 바다·주방 장식도 모두 놓을 수 있다
     if (list.length <= 5) return [{ name: '놓기', items: list }];
     const tabs = [];
     for (let k = 0; k < list.length; k += 4) tabs.push({ name: `${tabs.length + 1}쪽`, items: list.slice(k, k + 4) });
@@ -498,14 +507,14 @@
       return { name: `${item.name}  Lv ${lv}/${C.VILLAGE_SPEED_LEVELS}`, desc, slotName: '업그레이드', note: '마을에서만 빨라진다 (최대 ' + fmtX(speedMult(C.VILLAGE_SPEED_LEVELS)) + '배)' };
     }
     if (item.consumable) return { name: item.name, desc: item.desc, slotName: '소모품', note: item.note || (inv ? `보유 ${inv.consumables[item.id] || 0}개` : '') };
-    if (item.clear) return { name: item.name, desc: '이 자리의 장식을 치워 둡니다', slotName: '', note: '' };
+    if (item.clear) return { name: item.name, desc: item.top ? '선반 위를 비워요. 이미 비어 있으면 선반이 가방으로 돌아가요' : '이 자리의 장식을 치워 둡니다', slotName: '', note: '' };
     if (item.house) {
       const here = inv && inv.home.type === item.id;
       return { name: item.name, desc: `방 크기 ${item.cols}칸 · 바닥 가구 ${item.floor}자리, 벽 장식 ${item.wall}자리`, slotName: '집', note: here ? '지금 살고 있는 집' : '사면 마을의 빈 터에 지어집니다 (이사)' };
     }
     if (item.decor) {
       const own = inv ? inv.home.owned[item.id] || 0 : 0;
-      return { name: item.name, desc: item.place === 'floor' ? '바닥에 놓는 가구' : '벽에 거는 장식', slotName: '장식품', note: inv ? `보유 ${own}개 · 남은 ${decorLeft(inv, item.id)}개` : '' };
+      return { name: item.name, desc: item.id === 'd_rack' ? '위에 작은 가구를 올릴 수 있는 선반' : item.place === 'floor' ? '바닥에 놓는 가구' : '벽에 거는 장식', slotName: '장식품', note: inv ? `보유 ${own}개 · 남은 ${decorLeft(inv, item.id)}개` : '' };
     }
     if (item.pickaxe) return { name: item.name, desc: item.desc, slotName: '곡괭이', note: inv && inv.items.includes(item.id) ? (inv.equipped.pick === item.id ? '장착 중 (누르면 뺀다)' : '누르면 장착한다') : '사서 장착하면 광석을 캘 수 있다' };
     if (item.tool) return { name: item.name, desc: item.desc, slotName: '도구', note: inv && inv.items.includes(item.id) ? '가지고 있어요 (계속 쓰인다)' : '한 번 사면 계속 쓴다' };
@@ -657,7 +666,7 @@
       tabs: [
         { name: '가구', items: ids('d_bed', 'd_shelf', 'd_table', 'd_sofa') },
         { name: '소품', items: ids('d_plant', 'd_stove', 'd_tank', 'd_trophy') },
-        { name: '벽 장식', items: ids('d_painting', 'd_clock', 'd_swords', 'd_map') },
+        { name: '벽 장식', items: ids('d_rack', 'd_painting', 'd_clock', 'd_swords', 'd_map') },
         { name: '벽 소품', items: ids('d_flag', 'd_candle', 'd_deer', 'd_mirror') },
       ],
     },
@@ -768,6 +777,7 @@
       home.type = item.id;
       home.placed.floor.length = Math.min(home.placed.floor.length, item.floor);
       home.placed.wall.length = Math.min(home.placed.wall.length, item.wall);
+      if (home.placed.top) home.placed.top.length = Math.min(home.placed.top.length, item.wall);
       return { ok: true, msg: `${item.name} 구입! 마을의 빈 터가 우리 집이 되었어요.` };
     }
     if (item.decor) {

@@ -503,10 +503,10 @@
       ctx.fillStyle = '#ffd54a';
       ctx.fillText('설정', P.x + P.w / 2, P.y + 28);
       const S = G.Settings;
-      const labels = ['음악 음량', '데미지 숫자 표시', '패링할 때 나는 소리', '반짝임 효과', '화면 흔들림', '지금 여기서 저장하기 (자동 저장도 돼요)', '1분 전으로 돌아가기', '처음부터 다시하기 (이 칸을 지워요)', '게임 나가기 (처음 화면으로)'];
-      const vals = [S.music, S.dmgNum, S.parrySound, S.sparkle, S.shake, 0, 0, 0, 0];
+      const labels = ['음악 음량', '효과음 음량', '데미지 숫자 표시', '패링할 때 나는 소리', '반짝임 효과', '화면 흔들림', '지금 여기서 저장하기 (자동 저장도 돼요)', '1분 전으로 돌아가기', '처음부터 다시하기 (이 칸을 지워요)', '게임 나가기 (처음 화면으로)'];
+      const vals = [S.music, S.sfx, S.dmgNum, S.parrySound, S.sparkle, S.shake, 0, 0, 0, 0];
       rows.rows.forEach((r, i) => {
-        if (st.fromTitle && i >= 5) return; // 처음 화면에서는 소리/효과 설정만
+        if (st.fromTitle && i >= 6) return; // 처음 화면에서는 소리/효과 설정만
         const on = i === st.cur;
         ctx.fillStyle = on ? 'rgba(255,213,74,0.18)' : 'rgba(255,255,255,0.05)';
         ctx.fillRect(r.x, r.y, r.w, r.h);
@@ -515,17 +515,17 @@
         ctx.font = '16px sans-serif';
         ctx.fillStyle = '#fff';
         ctx.fillText(labels[i], r.x + 14, r.y + r.h / 2);
-        if (i === 0) {
-          const b = rows.bar;
+        if (i <= 1) {
+          const b = rows.bars[i];
           ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(b.x, b.y, b.w, b.h);
-          ctx.fillStyle = '#ffd54a'; ctx.fillRect(b.x, b.y, b.w * vals[0], b.h);
-          ctx.fillStyle = '#fff'; ctx.fillRect(b.x + b.w * vals[0] - 3, b.y - 4, 6, b.h + 8);
-          ctx.textAlign = 'right'; ctx.fillStyle = '#ffd54a'; ctx.fillText(Math.round(vals[0] * 100) + '%', r.x + r.w - 14, r.y + r.h / 2);
-        } else if (i >= 5) {
+          ctx.fillStyle = '#ffd54a'; ctx.fillRect(b.x, b.y, b.w * vals[i], b.h);
+          ctx.fillStyle = '#fff'; ctx.fillRect(b.x + b.w * vals[i] - 3, b.y - 4, 6, b.h + 8);
+          ctx.textAlign = 'right'; ctx.fillStyle = '#ffd54a'; ctx.fillText(Math.round(vals[i] * 100) + '%', r.x + r.w - 14, r.y + r.h / 2);
+        } else if (i >= 6) {
           ctx.textAlign = 'right';
           ctx.font = 'bold 16px sans-serif';
-          ctx.fillStyle = i === 5 ? '#7dffa0' : i === 6 ? '#9fd8ff' : i === 8 ? '#ffd54a' : (st.confirm ? '#ff6a6a' : '#ffb4a0');
-          ctx.fillText(i !== 7 ? 'Enter' : (st.confirm ? '한 번 더!' : 'Enter'), r.x + r.w - 14, r.y + r.h / 2);
+          ctx.fillStyle = i === 6 ? '#7dffa0' : i === 7 ? '#9fd8ff' : i === 9 ? '#ffd54a' : (st.confirm ? '#ff6a6a' : '#ffb4a0');
+          ctx.fillText(i !== 8 ? 'Enter' : (st.confirm ? '한 번 더!' : 'Enter'), r.x + r.w - 14, r.y + r.h / 2);
         } else {
           ctx.textAlign = 'right';
           ctx.font = 'bold 16px sans-serif';
@@ -2277,9 +2277,9 @@
       const w = 560, h = 536;
       const panel = { x: Math.round((vw - w) / 2), y: Math.round((vh - h) / 2), w, h };
       const rows = [];
-      for (let i = 0; i < 9; i++) rows.push({ x: panel.x + 24, y: panel.y + 46 + i * 43, w: w - 48, h: 37 });
-      const r0 = rows[0];
-      return { panel, rows, bar: { x: r0.x + 150, y: r0.y + r0.h / 2 - 4, w: r0.w - 150 - 80, h: 8 } };
+      for (let i = 0; i < 10; i++) rows.push({ x: panel.x + 24, y: panel.y + 44 + i * 39, w: w - 48, h: 34 });
+      const bars = rows.map((r) => ({ x: r.x + 150, y: r.y + r.h / 2 - 4, w: r.w - 150 - 80, h: 8 }));
+      return { panel, rows, bar: bars[0], bars };
     }
 
     static regionImage(name) {

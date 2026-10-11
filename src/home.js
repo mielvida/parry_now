@@ -30,13 +30,18 @@
 
   // 꾸밀 수 있는 자리들: [{kind:'floor'|'wall', index, x, y}]
   // 방 한가운데에 촘촘히 모아 놓는다 (바닥 가구 줄과, 그 사이사이 높이의 벽 장식 줄)
-  function slots(typeId, terrain) {
+  const RACK_DY = 5; // 벽 선반 판자 윗면: 벽 자리 중심에서 아래로 이만큼 (위에 놓는 가구의 바닥)
+  function slots(typeId, terrain, placed) {
     const d = houseDef(typeId);
     const cx = terrain.width / 2 + T; // 문 쪽이 왼쪽이라 살짝 오른쪽으로
     const out = [];
     for (let i = 0; i < d.floor; i++) out.push({ kind: 'floor', index: i, x: cx + (i - (d.floor - 1) / 2) * SLOT_GAP, y: GROUND_Y });
     const shift = (d.floor - d.wall) % 2 === 0 ? SLOT_GAP / 2 : 0; // 벽 장식이 항상 가구와 가구 사이에 오도록 (개수 홀짝에 맞춤)
     for (let i = 0; i < d.wall; i++) out.push({ kind: 'wall', index: i, x: cx + (i - (d.wall - 1) / 2) * SLOT_GAP + shift, y: WALL_Y });
+    if (placed) { // 선반을 놓은 자리 위에는 작은 바닥 가구를 더 올려 놓을 수 있다
+      placed.top = placed.top || [];
+      for (let i = 0; i < d.wall; i++) if (placed.wall[i] === 'd_rack') out.push({ kind: 'top', index: i, x: cx + (i - (d.wall - 1) / 2) * SLOT_GAP + shift, y: WALL_Y + RACK_DY });
+    }
     return out;
   }
 
@@ -53,6 +58,11 @@
       rect(ctx, '#e8e8f4', x - 36, y - 48, 26, 10);
       rect(ctx, '#4f7fd4', x - 8, y - 38, 52, 10);
       rect(ctx, '#3a62b0', x - 8, y - 38, 52, 3);
+    },
+    d_rack(ctx, x, y) { // 벽에 다는 선반: 판자 윗면이 y + 5
+      rect(ctx, '#5a3818', x - 40, y + 5, 80, 8);
+      rect(ctx, '#8a5a2b', x - 40, y + 5, 80, 3);
+      for (const dx of [-30, 22]) { ctx.fillStyle = '#4a2c10'; ctx.beginPath(); ctx.moveTo(x + dx, y + 13); ctx.lineTo(x + dx + 8, y + 13); ctx.lineTo(x + dx + 8, y + 26); ctx.closePath(); ctx.fill(); }
     },
     d_shelf(ctx, x, y) {
       rect(ctx, '#6b4423', x - 30, y - 100, 60, 100);
@@ -357,12 +367,17 @@
         ctx.strokeStyle = 'rgba(255,255,255,0.55)'; // 빈 자리: 점선 칸 + 더하기
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 5]);
-        if (s.kind === 'floor') ctx.strokeRect(s.x - 38, s.y - 70, 76, 68); else ctx.strokeRect(s.x - 32, s.y - 28, 64, 56);
+        if (s.kind !== 'wall') ctx.strokeRect(s.x - 38, s.y - 70, 76, 68); else ctx.strokeRect(s.x - 32, s.y - 28, 64, 56);
         ctx.setLineDash([]);
-        const cy = s.kind === 'floor' ? s.y - 36 : s.y;
+        const cy = s.kind !== 'wall' ? s.y - 36 : s.y;
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
         ctx.fillRect(s.x - 8, cy - 1.5, 16, 3); ctx.fillRect(s.x - 1.5, cy - 8, 3, 16);
       }
+      HomeTheme.drawChefs(ctx, terrain, time);
+    },
+    drawChefs(ctx, terrain, time) { // 요리사들 (기구 옆 / 선반 위)
+      if (!terrain.homeChefs || !G.Cook) return;
+      terrain.homeChefs.forEach((c, i) => G.Cook.drawChef(ctx, c.x, c.y, time, terrain.chefWorking, c.face, i * 1.7));
     },
     drawVignette(ctx, w, h) {
       const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.5, w / 2, h / 2, w * 0.72);

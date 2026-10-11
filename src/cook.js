@@ -29,7 +29,7 @@
   };
   // 새 조리법마다 한 가지씩 특별한 효과가 더 붙는다 (같은 재료여도 기구에 따라 능력이 달라진다)
   const METHOD_BIAS = { 12: 'power', 13: 'shield', 14: 'coin', 15: 'stamina', 16: 'oxygen', 17: 'speed', 18: 'invuln', 19: 'regen', 20: 'coin', 21: 'swim', 22: 'regen', 23: 'power', 24: 'stamina', 25: 'crit', 26: 'power', 27: 'crit', 28: 'power', 29: 'coin', 30: 'shield', 31: 'speed', 32: 'swim', 33: 'stamina', 34: 'light', 35: 'crit' };
-  const placedIds = (inv) => { const out = []; for (const h of [inv.home].concat(Object.values(inv.homes || {}))) if (h && h.placed) out.push(...(h.placed.floor || []), ...(h.placed.wall || [])); return out; };
+  const placedIds = (inv) => { const out = []; for (const h of [inv.home].concat(Object.values(inv.homes || {}))) if (h && h.placed) out.push(...(h.placed.floor || []), ...(h.placed.wall || []), ...(h.placed.top || [])); return out; };
   const COUNT_NAME = ['', '모둠 ', '특선 ', '왕실 ', '대형 특선 ']; // 재료 수 1~5
   const GARNISH = ['', '허브 ', '매콤 ', '고소한 ', '상큼한 ', '향긋한 ', '달콤 '];
   const GCOL = ['#ffffff', '#4fae45', '#d02a2a', '#e8d8a0', '#f0e060', '#7ad0a0', '#ff9ac0'];
@@ -171,10 +171,11 @@
 
   // ---- 요리사: 고용해서 재료를 맡겨 두면 알아서 요리해 쌓아 둔다 (집에 돌아오면 만든 만큼 받는다) ----
   //  처음엔 2분에 1개, 업그레이드할 때마다 10초씩 빨라져 최대 30초까지. 맡긴 재료가 떨어지면 멈춘다
-  const CHEF_BASE = 120, CHEF_STEP = 10, CHEF_MAX = 9, CHEF_HIRE = 5000;
+  const CHEF_BASE = 120, CHEF_STEP = 10, CHEF_MAX = 9, CHEF_HIRE = 5000, CHEF_N_MAX = 8; // 여러 명을 고용할 수 있고, 한 명 늘 때마다 고용비가 2배
   const chefOf = (inv) => {
     const c = inv.chef || (inv.chef = { hired: false, lv: 0, last: 0, m: 0, rnd: true, k: 3, stock: {}, out: {} });
     if (c.rnd === undefined) { c.rnd = c.m >= 12; if (c.rnd) c.m = 0; } // 예전 저장: 12 = 알아서
+    if (c.n === undefined) c.n = c.hired ? 1 : 0; // 예전 저장: 한 명
     return c;
   };
   function chefMethods(inv) { // 요리사가 쓸 수 있는 조리법: 가스레인지 기본 + 집에 놓은 기구들
@@ -188,6 +189,8 @@
     const i = ms.indexOf(c.m);
     if (i < 0 || i === ms.length - 1) c.rnd = true; else c.m = ms[i + 1];
   }
+  const chefHireCost = (inv) => CHEF_HIRE * Math.pow(2, chefOf(inv).n); // 첫째 5000, 둘째 10000, 셋째 20000 ...
+  function chefHire(inv) { const c = chefOf(inv); c.n += 1; if (!c.hired) { c.hired = true; c.last = Date.now(); } return c.n; }
   const chefInterval = (inv) => CHEF_BASE - CHEF_STEP * chefOf(inv).lv; // 초
   const chefUpCost = (inv) => Math.round((2500 * Math.pow(1.6, chefOf(inv).lv)) / 10) * 10;
   const chefStockUnits = (inv) => Object.values(chefOf(inv).stock).reduce((a, b) => a + b, 0);
@@ -207,6 +210,7 @@
     if (!c.last) c.last = now;
     let made = 0;
     while (now - c.last >= iv && chefStockUnits(inv) > 0) {
+     for (let q = 0; q < Math.max(1, c.n) && chefStockUnits(inv) > 0; q++) { // 요리사 한 명이 한 번에 하나씩
       const ids = [];
       for (const id of Object.keys(c.stock)) for (let i = 0; i < c.stock[id]; i++) ids.push(id);
       const k = Math.min(Math.max(1, c.k), ids.length);
@@ -219,7 +223,9 @@
       const m = c.rnd || !ms.includes(c.m) ? ms[Math.floor(Math.random() * ms.length)] : c.m;
       const r = makeDish(inv, entries, m);
       c.out[r.item.id] = (c.out[r.item.id] || 0) + 1;
-      c.last += iv; made++;
+      made++;
+     }
+      c.last += iv;
     }
     if (chefStockUnits(inv) <= 0) c.last = now; // 재료가 없는 동안은 시간이 쌓이지 않는다
     return made;
@@ -232,6 +238,45 @@
     return { n, names };
   }
   function chefNextSec(inv) { const c = chefOf(inv); if (!c.hired || chefStockUnits(inv) <= 0) return null; return Math.max(0, Math.ceil((c.last + chefInterval(inv) * 1000 - Date.now()) / 1000)); }
+
+
+  // ---- 집 안의 요리사들: 기구 옆에서 요리한다. 선반 위의 기구라면 선반 위에 올라가서 요리한다 ----
+  const CHEF_SIDE = [46, -46, 74, -74, 100, -100, 126, -126]; // 바닥 기구 옆 자리
+  const CHEF_TOP = [30, -30, 0, 0, 0, 0, 0, 0]; // 선반 위 자리 (선반 판자는 폭 80)
+  function chefSpots(inv, slots, ground) { // 요리사 n명이 서 있을 자리 [{x, y, face, onTop}]
+    const c = chefOf(inv);
+    if (!c.hired || c.n <= 0) return [];
+    const pl = (inv.home && inv.home.placed) || {};
+    const apps = (slots || []).filter((s) => APPS[(pl[s.kind] || [])[s.index]]);
+    const used = {}, out = [];
+    for (let i = 0; i < c.n; i++) {
+      if (!apps.length) { out.push({ x: (slots && slots[0] ? slots[0].x : 400) - 90 - i * 34, y: ground, face: 1, onTop: false }); continue; }
+      const s = apps[i % apps.length], k = used[s.index + s.kind] = (used[s.index + s.kind] || 0);
+      used[s.index + s.kind] += 1;
+      const top = s.kind === 'top';
+      const off = top ? CHEF_TOP[k] : CHEF_SIDE[k];
+      out.push({ x: s.x + off, y: s.y, face: off > 0 ? -1 : off < 0 ? 1 : 1, onTop: top });
+    }
+    return out;
+  }
+  function drawChef(ctx, x, y, t, working, face, seed = 0) { // 발 위치 (x, y)
+    const bob = working ? Math.sin(t * 8 + seed) * 1.5 : 0;
+    ctx.save(); ctx.translate(x, y); ctx.scale(face || 1, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(0, 0, 10, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3a3a46'; ctx.fillRect(-6, -8, 5, 8); ctx.fillRect(1, -8, 5, 8); // 다리
+    ctx.fillStyle = '#f4f4f0'; ctx.fillRect(-8, -26 + bob * 0.3, 16, 19); // 흰 옷
+    ctx.fillStyle = '#d8d8d0'; ctx.fillRect(-1, -26 + bob * 0.3, 2, 19);
+    ctx.fillStyle = '#c8603a'; ctx.fillRect(-6, -14, 12, 8); // 앞치마
+    ctx.fillStyle = '#f2c8a0'; ctx.fillRect(-6, -36 + bob * 0.3, 12, 10); // 얼굴
+    ctx.fillStyle = '#222'; ctx.fillRect(1, -32 + bob * 0.3, 2, 2);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(-7, -46 + bob * 0.3, 14, 8); ctx.fillRect(-5, -50 + bob * 0.3, 10, 5); // 요리사 모자
+    const a = working ? Math.sin(t * 9 + seed) * 0.6 : -0.1; // 팔: 요리할 때는 휘젓는다
+    ctx.save(); ctx.translate(6, -22); ctx.rotate(-0.9 + a); ctx.fillStyle = '#f4f4f0'; ctx.fillRect(0, -2, 12, 4); ctx.fillStyle = '#f2c8a0'; ctx.fillRect(11, -2, 3, 4);
+    if (working) { ctx.fillStyle = '#a07a3a'; ctx.fillRect(13, -1, 8, 2); } // 국자
+    ctx.restore();
+    ctx.restore();
+    if (working) { ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; const o = Math.sin(t * 3 + seed) * 2; ctx.beginPath(); ctx.moveTo(x + 10 * (face || 1) + o, y - 38); ctx.quadraticCurveTo(x + 12 * (face || 1), y - 44, x + 10 * (face || 1) - o, y - 50); ctx.stroke(); ctx.restore(); }
+  }
 
   // ---- 가스레인지 ----
   ITEMS.d_gas = { id: 'd_gas', name: '가스레인지', price: 2400, decor: true, place: 'floor' };
@@ -444,16 +489,17 @@
     if (!list.length) { ctx.textAlign = 'left'; ctx.font = '16px sans-serif'; ctx.fillStyle = '#b8a890'; ctx.fillText('맡길 재료가 없어요.', lx, ly + 40); }
     const rx = g.x + 430, ry = g.y + 64;
     ctx.textAlign = 'left'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = c.hired ? '#7dffa0' : '#ffb0a0';
-    ctx.fillText(c.hired ? `요리사 고용 중 (속도 Lv ${c.lv}/${CHEF_MAX})` : `요리사를 고용하세요 (H · ${CHEF_HIRE} G)`, rx, ry);
+    ctx.fillText(c.hired ? `요리사 ${c.n}명 일하는 중 (속도 Lv ${c.lv}/${CHEF_MAX})` : `요리사를 고용하세요 (H · ${CHEF_HIRE} G)`, rx, ry);
     ctx.font = '15px sans-serif'; ctx.fillStyle = '#e8d8b8';
     const iv = chefInterval(inv);
     const next = chefNextSec(inv);
     const lines = [
-      `요리 속도: ${iv}초에 1개${c.lv >= CHEF_MAX ? ' (최고!)' : `   -   U: 업그레이드 (${chefUpCost(inv)} G) -> ${iv - CHEF_STEP}초`}`,
+      `요리 속도: ${iv}초에 ${Math.max(1, c.n)}개${c.lv >= CHEF_MAX ? ' (최고!)' : `   -   U: 업그레이드 (${chefUpCost(inv)} G) -> ${iv - CHEF_STEP}초`}`,
       `맡겨 둔 재료: ${chefStockUnits(inv)}개 (${Object.keys(c.stock).length}종)${next !== null ? `   다음 요리까지 ${next}초` : c.hired ? '   (재료가 없어서 쉬는 중)' : ''}`,
       `조리법: ${c.rnd ? '요리사가 알아서' : METHODS[c.m]}   (M 바꾸기 · 쓸 수 있는 조리법 ${chefMethods(inv).length}가지)`,
       `한 접시에 넣는 재료: ${c.k}개   (N 바꾸기)`,
       `만들어 둔 요리: ${chefPending(inv)}개   (G: 받기 · 집에 오면 자동으로 받아요)`,
+      c.n >= CHEF_N_MAX ? `요리사는 최대 ${CHEF_N_MAX}명이에요` : `H: 요리사 한 명 더 (${chefHireCost(inv)} G, 한 명 늘 때마다 2배)`,
     ];
     lines.forEach((t, i) => ctx.fillText(t, rx, ry + 34 + i * 28));
     const outList = Object.keys(c.out).filter((id) => c.out[id] > 0).slice(0, 3);
@@ -468,5 +514,5 @@
   // 파란 피를 채워 주는 기존 음식들 (빨간 피가 넘치면 파란 피가 되는 건 모든 음식이 같다)
   [['d_phoenix', 1], ['d_holy', 2], ['d_heart', 3], ['f_feast', 1], ['sd_clam', 1], ['sd_feast', 2]].forEach(([id, v]) => { const it = ITEMS[id]; if (it) { it.blue = v; it.desc = `${it.desc} · 파란 피 ${v}칸`; } });
 
-  G.Cook = { APPS, chefMethods, chefNextMethod, areas, chefOf, chefInterval, chefUpCost, chefProduce, chefCollect, chefDeposit, chefStockUnits, chefPending, CHEF_MAX, CHEF_HIRE, EFFECTS, EFF, effText, addSource, addPantry, SOURCES, specOf, METHODS, ingredients, cook, registerAll, drawDish, open, draw, hashStr };
+  G.Cook = { chefHireCost, chefHire, chefSpots, drawChef, CHEF_N_MAX, APPS, chefMethods, chefNextMethod, areas, chefOf, chefInterval, chefUpCost, chefProduce, chefCollect, chefDeposit, chefStockUnits, chefPending, CHEF_MAX, CHEF_HIRE, EFFECTS, EFF, effText, addSource, addPantry, SOURCES, specOf, METHODS, ingredients, cook, registerAll, drawDish, open, draw, hashStr };
 })(window.Game);

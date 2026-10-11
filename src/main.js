@@ -322,7 +322,7 @@
   const seaCaveCoins = () => Math.round((6000 + 2500 * ((story.seaCaveRun || 1) - 1)) * (1 + G.Shop.homeBonuses(inv).coin)); // 들어갈수록 더 많이 준다
   let seaLv = null, seaSt = null, seaO2 = 45, seaDepth = 0, seaDrown = 0, seaInTown = false; // 바다: 지형, 해산물/거품, 산소, 수심
   let blue = 0; // 파란 피: 빨간 피가 가득일 때 넘치게 먹은 음식, 또는 파란 피를 주는 음식. 맞으면 빨간 피보다 먼저 닳고, 최대 피 칸 수까지만 찬다
-  let buffRegenT = 0, buffT = 0, chefHomeCheck = false; // 음식 효과(재생) 시간, 요리사 확인
+  let buffRegenT = 0, buffT = 0, chefHomeCheck = false, chefTickT = 0; // 음식 효과(재생) 시간, 요리사 확인
   let cookUI = null;           // 가스레인지 요리 창
   let achUI = null;            // 업적 모음집 {page}
   let floorUI = null;          // 던전 문: 가고 싶은 층 고르기 {sel, max}
@@ -1261,7 +1261,7 @@
     if (name === 'home') {
       chefHomeCheck = true;
       G.HomeTheme.setHouse(inv.home.type);
-      terrain.homeSlots = G.Home.slots(inv.home.type || 'house1', terrain);
+      terrain.homeSlots = G.Home.slots(inv.home.type || 'house1', terrain, inv.home.placed);
     }
     spawn = terrain.spawnFor(C.PLAYER_W, C.PLAYER_H);
     // near: 마을로 돌아올 때 어느 입구 앞에서 시작할지 ('D' 동굴 입구, 또는 스테이지 이름 = 그 스테이지의 문)
@@ -1719,6 +1719,7 @@
     }
     let best = null; // 집 안: 가장 가까운 꾸밀 자리
     for (const sl of terrain.homeSlots) {
+      if (sl.kind === 'wall' && inv.home.placed.wall[sl.index] === 'd_rack') continue; // 선반 자리는 위쪽 자리로 다룬다 (비우고 치우기 = 선반 치우기)
       const dx = Math.abs(px - sl.x);
       if (dx < 62 && Math.abs(feet - GROUND_Y_HOME) < T * 2 && (!best || dx < best.dx)) best = { dx, slot: sl };
     }
@@ -2423,6 +2424,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       const d = (v) => `${v >= 0 ? '+' : ''}${Math.round(v * 1000) / 10}%`;
       res.msg += item.clear ? ` (코인 ${d(after.coin - before.coin)}, 치명타 ${d(after.crit - before.crit)})` : ` (코인 ${d(after.coin - before.coin)}, 치명타 ${d(after.crit - before.crit)} 더!)`;
     }
+    terrain.homeSlots = G.Home.slots(inv.home.type || 'house1', terrain, inv.home.placed); // 선반을 놓거나 치우면 자리가 바뀐다
     shop.def.tabs = G.Shop.placeTabs(inv, sl.kind);
     shop.tab = Math.min(shop.tab, shop.def.tabs.length - 1);
     shop.msg = res.msg;
@@ -3154,7 +3156,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       const i = L.rows.findIndex((r) => inRect(p, r));
       if (i < 0) return;
       settingsUI.cur = i;
-      if (i === 0) { if (p.x >= L.bar.x - 6 && p.x <= L.bar.x + L.bar.w + 6) { G.Audio.setMusicVolume(Math.round(((p.x - L.bar.x) / L.bar.w) * 20) / 20); G.Settings.save(); G.Audio.play('catch'); } }
+      if (i <= 1) { const bar = L.bars[i]; if (p.x >= bar.x - 6 && p.x <= bar.x + bar.w + 6) { G.Audio[i === 0 ? 'setMusicVolume' : 'setSfxVolume'](Math.round(((p.x - bar.x) / bar.w) * 20) / 20); G.Settings.save(); G.Audio.play('catch'); } }
       else changeSetting(i, 0);
       return;
     }
@@ -4277,19 +4279,19 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   }
 
   // 설정 값을 바꾼다 (dir: -1/+1 = 음량 조절 또는 토글, 0 = 토글만)
-  const SETTING_KEYS = ['music', 'dmgNum', 'parrySound', 'sparkle', 'shake'];
+  const SETTING_KEYS = ['music', 'sfx', 'dmgNum', 'parrySound', 'sparkle', 'shake'];
   function changeSetting(i, dir) {
     const S = G.Settings;
-    if (i === 8) { // 게임 나가기: 저장하고 처음 화면(저장 칸 고르기)으로
+    if (i === 9) { // 게임 나가기: 저장하고 처음 화면(저장 칸 고르기)으로
       if (dir !== 0 || settingsUI.fromTitle) return;
       saveGame();
       saveBlocked = true;
       window.location.reload();
       return;
     }
-    if ((i === 5 || i === 6) && stageName === 'legion') { settingsUI.msg = '군단 요새에서는 저장하기와 되돌아가기를 쓸 수 없어요 (체크포인트가 있어요)'; settingsUI.msgT = 3; G.Audio.play('deny'); return; }
-    if (i === 5) { if (dir === 0) { const ok = saveGame(); settingsUI.msg = ok ? `저장했어요! 다음에 켜면 여기(${(STAGES[stageName] && STAGES[stageName].label) || stageName})에서 이어져요` : '저장할 수 없어요'; settingsUI.msgT = 2; G.Audio.play(ok ? 'treasure' : 'deny'); } return; }
-    if (i === 6) { // 1분 전으로 돌아가기
+    if ((i === 6 || i === 7) && stageName === 'legion') { settingsUI.msg = '군단 요새에서는 저장하기와 되돌아가기를 쓸 수 없어요 (체크포인트가 있어요)'; settingsUI.msgT = 3; G.Audio.play('deny'); return; }
+    if (i === 6) { if (dir === 0) { const ok = saveGame(); settingsUI.msg = ok ? `저장했어요! 다음에 켜면 여기(${(STAGES[stageName] && STAGES[stageName].label) || stageName})에서 이어져요` : '저장할 수 없어요'; settingsUI.msgT = 2; G.Audio.play(ok ? 'treasure' : 'deny'); } return; }
+    if (i === 7) { // 1분 전으로 돌아가기
       if (dir !== 0) return;
       const msg = rewindOneMinute();
       settingsUI = null;
@@ -4297,13 +4299,14 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       G.Audio.play('pickup');
       return;
     }
-    if (i === 7) { // 처음부터 다시하기: 두 번 눌러야 한다 (지금 칸을 지운다)
+    if (i === 8) { // 처음부터 다시하기: 두 번 눌러야 한다 (지금 칸을 지운다)
       if (dir !== 0) return;
       if (!settingsUI.confirm) { settingsUI.confirm = true; settingsUI.msg = '정말 처음부터? 한 번 더 누르면 모든 진행이 지워져요'; settingsUI.msgT = 4; G.Audio.play('deny'); }
       else resetGame();
       return;
     }
     if (i === 0) { if (dir) G.Audio.setMusicVolume(Math.round((S.music + dir * 0.1) * 10) / 10); }
+    else if (i === 1) { if (dir) G.Audio.setSfxVolume(Math.round((S.sfx + dir * 0.1) * 10) / 10); }
     else S[SETTING_KEYS[i]] = !S[SETTING_KEYS[i]];
     S.save();
     G.Audio.play('catch');
@@ -4311,12 +4314,12 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function updateSettings() {
     const pressed = (...c) => c.some((k) => input.wasPressed(k));
     if (pressed('Escape', 'KeyO')) { settingsUI = null; return; }
-    const rowsN = settingsUI.fromTitle ? 5 : 9;
+    const rowsN = settingsUI.fromTitle ? 6 : 10;
     if (pressed('ArrowUp')) { settingsUI.cur = (settingsUI.cur + rowsN - 1) % rowsN; settingsUI.confirm = false; }
     if (pressed('ArrowDown')) { settingsUI.cur = (settingsUI.cur + 1) % rowsN; settingsUI.confirm = false; }
     if (pressed('ArrowLeft')) changeSetting(settingsUI.cur, -1);
     else if (pressed('ArrowRight')) changeSetting(settingsUI.cur, 1);
-    else if (pressed('Enter', 'Space')) changeSetting(settingsUI.cur, settingsUI.cur === 0 ? 1 : 0);
+    else if (pressed('Enter', 'Space')) changeSetting(settingsUI.cur, settingsUI.cur <= 1 ? 1 : 0);
   }
 
   function step(dt) {
@@ -4358,7 +4361,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
             if (!c.hired) { u.msg = '먼저 요리사를 고용하세요 (H).'; G.Audio.play('deny'); }
             else { const n = G.Cook.chefDeposit(inv, list[u.cur], pressed('KeyF') ? list[u.cur].count : 1); u.msg = `${list[u.cur] ? '' : ''}요리사에게 맡겼어요 (+${n})`; G.Audio.play('pickup'); }
           }
-          if (pressed('KeyH')) { if (c.hired) { u.msg = '이미 고용했어요.'; } else if (coins < G.Cook.CHEF_HIRE) { u.msg = `코인이 모자라요 (${G.Cook.CHEF_HIRE} G)`; G.Audio.play('deny'); } else { coins -= G.Cook.CHEF_HIRE; c.hired = true; c.last = Date.now(); u.msg = '요리사를 고용했어요! 재료를 맡겨 보세요.'; G.Audio.play('treasure'); } }
+          if (pressed('KeyH')) { const cost = G.Cook.chefHireCost(inv); if (c.n >= G.Cook.CHEF_N_MAX) { u.msg = `요리사는 최대 ${G.Cook.CHEF_N_MAX}명이에요.`; G.Audio.play('deny'); } else if (coins < cost) { u.msg = `코인이 모자라요 (${cost} G)`; G.Audio.play('deny'); } else { coins -= cost; const n = G.Cook.chefHire(inv); u.msg = n === 1 ? '요리사를 고용했어요! 재료를 맡겨 보세요.' : `요리사가 ${n}명이 되었어요! 이제 한 번에 ${n}개씩 만들어요.`; G.Audio.play('treasure'); } }
           if (pressed('KeyU')) { if (!c.hired) u.msg = '먼저 요리사를 고용하세요.'; else if (c.lv >= G.Cook.CHEF_MAX) u.msg = '이미 가장 빨라요 (30초).'; else { const cost = G.Cook.chefUpCost(inv); if (coins < cost) { u.msg = `코인이 모자라요 (${cost} G)`; G.Audio.play('deny'); } else { coins -= cost; c.lv += 1; u.msg = `요리 속도 업! 이제 ${G.Cook.chefInterval(inv)}초에 1개`; G.Audio.play('treasure'); } } }
           if (pressed('KeyM')) { G.Cook.chefNextMethod(inv); u.msg = ''; G.Audio.play('catch'); }
           if (pressed('KeyN')) { c.k = c.k % 5 + 1; u.msg = ''; G.Audio.play('catch'); }
@@ -4587,7 +4590,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       } else if (near && near.type === 'slot') { // 집 안 꾸미기: 가진 장식품을 고른다
         const sl = near.slot;
         if (G.Cook.APPS[inv.home.placed[sl.kind][sl.index]]) { cookUI = G.Cook.open(inv, sl); G.Audio.play('pickup'); input.endFrame(); return; } // 가스레인지: 요리
-        shop = { kind: 'place', mode: 'place', slot: sl, def: { title: sl.kind === 'floor' ? '바닥 가구 놓기' : '벽 장식 걸기', tabs: G.Shop.placeTabs(inv, sl.kind) }, tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
+        shop = { kind: 'place', mode: 'place', slot: sl, def: { title: sl.kind === 'floor' ? '바닥 가구 놓기' : sl.kind === 'top' ? '선반 위에 놓기' : '벽 장식 걸기', tabs: G.Shop.placeTabs(inv, sl.kind) }, tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
         G.Audio.play('pickup');
       } else if (near && near.type === 'home') { // 마을의 내 집 터
         if (inv.home.type) { homeFrom = stageName; loadStage('home', true); input.endFrame(); return; }
@@ -4617,6 +4620,16 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     buffT -= dt; // 음식 효과: 시간이 다 된 것은 지우고, 재생은 5초마다 피 ½칸
     if (buffT <= 0) { buffT = 1; const act = G.Shop.buffList(inv); if (act.length !== (inv.buffs || []).length) { inv.buffs = act; applyEquipment(); applySpeed(); popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '음식 효과가 끝났어요', t: 1.6, color: 'rgba(255,225,160,A)' }); } }
     if (G.Shop.buffVal(inv, 'regen') > 0) { buffRegenT += dt; if (buffRegenT >= 5) { buffRegenT = 0; if (lives < maxLives()) { lives = Math.min(maxLives(), lives + 0.5); popups.push({ x: player.x + player.w / 2, y: player.y - 30, text: '재생 +½', t: 1.1, color: 'rgba(255,140,170,A)' }); } } } else buffRegenT = 0;
+    if (stageName === 'home' && G.Cook.chefOf(inv).hired) { // 집 안: 요리사들이 기구 옆에서 일하고, 다 만든 요리는 바로 가방으로
+      const c = G.Cook.chefOf(inv);
+      terrain.homeChefs = G.Cook.chefSpots(inv, terrain.homeSlots, GROUND_Y_HOME);
+      terrain.chefWorking = G.Cook.chefStockUnits(inv) > 0;
+      chefTickT -= dt;
+      if (chefTickT <= 0) {
+        chefTickT = 1;
+        if (G.Cook.chefProduce(inv) > 0 && !chefHomeCheck) { const r = G.Cook.chefCollect(inv); if (r.n > 0) { popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `요리사가 요리를 만들었어요: ${r.names.join(', ')}${r.n > 3 ? ' 외' : ''} (가방에 넣었어요)`, t: 3, color: 'rgba(255,225,120,A)' }); G.Audio.play('pickup'); } }
+      }
+    } else if (stageName === 'home') terrain.homeChefs = null;
     if (stageName === 'home' && chefHomeCheck && stageTime > 0.5) { // 집에 돌아왔다: 요리사가 만들어 둔 요리를 받는다
       chefHomeCheck = false;
       if (G.Cook.chefOf(inv).hired) { G.Cook.chefProduce(inv); const r = G.Cook.chefCollect(inv); if (r.n > 0) { popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `요리사가 요리 ${r.n}개를 만들어 뒀어요! (가방에 넣었어요)`, t: 4, color: 'rgba(255,225,120,A)' }); G.Audio.play('treasure'); } else if (G.Cook.chefStockUnits(inv) > 0) popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: '요리사가 열심히 요리 중이에요…', t: 3, color: 'rgba(255,225,160,A)' }); }

@@ -3,6 +3,7 @@
 (function (G) {
   let ctx = null;
   let master = null;
+  let sfxOut = null;
   let noiseBuf = null;
   let muted = false;
   let pitch = 1; // 재생 때마다 바뀌는 음높이 배율 (효과음마다 살짝씩 다르게)
@@ -19,6 +20,9 @@
       musicOut = ctx.createGain();
       musicOut.gain.value = G.Settings.music;
       musicOut.connect(master);
+      sfxOut = ctx.createGain(); // 효과음 음량
+      sfxOut.gain.value = G.Settings.sfx;
+      sfxOut.connect(master);
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -29,7 +33,7 @@
   }
 
   // 음 하나: 주파수를 f0 -> f1로 미끄러뜨리며 지수 감쇠
-  function tone(type, f0, f1, dur, vol, delay = 0, dest = master) {
+  function tone(type, f0, f1, dur, vol, delay = 0, dest = sfxOut) {
     const t = ctx.currentTime + delay;
     f0 *= pitch;
     f1 *= pitch;
@@ -46,7 +50,7 @@
   }
 
   // 노이즈 한 번: 필터 주파수를 f0 -> f1로 훑는다
-  function noise(dur, vol, f0, f1, filter = 'bandpass', delay = 0, q = 1, dest = master) {
+  function noise(dur, vol, f0, f1, filter = 'bandpass', delay = 0, q = 1, dest = sfxOut) {
     const t = ctx.currentTime + delay;
     f0 *= pitch;
     f1 *= pitch;
@@ -406,6 +410,10 @@
     setMusicVolume(v) {
       G.Settings.music = Math.max(0, Math.min(1, v));
       if (musicOut) musicOut.gain.value = G.Settings.music;
+    },
+    setSfxVolume(v) {
+      G.Settings.sfx = Math.max(0, Math.min(1, v));
+      if (sfxOut) sfxOut.gain.value = G.Settings.sfx;
     },
     toggleMute() {
       muted = !muted;
