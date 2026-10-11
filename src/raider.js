@@ -140,6 +140,7 @@
     }
 
     _move(dt, dx, near, terrain, V, speed) {
+      if (this.hold && !near) { this.vx = 0; return; } // 가만히 서 있는다 (가까이 오면 맞서 싸운다)
       const target = near ? Math.sign(dx) : Math.sign(this.marchX - (this.x + this.w / 2));
       const absDx = Math.abs(dx);
       if (target !== 0) this.dir = target;

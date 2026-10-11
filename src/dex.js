@@ -136,7 +136,7 @@
     const px = 30, py = 14, pw = W - 60, ph = H - 28;
     const tabs = [0, 1, 2].map((i) => ({ x: px + 24 + i * 200, y: py + 56, w: 192, h: 32 }));
     const gx = px + (pw - COLS * CELL) / 2, gy = py + 100;
-    return { px, py, pw, ph, tabs, gx, gy, rows: 4, cell: (i) => ({ x: gx + (i % COLS) * CELL, y: gy + Math.floor(i / COLS) * CELL, w: CELL - 6, h: CELL - 6 }) };
+    return { px, py, pw, ph, tabs, fightBtn: { x: px + pw - 214, y: py + ph - 70, w: 178, h: 40 }, gx, gy, rows: 4, cell: (i) => ({ x: gx + (i % COLS) * CELL, y: gy + Math.floor(i / COLS) * CELL, w: CELL - 6, h: CELL - 6 }) };
   }
   G.Shop.SHOPS.dexhall = { title: '도감관', tabs: [] };
   const Dex = {
@@ -147,6 +147,9 @@
       const pressed = (...c) => c.some((k) => input.wasPressed(k));
       const list = entries(ui.tab);
       if (!fresh && pressed('Escape')) { ui.closed = true; return; }
+      const sel = list[ui.cur];
+      const canFight = !!(sel && sel.kind === 'mob' && isRegistered(ui.inv || inv, sel.id));
+      if (canFight && !fresh && pressed('KeyF')) { ui.fight = sel.id; ui.closed = true; return; } // 등록한 몬스터·보스와 싸워 보기
       if (pressed('Tab', 'KeyE')) { ui.tab = (ui.tab + 1) % 3; ui.cur = 0; ui.scroll = 0; }
       if (pressed('KeyQ')) { ui.tab = (ui.tab + 2) % 3; ui.cur = 0; ui.scroll = 0; }
       if (pressed('ArrowRight', 'KeyD')) ui.cur = Math.min(list.length - 1, ui.cur + 1);
@@ -159,6 +162,8 @@
       if (ui.wheel) { const maxS = Math.max(0, Math.ceil(list.length / COLS) - 4); ui.scroll = Math.max(0, Math.min(maxS, ui.scroll + (ui.wheel > 0 ? 1 : -1))); ui.wheel = 0; }
       if (ui.click) {
         const g = geometry(G.Config.VIEW_W, G.Config.VIEW_H);
+        const fb = g.fightBtn;
+        if (canFight && ui.click.x >= fb.x && ui.click.x < fb.x + fb.w && ui.click.y >= fb.y && ui.click.y < fb.y + fb.h) { ui.fight = sel.id; ui.closed = true; return; }
         const t = g.tabs.findIndex((r) => ui.click.x >= r.x && ui.click.x < r.x + r.w && ui.click.y >= r.y && ui.click.y < r.y + r.h);
         if (t >= 0) { ui.tab = t; ui.cur = 0; ui.scroll = 0; }
         for (let i = ui.scroll * COLS; i < Math.min(list.length, (ui.scroll + 4) * COLS); i++) {
@@ -221,6 +226,12 @@
         ctx.fillText(known ? e.desc : (e.kind === 'mob' ? '아직 만나지 못했어요. 쓰러뜨리면 등록돼요.' : e.kind === 'fish' ? '아직 낚지 못했어요. 낚시로 잡으면 등록돼요.' : '아직 잡지 못했어요. 잠자리채로 잡으면 등록돼요.'), g.px + 130, dy + 52);
         ctx.fillStyle = known ? '#7dffa0' : '#9aa4c0'; ctx.font = 'bold 14px sans-serif';
         ctx.fillText(known ? (isRegistered(inv, e.id) ? `등록 완료 (보상 ${REWARD} G 받음)` : '발견! 도감관에서 등록하면 보상을 받아요') : `등록하면 ${REWARD} G`, g.px + 130, dy + 78);
+        if (e.kind === 'mob' && isRegistered(inv, e.id)) { // 등록한 몬스터·보스는 결투장에서 싸워 볼 수 있다
+          const fb = g.fightBtn;
+          ctx.fillStyle = 'rgba(255,120,80,0.28)'; ctx.fillRect(fb.x, fb.y, fb.w, fb.h);
+          ctx.strokeStyle = '#ff9a6a'; ctx.lineWidth = 2; ctx.strokeRect(fb.x, fb.y, fb.w, fb.h);
+          ctx.textAlign = 'center'; ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText('결투장에서 싸우기 (F)', fb.x + fb.w / 2, fb.y + fb.h / 2);
+        }
         if (ui.msg) { ctx.textAlign = 'right'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#ffd54a'; ctx.fillText(ui.msg, g.px + g.pw - 40, dy + 30); }
       }
       ctx.restore();

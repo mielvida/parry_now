@@ -105,7 +105,7 @@
     duelarena: { // 결투장: 보스전처럼 AI 용사와 싸운다
       music: 'cave', label: '결투장', level: G.Levels.duelarena, theme: G.Beach, monsterless: true, returnNear: 'village', exitTo: 'village',
       boss: { col: 2, kind: 'duel' },
-      get goal() { return duelRun ? `결투! ${duelRun.mode === 'cowboy' ? '총싸움' : '공격! (칼싸움)'} — 상대 체력을 0으로! 던지는 무기는 던지고, 쏘는 무기는 쏴요. 건 돈 ${duelRun.cost} G` : '결투장'; },
+      get goal() { return duelRun && duelRun.dex ? `도감 대결! ${G.Dex.nameOf(duelRun.dex)}을(를) 쓰러뜨려 보자 (연습이라 보상은 없어요)` : duelRun ? `결투! ${duelRun.mode === 'cowboy' ? '총싸움' : '공격! (칼싸움)'} — 상대 체력을 0으로! 던지는 무기는 던지고, 쏘는 무기는 쏴요. 건 돈 ${duelRun.cost} G` : '결투장'; },
       banner: { title: '결투!', sub: '링 위의 승부', dur: 2.5, caption: '…관중이 환호한다. 상대의 체력을 먼저 0으로 만들어라!' },
     },
     home: { // 우리 집 안 (마을의 내 집 터에서 E). 장식품을 놓고 치우는 곳
@@ -471,6 +471,10 @@
     if (bk && bk.startsWith('dark_')) { // 다크월드 보스 (정의의 어둠돌 / 정의의 어둠 / 시크너)
       const DB = bk === 'dark_sikner' ? G.Sikner : G.DarkBoss; // 100층 시크너는 전용 패턴
       boss = new DB(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv, bk.slice(5));
+      return;
+    }
+    if (bk === 'duel' && duelRun && duelRun.dex) { // 도감 대결: 보스면 그 보스, 몬스터면 보스 없음
+      boss = duelRun.dex.startsWith('boss_') ? makeDexBoss(duelRun.dex, st) : null;
       return;
     }
     if (bk === 'duel' && duelRun) { // 결투장의 AI 용사
@@ -994,7 +998,7 @@
   }
   // 결투 중에 규칙을 어기는 무기로 바꾸려는지 (고르는 무기 id)
   // (결투장 안에서만: 개발 메뉴 등으로 결투장을 벗어나 duelRun이 남아 있어도 평소 무기 교체는 막지 않는다)
-  const duelBlocks = (weaponId) => (duelRun && stageName === 'duelarena' ? duelWeaponProblem(duelRun.mode === 'cowboy' ? 'gun' : 'fight', weaponId) : null);
+  const duelBlocks = (weaponId) => (duelRun && stageName === 'duelarena' && duelRun.mode !== 'dex' ? duelWeaponProblem(duelRun.mode === 'cowboy' ? 'gun' : 'fight', weaponId) : null);
   function startDuelArena(m) {
     const lv = 4 + Math.floor(Math.random() * 2); // 상대는 항상 고수: 등급 4~5
     const hp = Math.max(1, Math.ceil(maxLives())); // 결투장: 상대의 피는 내 최대 피와 같다
@@ -1006,10 +1010,78 @@
     loadStage('duelarena', true);
     lives = maxLives(); // 결투 동안은 체력이 가득 차 있다 (결투가 끝나면 원래대로)
   }
+  // 도감에 등록한 몬스터·보스와 결투장에서 싸워 본다 (연습: 코인·경험치 없음. 이기든 지든 도감관 앞으로 돌아온다)
+  const DEX_MOBS = { slime_green: ['slime', 'green'], slime_ice: ['slime', 'ice'], slime_lava: ['slime', 'lava'], slime_dark: ['slime', 'dark'], bat: ['bat'], goldbat: ['bat', 'gold'], crab: ['crab'], golem: ['golem'], darkstone: ['darkstone'], shade: ['shade'] };
+  function startDexFight(id) {
+    duelRun = { mode: 'dex', dex: id, cost: 0, livesBackup: lives, end: null, endT: 0, cfg: null };
+    mini = null; cutscene = null; dialog = null;
+    loadStage('duelarena', true);
+    lives = maxLives();
+    blue = 0;
+    if (!id.startsWith('boss_')) spawnDexMobs(id);
+  }
+  function spawnDexMobs(id) {
+    const n = ['raider_ogre', 'golem', 'darkstone'].includes(id) ? 2 : 3;
+    monsters.length = 0;
+    G.Raider.pool = monsters;
+    for (let i = 0; i < n; i++) {
+      const col = 20 + i * 4, row = 15;
+      let mo;
+      if (id.startsWith('raider_')) { const V = G.Raider.VARIANTS[id.slice(7)]; const p = terrain.placeOnTile(col, row, V.w, V.h); mo = new G.Raider(p.x, p.y, id.slice(7)); mo.marchX = p.x + V.w / 2; }
+      else {
+        const d = DEX_MOBS[id] || ['slime', 'green'];
+        if (d[0] === 'slime') { const p = terrain.placeOnTile(col, row, C.SLIME_W, C.SLIME_H); mo = new G.Slime(p.x, p.y); mo.variant = d[1]; }
+        else if (d[0] === 'bat') { const p = terrain.centerOnTile(col, 8, C.BAT_W, C.BAT_H); mo = new G.Bat(p.x, p.y); mo.golden = d[1] === 'gold'; mo.maxHp = mo.golden ? C.GOLDEN_BAT_HP : 2; mo.hp = mo.maxHp; mo.speedMul = mo.golden ? C.GOLDEN_BAT_SPEED : 1; }
+        else if (d[0] === 'crab') { const p = terrain.placeOnTile(col, row, C.CRAB_W, C.CRAB_H); mo = new G.Crab(p.x, p.y); }
+        else if (d[0] === 'golem') { const p = terrain.placeOnTile(col, row, C.GOLEM_W, C.GOLEM_H); mo = new G.Golem(p.x, p.y); }
+        else if (d[0] === 'darkstone') { const p = terrain.placeOnTile(col, row, G.DarkStone.W, G.DarkStone.H); mo = new G.DarkStone(p.x, p.y); }
+        else { const p = terrain.centerOnTile(col, 10, G.Shade.W, G.Shade.H); mo = new G.Shade(p.x, p.y); }
+      }
+      if (mo.maxHp < 20) { mo.maxHp = 20; mo.hp = 20; }
+      mo.stageSpeed = 1;
+      mo.contactDmg = 1;
+      mo.immune = {};
+      // 원래 있던 곳의 단단함(체력)과 딴딴함(더 때려야 하는 횟수)을 그대로 가진다
+      if (['slime_dark', 'darkstone', 'shade'].includes(id)) { // 다크월드 몬스터 (50층쯤의 단단함)
+        mo.dark = true; mo.maxHp = Math.round(mo.maxHp * 4); mo.hp = mo.maxHp; mo.extraHits = 4;
+      } else if (id.startsWith('raider_')) { // 군단 병사 (1층의 단단함)
+        const sv = id.slice(7), ml = maxLives();
+        mo.maxHp = mo.hp = 60;
+        mo.extraHits = Math.min(30, 4 * ml - 1 + (sv === 'shield' || sv === 'ogre' ? 3 : 0));
+      }
+      mo.byAlly = true; // 연습: 코인·경험치·기록 없음
+      mo.noRespawn = true; // 쓰러뜨리면 끝
+      mo.hold = true; // 병사들은 가만히 서 있는다
+      monsters.push(mo);
+      effects.spawn(mo.x + mo.w / 2, mo.y + mo.h);
+    }
+  }
+  function makeDexBoss(id, st) {
+    const L = st.boss.col * C.TILE, W = terrain.width - st.boss.col * C.TILE * 2, gy = (terrain.treasure.row + 1) * C.TILE;
+    if (id === 'boss_king') return new G.KingSlime(L, W, gy, bossEv);
+    if (id === 'boss_ape') return new G.ApeBoss(L, W, gy, bossEv);
+    if (id === 'boss_dragon') return new G.Boss(L, W, gy, bossEv);
+    if (id === 'boss_sikner') return new G.Sikner(L, W, gy, bossEv, 'sikner');
+    return new G.DarkBoss(L, W, gy, bossEv, id === 'boss_justice' ? 'justice' : 'stone');
+  }
+  function goShopFront(stage, kind) { // 어느 곳의 가게 앞으로
+    loadStage(stage, true);
+    const sh = terrain.shops.find((q) => q.kind === kind);
+    if (sh) {
+      player.placeAt(sh.col * C.TILE + C.TILE / 2 - player.w / 2 - 70, (sh.row + 1) * C.TILE - player.h);
+      camera.follow(player, terrain, C.DT, true);
+    }
+  }
   function duelWin() {
     const r = duelRun;
     if (!r || r.end) return;
     r.end = 'win';
+    if (r.dex) {
+      popups.push({ x: player.x + player.w / 2, y: player.y - 56, text: `${G.Dex.nameOf(r.dex)} 격파! (연습 승리)`, t: 3, color: 'rgba(125,255,160,A)' });
+      G.Audio.play('treasure');
+      effects.treasure(player.x + player.w / 2, player.y);
+      return;
+    }
     const lv = r.cfg.lv;
     const pay = Math.round(r.cost * (1.6 + 0.2 * lv));
     coins += pay;
@@ -1024,17 +1096,19 @@
     lives = 1;
     player.invuln = 99;
     if (boss) boss.stop = true;
-    popups.push({ x: player.x + player.w / 2, y: player.y - 56, text: `결투 패배… -${r.cost} G`, t: 3, color: 'rgba(255,140,140,A)' });
+    for (const mo of monsters) if (r.dex) mo.stunned = 99; // (연습 중 쓰러지면 상대가 멈춘다)
+    popups.push({ x: player.x + player.w / 2, y: player.y - 56, text: r.dex ? '쓰러졌다… (연습이라 잃는 건 없어요)' : `결투 패배… -${r.cost} G`, t: 3, color: 'rgba(255,140,140,A)' });
     G.Audio.play('gameover');
   }
   function updateDuelRun(dt) {
     const r = duelRun;
+    if (r && r.dex && !r.end && !boss && stageTime > 1 && !monsters.some((mo) => mo.alive)) duelWin(); // 도감 몬스터를 모두 쓰러뜨렸다
     if (!r || !r.end) return;
     r.endT += dt;
-    if (r.endT >= 2.6) { // 마을의 결투장 앞으로 돌아간다
+    if (r.endT >= 2.6) { // 마을의 결투장 앞으로 (도감 대결은 왕국의 도감관 앞으로) 돌아간다
       lives = r.livesBackup;
       duelRun = null;
-      goVillageShop('mgduel');
+      if (r.dex) goShopFront('kingdom', 'dexhall'); else goVillageShop('mgduel');
     }
   }
 
@@ -1562,9 +1636,9 @@
   // 관리자 모드(F1 개발 메뉴, F2 관리자 무기)는 비밀번호를 눌러야 열린다 (창을 새로 켜면 다시 입력)
   const ADMIN_PW = '96221430';
   const ADMIN_KEY = 'parry_admin_unlocked';
-  const setAdminUnlocked = (v) => { adminUnlocked = v; if (noSave()) return; try { if (v) localStorage.setItem(ADMIN_KEY, '1'); else localStorage.removeItem(ADMIN_KEY); } catch (e) { /* 저장소 없음 */ } };
-  let adminUnlocked = false;
-  try { adminUnlocked = !noSave() && localStorage.getItem(ADMIN_KEY) === '1'; } catch (e) { adminUnlocked = false; } // 한 번 비밀번호를 누르면 나갔다 들어와도 열려 있다 (다시 잠그기 전까지)
+  let adminUnlocked = false; // 비밀번호를 누르면 이번에 켠 동안만 열려 있다 (게임을 새로 켜면 다시 입력)
+  const setAdminUnlocked = (v) => { adminUnlocked = v; };
+  try { localStorage.removeItem(ADMIN_KEY); } catch (e) { /* 저장소 없음 */ } // 예전 버전이 저장해 둔 '열림' 표시는 지운다
   let pwUI = null; // {buf, msg, msgT, then}
   function askPassword(then) {
     if (adminUnlocked) { then(); return; }
@@ -3732,6 +3806,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       const p = terrain.placeOnTile(col, row, V.w, V.h);
       const mo = new G.Raider(p.x, p.y, variant);
       mo.marchX = p.x + V.w / 2;
+      mo.hold = true; // 군단 병사도 오락가락하지 않고 가만히 서 있는다
       mo.stageSpeed = 1.15 + 0.12 * f;
       mo.contactDmg = 1;
       mo.immune = {};
@@ -4410,7 +4485,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       if (inv.items.includes('map_' + stageName)) { mapUI = { markers: G.TownMap.markers(terrain, (st) => (STAGES[st] && STAGES[st].label) || ({ darkhub: '다크월드', dungeon: '던전', forest: '숲', snow: '설산', volcano: '화산', orecave: '광물 동굴', meadow: '성 밖 숲', kingdom: '왕국', village: '마을', abyss: '심연 동굴' }[st] || st)) }; G.Audio.play('pickup'); }
       else { popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: `${stageName === 'kingdom' ? '왕국' : '마을'} 지도를 물약 가게에서 사면 N 키로 볼 수 있어요`, t: 2.4, color: 'rgba(255,230,160,A)' }); G.Audio.play('deny'); }
     }
-    if (dexUI) { G.Dex.update(dexUI, input, dt, inv); if (dexUI.closed) dexUI = null; input.endFrame(); return; } // 도감을 보는 동안 게임이 멈춘다
+    if (dexUI) { G.Dex.update(dexUI, input, dt, inv); if (dexUI.closed) { const f = dexUI.fight; dexUI = null; if (f) startDexFight(f); } input.endFrame(); return; } // 도감을 보는 동안 게임이 멈춘다
     if (fishUI) { updateFishUI(dt); input.endFrame(); return; } // 낚시 미니게임 중에는 게임이 멈춘다
     if (!devUI && input.wasPressed('F1')) { // F1: 개발 메뉴 (모든 테스트 기능, 비밀번호)
       askPassword(() => { devUI = { tab: 0, cur: 0, scroll: 0, msg: '', msgT: 0, fresh: true }; });
