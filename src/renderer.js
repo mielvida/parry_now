@@ -156,7 +156,7 @@
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
       this._drawEdgeTexts(main, hud);
-      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel || hud.ach || hud.cook));
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel || hud.ach || hud.cook || hud.visit));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
@@ -4076,6 +4076,7 @@
         ctx.restore();
       }
       if (hud.cook) G.Cook.draw(ctx, this.viewW, this.viewH, hud.cook.ui, hud.cook.inv); // 가스레인지 요리 창
+      if (hud.visit) G.Beach.drawVisit(ctx, this.viewW, this.viewH, hud.visit, Date.now() / 1000); // 마을 사람 집 안
       if (hud.gacha) this._drawGacha(ctx, hud.gacha);
       if (hud.floorSel) this._drawFloorSelect(ctx, hud.floorSel);
       if (hud.ach) G.Achv.draw(ctx, this.viewW, this.viewH, hud.ach);

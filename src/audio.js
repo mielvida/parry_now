@@ -3,6 +3,7 @@
 (function (G) {
   let ctx = null;
   let master = null;
+  let musicFilter = null, underwater = false;
   let sfxOut = null;
   let noiseBuf = null;
   let muted = false;
@@ -19,7 +20,9 @@
       master.connect(ctx.destination);
       musicOut = ctx.createGain();
       musicOut.gain.value = G.Settings.music;
-      musicOut.connect(master);
+      musicFilter = ctx.createBiquadFilter(); // 물속에서는 노래가 먹먹하게 (낮은 소리만 통과)
+      musicFilter.type = 'lowpass'; musicFilter.Q.value = 0.7; musicFilter.frequency.value = underwater ? 420 : 22000;
+      musicOut.connect(musicFilter); musicFilter.connect(master);
       sfxOut = ctx.createGain(); // 효과음 음량
       sfxOut.gain.value = G.Settings.sfx;
       sfxOut.connect(master);
@@ -410,6 +413,11 @@
     setMusicVolume(v) {
       G.Settings.music = Math.max(0, Math.min(1, v));
       if (musicOut) musicOut.gain.value = G.Settings.music;
+    },
+    setUnderwater(on) { // 바다 속이면 노래가 먹먹해진다
+      if (on === underwater) return;
+      underwater = on;
+      if (ctx && musicFilter) musicFilter.frequency.setTargetAtTime(on ? 420 : 22000, ctx.currentTime, 0.18);
     },
     setSfxVolume(v) {
       G.Settings.sfx = Math.max(0, Math.min(1, v));

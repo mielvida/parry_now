@@ -824,7 +824,7 @@
       for (const Y of terrain.homeLots) { // 내 집 터 (샀으면 산 집이 지어져 있다)
         const bx = Y.col * TILE + TILE / 2;
         if (bx < camera.x - 200 || bx > camera.x + view) continue;
-        G.Home.drawLot(ctx, terrain.home && terrain.home.type, bx, (Y.row + 1) * TILE, time);
+        G.Home.drawLot(ctx, (Y.lux ? terrain.luxHome : terrain.home) && (Y.lux ? terrain.luxHome : terrain.home).type, bx, (Y.row + 1) * TILE, time);
       }
       for (const G2 of terrain.gates) {
         if (G2.stage === 'darkhub' && !(terrain.story && terrain.story.revealed)) continue;
@@ -843,10 +843,25 @@
         if (bx < camera.x - 150 || bx > camera.x + view) continue;
         drawShop(ctx, S, bx, (S.row + 1) * TILE, time, !!terrain.invasion);
       }
+      if (!terrain.invasion) terrain.houses.forEach((H, hi) => { // 사람이 들어가 있는 집은 창문에 불이 켜진다
+        if (!terrain.villagers.some((q) => q.inside === hi)) return;
+        const hx = H.col * TILE + TILE / 2, hy = (H.row + 1) * TILE;
+        if (hx < camera.x - 100 || hx > camera.x + view) return;
+        const gl = ctx.createRadialGradient(hx, hy - 28, 2, hx, hy - 28, 34); gl.addColorStop(0, 'rgba(255,225,130,0.7)'); gl.addColorStop(1, 'rgba(255,225,130,0)');
+        ctx.fillStyle = gl; ctx.fillRect(hx - 40, hy - 70, 80, 70);
+      });
       if (!terrain.invasion) terrain.villagers.forEach((V, i) => { // 적군이 쳐들어오면 마을 사람들은 사라진다
-        const bx = V.col * TILE + TILE / 2;
+        if (V.inside !== null && V.inside !== undefined) return; // 집 안
+        const bx = V.x !== undefined ? V.x : V.col * TILE + TILE / 2;
         if (bx < camera.x - 60 || bx > camera.x + view) return;
-        G.Npc.draw(ctx, 'villager', bx, (V.row + 1) * TILE, i % 2 ? -1 : 1, time + i);
+        const bob = V.walk ? Math.abs(Math.sin(time * 9 + i)) * 2 : 0;
+        G.Npc.draw(ctx, 'villager', bx, (V.row + 1) * TILE - bob, V.face || (i % 2 ? -1 : 1), time + i);
+        if (V.emote) { // 말풍선: 음식을 먹는 중 / 물건을 사는 중
+          const ey = (V.row + 1) * TILE - 78 - Math.sin(time * 3 + i) * 2;
+          ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.ellipse(bx, ey, 15, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(bx - 3, ey + 10); ctx.lineTo(bx + 1, ey + 18); ctx.lineTo(bx + 5, ey + 10); ctx.fill();
+          if (V.emote === 'eat') { ctx.fillStyle = '#c8602a'; ctx.beginPath(); ctx.arc(bx, ey + 1, 8, 0, Math.PI); ctx.fill(); ctx.fillStyle = '#f4f0e0'; ctx.beginPath(); ctx.ellipse(bx, ey + 1, 8, 2.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(160,160,170,0.8)'; ctx.lineWidth = 1.5; for (const dx of [-3, 3]) { ctx.beginPath(); ctx.moveTo(bx + dx, ey - 3); ctx.quadraticCurveTo(bx + dx + 2, ey - 7, bx + dx, ey - 10); ctx.stroke(); } }
+          else { ctx.fillStyle = '#e8b830'; ctx.beginPath(); ctx.arc(bx, ey, 8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#a07818'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#8a6410'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('G', bx, ey + 1); }
+        }
       });
     },
 
@@ -860,5 +875,30 @@
     },
   };
 
+  // 마을 사람 집 안 방문: 문을 두드린 뒤 방이 보이고, 집주인이 맞아 준다
+  Beach.drawVisit = function (ctx, W, H, u, time) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.88)'; ctx.fillRect(0, 0, W, H);
+    const px = 90, py = 50, pw = W - 180, ph = H - 120;
+    if (u.t < 1.1) { // 문 앞: 똑똑
+      ctx.fillStyle = '#6a4a28'; ctx.fillRect(W / 2 - 60, H / 2 - 110, 120, 200); ctx.fillStyle = '#8a6438'; ctx.fillRect(W / 2 - 52, H / 2 - 102, 104, 184);
+      ctx.fillStyle = '#e8c860'; ctx.beginPath(); ctx.arc(W / 2 + 36, H / 2 - 10, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 34px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(Math.floor(u.t * 5) % 2 ? '똑똑!' : '똑똑똑!', W / 2, H / 2 - 140);
+      ctx.restore(); return;
+    }
+    ctx.fillStyle = '#c8a070'; ctx.fillRect(px, py, pw, ph - 70); // 벽
+    ctx.fillStyle = 'rgba(120,70,20,0.2)'; for (let k = 1; k < 8; k++) ctx.fillRect(px, py + k * 40, pw, 2);
+    ctx.fillStyle = '#7a5530'; ctx.fillRect(px, py + ph - 70, pw, 70); // 바닥
+    ctx.fillStyle = '#9fd8f0'; ctx.fillRect(px + 60, py + 40, 110, 90); ctx.strokeStyle = '#6a4a28'; ctx.lineWidth = 6; ctx.strokeRect(px + 60, py + 40, 110, 90); ctx.beginPath(); ctx.moveTo(px + 115, py + 40); ctx.lineTo(px + 115, py + 130); ctx.moveTo(px + 60, py + 85); ctx.lineTo(px + 170, py + 85); ctx.stroke();
+    ctx.fillStyle = '#4f7fd4'; ctx.fillRect(px + pw - 230, py + ph - 130, 190, 60); ctx.fillStyle = '#f4f4f4'; ctx.fillRect(px + pw - 225, py + ph - 142, 60, 14); ctx.fillStyle = '#6b4423'; ctx.fillRect(px + pw - 235, py + ph - 150, 12, 82); // 침대
+    ctx.fillStyle = '#6b4423'; ctx.fillRect(px + 250, py + ph - 130, 150, 12); ctx.fillRect(px + 262, py + ph - 118, 10, 48); ctx.fillRect(px + 378, py + ph - 118, 10, 48); // 탁자
+    ctx.fillStyle = '#f4f0e0'; ctx.fillRect(px + 290, py + ph - 146, 22, 16); ctx.fillRect(px + 340, py + ph - 146, 22, 16); ctx.strokeStyle = 'rgba(200,200,210,0.8)'; ctx.lineWidth = 2; for (const dx of [299, 349]) { ctx.beginPath(); ctx.moveTo(px + dx, py + ph - 150); ctx.quadraticCurveTo(px + dx + 4, py + ph - 160, px + dx, py + ph - 170); ctx.stroke(); } // 찻잔
+    ctx.save(); ctx.translate(px + pw / 2 + 40, py + ph - 70); ctx.scale(2.2, 2.2); G.Npc.draw(ctx, 'villager', 0, 0, -1, time); ctx.restore(); // 집주인
+    ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.fillRect(px, py + ph - 52 + 6, pw, 70);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(`마을 사람: "${u.line}"`, W / 2, py + ph - 14);
+    ctx.font = '14px sans-serif'; ctx.fillStyle = '#ffe9a0'; ctx.fillText(u.msg || ' ', W / 2, py + ph + 14);
+    ctx.fillStyle = '#9aa4c0'; ctx.fillText('E / Esc: 인사하고 나가기', W / 2, py + ph + 36);
+    ctx.restore();
+  };
   G.Beach = Beach;
 })(window.Game);

@@ -320,7 +320,7 @@
   const inSea = () => stageName === 'sea' || stageName === 'seacave';
   const curSeaLv = () => (stageName === 'seacave' ? seaCaveLv : seaLv);
   const seaCaveCoins = () => Math.round((6000 + 2500 * ((story.seaCaveRun || 1) - 1)) * (1 + G.Shop.homeBonuses(inv).coin)); // 들어갈수록 더 많이 준다
-  let seaLv = null, seaSt = null, seaO2 = 45, seaDepth = 0, seaDrown = 0, seaInTown = false; // 바다: 지형, 해산물/거품, 산소, 수심
+  let seaLv = null, seaSt = null, seaO2 = 45, seaDepth = 0, seaDrown = 0, seaInTown = false, seaInPocket = false; // 바다: 지형, 해산물/거품, 산소, 수심
   let blue = 0; // 파란 피: 빨간 피가 가득일 때 넘치게 먹은 음식, 또는 파란 피를 주는 음식. 맞으면 빨간 피보다 먼저 닳고, 최대 피 칸 수까지만 찬다
   let buffRegenT = 0, buffT = 0, chefHomeCheck = false, chefTickT = 0; // 음식 효과(재생) 시간, 요리사 확인
   let cookUI = null;           // 가스레인지 요리 창
@@ -1292,11 +1292,20 @@
   // 마을과 왕국은 집이 따로 있다 (산 집, 가진 장식품, 놓은 장식). inv.home은 지금 있는 도시의 집을 가리킨다
   const newHome = () => ({ type: null, owned: {}, placed: { floor: [], wall: [] } });
   let homeTown = 'village';
+  let homeKey = null; // 고급 집에 들어와 있으면 그 집 이름 ('undersea' | 'villa')
+  const luxKeyHere = () => (stageName === 'sea' ? 'undersea' : 'villa');
+  function syncHome() { // 고급 부동산 창이 열려 있는 동안은 고급 집을 상대로 사고, 값도 훨씬 비싸다
+    if (!inv.homes) return;
+    inv.home = inv.homes[shop && shop.luxKey ? shop.luxKey : homeTown];
+    G.Shop.estateMul = shop && shop.luxKey ? 25 : 1;
+  }
   function bindHome() {
     if (!inv.homes) inv.homes = { village: inv.home && inv.home.placed ? inv.home : newHome(), kingdom: newHome() }; // 예전 저장: 지금까지의 집은 마을 집
     if (!inv.homes.village) inv.homes.village = newHome();
     if (!inv.homes.kingdom) inv.homes.kingdom = newHome();
     if (!inv.homes.harbor) inv.homes.harbor = newHome();
+    if (!inv.homes.undersea) inv.homes.undersea = newHome(); // 수중 마을의 고급 집
+    if (!inv.homes.villa) inv.homes.villa = newHome();       // 해변 마을의 고급 집
     inv.home = inv.homes[homeTown];
   }
   function loadStage(name, keepLives = false, near = null) {
@@ -1304,7 +1313,8 @@
     stageName = name;
     if (name === 'village' || name === 'kingdom') homeTown = name;
     else if (name === 'sea') homeTown = 'harbor'; // 항구 마을도 내 집을 지을 수 있다
-    else if (name === 'home') homeTown = homeFrom === 'kingdom' ? 'kingdom' : homeFrom === 'sea' ? 'harbor' : 'village';
+    else if (name === 'home') homeTown = homeKey || (homeFrom === 'kingdom' ? 'kingdom' : homeFrom === 'sea' ? 'harbor' : 'village');
+    if (name !== 'home') homeKey = null;
     bindHome();
     skipBanner = name === 'village' && !!seenStages.village;
     if (name === 'kingdom' && !seenStages.kingdom) fanfare = true; // 처음 왕국에 들어서면 웅장하게
@@ -1332,6 +1342,7 @@
     terrain.story = story;
     terrain.exitLabel = st.exitLabel || (st.exitTo === 'kingdom' ? '왕국' : null); // 출구 문에 쓰이는 이름
     terrain.home = inv.home; // 마을 터와 집 안이 산 집/놓은 장식을 그린다
+    terrain.luxHome = inv.homes ? inv.homes[name === 'sea' ? 'undersea' : 'villa'] : null; // 고급 집 터에 지어진 집
     if (name === 'home') {
       chefHomeCheck = true;
       G.HomeTheme.setHouse(inv.home.type);
@@ -1340,7 +1351,7 @@
     spawn = terrain.spawnFor(C.PLAYER_W, C.PLAYER_H);
     // near: 마을로 돌아올 때 어느 입구 앞에서 시작할지 ('D' 동굴 입구, 또는 스테이지 이름 = 그 스테이지의 문)
     if (name === 'sea' && near === 'seacave') spawn = terrain.placeOnTile(seaLv.caveEntrance.col, seaLv.caveEntrance.row - 1, C.PLAYER_W, C.PLAYER_H);
-    const arrive = near === 'D' ? terrain.caveEntrances[0] : near === 'Y' ? terrain.homeLots[0] : near === 'palace' ? terrain.castles[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
+    const arrive = near === 'D' ? terrain.caveEntrances[0] : near === 'Y' ? (terrain.homeLots.find((l) => !l.lux) || terrain.homeLots[0]) : near === 'Z' ? (terrain.homeLots.find((l) => l.lux) || terrain.homeLots[0]) : near === 'palace' ? terrain.castles[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
     if (arrive) spawn = terrain.placeOnTile(arrive.col - 2, arrive.row, C.PLAYER_W, C.PLAYER_H);
 
     chest = terrain.treasure && !chestTaken[name] && !st.boss ? makeChest() : null; // 보스가 있는 스테이지는 보스를 쓰러뜨려야 상자가 나온다
@@ -1402,6 +1413,7 @@
     }
     if (name === 'sea') { for (const sh of seaLv.extraShops) terrain.shops.push(Object.assign({ sea: true }, sh)); G.Sea.Theme.setVisited(story.seaTownVisited); }
     if (name === 'sea') { seaSt = G.Sea.makeState(); seaO2 = diveMax(); seaDrown = 0; seaDepth = 0; }
+    if (name === 'sea' && story.seaCrack) openCrack(true); // 이미 무너뜨린 금 간 바위
     if (st.dark) scatterPickups(); // 던전에서는 가끔 아이템이 떨어져 있다
     oreNodes.royal = name === 'orecave' && story.oreFrom === 'kingdom'; // 왕국의 광물 동굴에서는 새 광석이 나온다
     oreNodes.setup(terrain, oreRun, name === 'orecave'); // 광물 동굴이면 광석 덩어리를 깐다
@@ -1513,7 +1525,9 @@
     } catch (e) { /* 저장소 없음 */ }
   }
   const replaceObj = (dst, src) => { for (const k of Object.keys(dst)) delete dst[k]; Object.assign(dst, JSON.parse(JSON.stringify(src || {}))); };
-  const RESTORABLE = ['village', 'kingdom', 'palace', 'meadow', 'darkhub', 'beach', 'cave', 'forest', 'snow', 'volcano', 'home']; // 같은 모양으로 다시 만들 수 있는 곳
+  const RESTORABLE = ['village', 'kingdom', 'palace', 'meadow', 'darkhub', 'beach', 'cave', 'forest', 'snow', 'volcano', 'home', 'sea', 'legion']; // 같은 모양으로 다시 만들 수 있는 곳 (바다·군단 요새 포함)
+  // 매번 새로 만들어지는 곳은 그곳으로 들어가는 입구 앞으로 돌아온다 [스테이지, 입구]
+  const RESUME_NEAR = () => ({ seacave: ['sea', 'seacave'], mine: [story.mineFrom || 'village', 'D'], orecave: [story.oreFrom || 'village', 'orecave'], abyss: ['kingdom', 'abyss'], dungeon: ['darkhub', null], duelarena: ['village', null] });
   // 저장 내용을 게임에 적용한다. exact = 저장한 자리(스테이지와 위치) 그대로, 아니면 마을에서 시작
   function applySave(d, exact = true) {
     coins = d.coins || 0; exp = d.exp || 0;
@@ -1523,8 +1537,10 @@
     darkFloor = d.darkFloor || 1; darkBest = d.darkBest || 0; mineRun = d.mineRun || 0; oreRun = d.oreRun || 0; abyssRun = d.abyssRun || 0; reapKills = d.reapKills || 0; usedT = d.usedT || 0;
     if (!inv.items || !inv.equipped) { Object.assign(inv, G.Shop.newInventory()); }
     cutscene = null; mini = null; shop = null; equipUI = null; dialog = null; duelRun = null; invasion = null; allies = []; if (terrain) terrain.invasion = null;
-    const target = RESTORABLE.includes(d.stage) && STAGES[d.stage] ? d.stage : (d.stage === 'dungeon' ? 'darkhub' : d.stage === 'abyss' ? 'kingdom' : 'village');
-    loadStage(target);
+    const fb = RESUME_NEAR()[d.stage];
+    const target = RESTORABLE.includes(d.stage) && STAGES[d.stage] ? d.stage : (fb ? fb[0] : 'village');
+    loadStage(target, false, RESTORABLE.includes(d.stage) ? null : (fb ? fb[1] : null));
+    if (d.stage === 'duelarena') goVillageShop('mgduel'); // 결투장은 마을의 결투장 앞으로
     cutscene = null;
     applyEquipment();
     lives = maxLives();
@@ -1753,6 +1769,65 @@
   // 상점/대화: 플레이어 가까이에 있는 상호작용 대상 (없으면 null)
   const GROUND_Y_HOME = 16 * C.TILE; // 집 안 바닥 윗면 y
   const strangerSpot = () => (stageName === 'kingdom' && story.legionDone && !story.harborDone ? G.Stranger.spotOf(terrain) : null); // 군단 요새를 깬 뒤 문 앞에 서 있다
+
+  // ---- 마을 사람들: 조금씩 돌아다니고, 집에 들어가고, 음식을 먹고, 물건을 산다 ----
+  //  말을 걸면 잠시 멈추고, 집 안에 들어가 있을 때는 문을 두드려(E) 들어가 볼 수 있다
+  let visitUI = null; // 마을 사람 집 안 방문 {v, house, t, line, got}
+  const VISIT_LINES = ['어서 와요! 누추하지만 차 한 잔 해요.', '와, 손님이라니! 편하게 앉아요.', '오늘은 집에서 쉬는 날이에요. 같이 쉬어 가요.', '바깥 소식 좀 들려줘요. 모험은 어때요?', '우리 집에 온 걸 환영해요! 이 차는 우리 동네 특산이에요.', '집이 작아도 아늑하죠? 마음껏 쉬다 가요.'];
+  const villagerX = (v) => (v.x !== undefined ? v.x : v.col * C.TILE + C.TILE / 2);
+  function pickVillagerPlan(v) {
+    const T = C.TILE, r = Math.random();
+    const bound = (x) => Math.max(v.bx - 360, Math.min(v.bx + 360, x));
+    const shops = terrain.shops.filter((s) => !s.kind.startsWith('mg') && Math.abs(s.col * T - v.bx) < 700);
+    const eat = shops.find((s) => s.kind === 'food') || null;
+    const houses = terrain.houses.map((h, i) => ({ h, i })).filter((q) => Math.abs(q.h.col * T - v.bx) < 700);
+    if (r < 0.42 || (!houses.length && !shops.length)) { v.tx = bound(v.bx + (Math.random() - 0.5) * 260); v.next = 'idle'; }
+    else if (r < 0.62 && houses.length) { const q = houses[Math.floor(Math.random() * houses.length)]; v.tx = q.h.col * T + T / 2; v.next = 'enter'; v.nextHouse = q.i; }
+    else if (r < 0.8 && eat) { v.tx = eat.col * T + T / 2 + (Math.random() - 0.5) * 50; v.next = 'eat'; }
+    else if (shops.length) { const s = shops[Math.floor(Math.random() * shops.length)]; v.tx = s.col * T + T / 2 + (Math.random() - 0.5) * 50; v.next = 'buy'; }
+    else { v.tx = bound(v.bx + (Math.random() - 0.5) * 260); v.next = 'idle'; }
+    v.state = 'walk';
+  }
+  function updateVillagers(dt) {
+    if (!terrain || !terrain.villagers.length || invasion || stageName === 'home') return;
+    const T = C.TILE;
+    for (const v of terrain.villagers) {
+      if (v.x === undefined) { v.x = v.col * T + T / 2; v.bx = v.x; v.state = 'idle'; v.t = 1 + Math.random() * 3; v.face = Math.random() < 0.5 ? 1 : -1; v.inside = null; v.emote = null; v.walk = false; }
+      if (v.freeze > 0) { v.freeze -= dt; v.walk = false; continue; } // 말을 걸면 멈춘다
+      v.t -= dt;
+      if (v.state === 'idle') { v.walk = false; v.emote = null; if (v.t <= 0) pickVillagerPlan(v); }
+      else if (v.state === 'walk') {
+        const dx = v.tx - v.x;
+        if (Math.abs(dx) < 4) {
+          v.walk = false;
+          if (v.next === 'enter') { v.inside = v.nextHouse; v.state = 'inside'; v.t = 7 + Math.random() * 10; effects.vanish(v.x, (v.row + 1) * T - 20); }
+          else if (v.next === 'eat') { v.state = 'eat'; v.emote = 'eat'; v.t = 3.5 + Math.random() * 2; }
+          else if (v.next === 'buy') { v.state = 'buy'; v.emote = 'buy'; v.t = 2.5 + Math.random() * 1.5; }
+          else { v.state = 'idle'; v.t = 2 + Math.random() * 4; }
+        } else { v.x += Math.sign(dx) * 42 * dt; v.face = Math.sign(dx); v.walk = true; }
+      } else if (v.state === 'inside') { v.walk = false; if (v.t <= 0) { v.inside = null; v.state = 'idle'; v.t = 1.5 + Math.random() * 2; effects.vanish(v.x, (v.row + 1) * T - 20); } }
+      else { v.walk = false; if (v.t <= 0) { v.emote = null; v.state = 'idle'; v.t = 1.5 + Math.random() * 3; } } // eat / buy
+    }
+  }
+  function knockHouse(hi) { // 집 안에 마을 사람이 있으면 문을 두드려 들어간다
+    const v = terrain.villagers.find((q) => q.inside === hi);
+    if (!v) return;
+    v.freeze = 9999;
+    visitUI = { v, house: hi, t: 0, line: VISIT_LINES[Math.floor(Math.random() * VISIT_LINES.length)], got: false };
+    G.Audio.play('catch');
+  }
+  function updateVisit(dt) {
+    const u = visitUI;
+    u.t += dt;
+    if (u.t > 1.1 && !u.got) {
+      u.got = true; G.Audio.play('pickup');
+      if (!u.v.teaAt || Date.now() - u.v.teaAt > 90000) { u.v.teaAt = Date.now(); if (lives < maxLives()) { lives = Math.min(maxLives(), lives + 0.5); u.msg = '차를 대접받았다! 피 +½'; } else u.msg = '따뜻한 차를 마셨다'; } else u.msg = '조금 전에 차를 마셨으니 이야기만 나눴다';
+    }
+    if (u.t > 1.4 && (input.wasPressed('KeyE') || input.wasPressed('Escape') || input.wasPressed('Enter') || input.wasPressed('Space'))) { // 인사하고 나온다
+      const v = u.v; v.freeze = 0; v.inside = null; v.state = 'idle'; v.t = 2; visitUI = null; G.Audio.play('catch');
+    }
+  }
+
   function nearbyInteract() {
     const T = C.TILE;
     const px = player.x + player.w / 2;
@@ -1777,7 +1852,12 @@
     }
     for (let i = 0; i < (invasion ? 0 : terrain.villagers.length); i++) {
       const v = terrain.villagers[i];
-      if (Math.abs(px - (v.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (v.row + 1) * T) < T * 2) return { type: 'talk', index: i };
+      if (v.inside !== null && v.inside !== undefined) continue; // 집 안에 있으면 문을 두드려야 한다
+      if (Math.abs(px - villagerX(v)) < T * 1.6 && Math.abs(feet - (v.row + 1) * T) < T * 2) return { type: 'talk', index: i };
+    }
+    if (!invasion) for (let hi = 0; hi < terrain.houses.length; hi++) { // 마을 사람이 들어가 있는 집: 문 두드리기
+      const h = terrain.houses[hi];
+      if (terrain.villagers.some((q) => q.inside === hi) && Math.abs(px - (h.col * T + T / 2)) < T * 1.6 && Math.abs(feet - (h.row + 1) * T) < T * 2) return { type: 'knock', house: hi };
     }
     for (const w of terrain.waters) {
       if (Math.abs(px - (w.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (w.row + 1) * T) < T * 2) return { type: 'water' };
@@ -1789,7 +1869,7 @@
       if (Math.abs(px - (d.col * T + T / 2)) < T * 2.2 && Math.abs(feet - (d.row + 1) * T) < T * 2) return { type: 'enter' };
     }
     for (const l of terrain.homeLots) {
-      if (Math.abs(px - (l.col * T + T / 2)) < T * 3 && Math.abs(feet - (l.row + 1) * T) < T * 2) return { type: 'home' };
+      if (Math.abs(px - (l.col * T + T / 2)) < T * 3 && Math.abs(feet - (l.row + 1) * T) < T * 2) return { type: 'home', lux: !!l.lux };
     }
     let best = null; // 집 안: 가장 가까운 꾸밀 자리
     for (const sl of terrain.homeSlots) {
@@ -3690,7 +3770,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   function seaPre() { // 플레이어 갱신 전: 수면 아래면 헤엄 모드
     const py = player.y + player.h / 2;
     const was = player.swim;
-    const inDome = stageName === 'sea' && G.Sea.inTown(seaLv, player.x + player.w / 2, py);
+    const inDome = stageName === 'sea' && G.Sea.inAir(seaLv, player.x + player.w / 2, py); // 수중 마을·공기 동굴 안은 공기: 걸어 다닌다
     player.swim = stageName === 'seacave' || (py > G.Sea.SURFACE * C.TILE + 6 && !inDome); // 수중 마을은 공기 방울 안: 중력이 있고 걸어 다닌다
     if (inDome && stageName === 'sea' && G.Sea.shaftOf(seaLv, player.x + player.w / 2) && (input.down.has('KeyW') || input.down.has('ArrowUp'))) { player.vy = -260; player.onGround = false; } // 입구 통로에서 W: 위로 올라간다
     player.swimSpeed = diveSpeed();
@@ -3698,21 +3778,23 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (!player.swim && was && player.vy < 0) player.vy = -600; // 수면 위로 3칸 높이로 폴짝 뛰어오른다
   }
   function updateSea(dt) {
-    if (!inSea() || !seaSt) return;
+    if (!inSea() || !seaSt) { G.Audio.setUnderwater(false); return; }
     const px = player.x + player.w / 2, py = player.y + player.h / 2;
     const lvNow = curSeaLv();
     seaDepth = G.Sea.depthAt(lvNow, player.y + player.h);
     seaInTown = stageName === 'sea' && G.Sea.inTown(seaLv, px, py);
+    seaInPocket = stageName === 'sea' && G.Sea.inPocket(seaLv, px, py);
     for (const a of seaSt.air || []) if (!a.gone && Math.hypot(a.x - px, a.y - py) < 46) { a.gone = true; seaO2 = Math.min(diveMax(), seaO2 + 10); popups.push({ x: a.x, y: a.y - 20, text: '공기방울! 산소 +10초', t: 1.6, color: 'rgba(190,240,255,A)' }); G.Audio.play('pickup'); effects.sparkle(a.x, a.y); } // 공기방울을 마시면 산소 10초
     const max = diveMax();
-    if ((!player.swim && stageName === 'sea') || seaInTown) seaO2 = Math.min(max, seaO2 + 45 * dt); // 수면 위나 수중 마을에서는 숨을 쉰다
+    if ((!player.swim && stageName === 'sea') || seaInTown || seaInPocket) seaO2 = Math.min(max, seaO2 + 45 * dt); // 수면 위나 수중 마을에서는 숨을 쉰다
     else seaO2 = Math.max(0, seaO2 - (1 + seaDepth / 2500) * Math.max(0.2, 1 - 0.05 * diveLv('suit') - G.Sea.diveBonus(inv).use) * dt);
     G.Sea.Theme.setLamp(Math.min(12, diveLv('lamp') + G.Sea.diveBonus(inv).lamp + G.Shop.buffVal(inv, 'light')));
     if (seaInTown && !story.seaTownVisited) { story.seaTownVisited = true; G.Sea.Theme.setVisited(true); popups.push({ x: px, y: player.y - 70, text: '수중 마을에 처음 왔다! 이제 항구 마을의 포털로도 올 수 있어요', t: 4, color: 'rgba(160,240,255,A)' }); G.Audio.play('treasure'); }
-    if (player.swim && !seaInTown && seaO2 <= 0) {
+    if (player.swim && !seaInTown && !seaInPocket && seaO2 <= 0) {
       seaDrown += dt;
       if (seaDrown >= 1.5) { seaDrown = 0; popups.push({ x: px, y: player.y - 30, text: '숨이 막혀요! 위로 올라가요', t: 1.6, color: 'rgba(255,150,150,A)' }); loseLife(px, py, 1); }
     } else seaDrown = 0;
+    G.Audio.setUnderwater(!!player.swim && !seaInTown && !seaInPocket); // 물속이면 노래가 먹먹하다 (공기 있는 곳에서는 또렷하게)
     G.Sea.updateState(seaSt, dt, player, terrain, lvNow, monsters, {});
     G.Sea.Theme.setLevel(lvNow);
   }
@@ -3722,6 +3804,27 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   const elemBlocked = (c) => !!c.sp.elem && !seaElems().includes(c.sp.elem); // 원소 물고기는 같은 원소의 광석을 붙인 무기로만 잡힌다
   const ELEM_KO = { fire: '불꽃', ice: '얼음', poison: '독', quake: '대지', light: '번개', shadow: '그림자' };
   const elemMsg = (c) => `${c.sp.name}: ${ELEM_KO[c.sp.elem]} 원소 광석을 붙인 작살·그물로만 잡혀요!`;
+  // 수중 마을 바닥의 금 간 바위: 6번 치면 무너지고 아래 숨은 방이 열린다
+  function openCrack(quiet) {
+    const ck = seaLv && seaLv.crack;
+    if (!ck || ck.broken) return;
+    ck.broken = true; story.seaCrack = true;
+    for (let r = ck.row; r < ck.row + ck.h; r++) for (let c = ck.col; c < ck.col + ck.w; c++) terrain.grid[r][c] = false; // 길
+    for (let r = ck.room.r0; r <= ck.room.r1; r++) for (let c = ck.room.c0; c <= ck.room.c1; c++) terrain.grid[r][c] = false; // 숨은 방
+    if (!quiet) { effects.quakeDust(ck.col * C.TILE + C.TILE, ck.row * C.TILE, 120); effects.shake(12, 0.4); G.Audio.play('shatter'); popups.push({ x: player.x + player.w / 2, y: player.y - 50, text: '바위가 무너졌다! 아래로 길이 열렸다', t: 2.6, color: 'rgba(255,230,160,A)' }); }
+  }
+  function crackHit() {
+    const ck = stageName === 'sea' && seaLv && seaLv.crack;
+    if (!ck || ck.broken) return;
+    const box = parryBox(player), T = C.TILE;
+    const rx = ck.col * T - 24, ry = ck.row * T - 24, rw = ck.w * T + 48, rh = ck.h * T + 24; // 닿을 듯 가까이서 치면 된다
+    if (box.x < rx + rw && box.x + box.w > rx && box.y < ry + rh && box.y + box.h > ry) {
+      ck.hits += 1;
+      effects.quakeDust(rx + rw / 2, ry, 50); effects.shake(4, 0.15); G.Audio.play('vanish');
+      if (ck.hits >= 6) openCrack(false);
+      else popups.push({ x: rx + rw / 2, y: ry - 20, text: `금이 더 갔다! (${ck.hits}/6)`, t: 1.2, color: 'rgba(255,225,170,A)' });
+    }
+  }
   function seaSwing(wn) { // 작살/그물을 휘두르면 앞의 해산물을 잡는다
     if (!inSea() || !seaSt) return;
     const g = wn.sea, px = player.x + player.w / 2, py = player.y + player.h / 2;
@@ -4398,6 +4501,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   }
 
   function step(dt) {
+    syncHome();
     if (titleUI) { // 처음 화면이 떠 있는 동안 게임은 멈춰 있다 (O: 설정)
       if (settingsUI) updateSettings();
       else if (!titleUI.halted && !titleUI.del && !titleUI.quit && (titleUI.copy === null || titleUI.copy === undefined) && input.wasPressed('KeyO')) { settingsUI = { cur: 0, fromTitle: true }; G.Audio.play('pickup'); }
@@ -4471,6 +4575,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       }
       input.endFrame(); return;
     }
+    if (visitUI) { updateVisit(dt); input.endFrame(); return; } // 마을 사람 집 안에 있는 동안 게임이 멈춘다
     if (achUI) { // 업적 모음집을 보는 동안 게임이 멈춘다
       if (input.wasPressed('Escape') || input.wasPressed('KeyT')) achUI = null;
       else if ((input.wasPressed('ArrowRight') || input.wasPressed('KeyD')) && achUI.page < G.Achv.pages() - 1) { achUI.page++; G.Audio.play('catch'); }
@@ -4647,7 +4752,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         else if (near.shop.kind === 'furnace') openForgePick(); // 용광로: 검 / 투척 무기 / 갑옷 중 무엇을 강화할지 먼저 고른다
         else {
           const sk = near.shop.sub || (near.shop.dive ? 'divegear' : near.shop.kind); // 바다 가게는 sub 이름의 상점을 연다
-          shop = { kind: sk, def: G.Shop.SHOPS[sk], tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
+          shop = { kind: sk, def: G.Shop.SHOPS[sk], tab: 0, hover: -1, msg: '', msgT: 0, ok: true, luxKey: near.shop.lux ? luxKeyHere() : null };
           G.Audio.play('pickup');
         }
       } else if (near && near.type === 'palace') { // 성문
@@ -4668,8 +4773,15 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         shop = { kind: 'place', mode: 'place', slot: sl, def: { title: sl.kind === 'floor' ? '바닥 가구 놓기' : sl.kind === 'top' ? '선반 위에 놓기' : '벽 장식 걸기', tabs: G.Shop.placeTabs(inv, sl.kind) }, tab: 0, hover: -1, msg: '', msgT: 0, ok: true };
         G.Audio.play('pickup');
       } else if (near && near.type === 'home') { // 마을의 내 집 터
-        if (inv.home.type) { homeFrom = stageName; loadStage('home', true); input.endFrame(); return; }
-        dialog = { text: `아직 집이 없다. ${homeTown === 'kingdom' ? '왕국의' : homeTown === 'harbor' ? '항구 마을의' : '마을의'} 부동산에서 집을 살 수 있다. (마을과 왕국은 집이 따로 있다)`, t: 3.5 };
+        if (near.lux) { // 고급 집 터
+          if (inv.homes[luxKeyHere()].type) { homeFrom = stageName; homeKey = luxKeyHere(); loadStage('home', true); input.endFrame(); return; }
+          dialog = { text: '아직 고급 집이 없다. 이곳의 고급 부동산에서 아주 비싼 집을 살 수 있다. (보통 집과는 따로 있는 집이다)', t: 3.5 };
+        } else if (inv.home.type) { homeFrom = stageName; loadStage('home', true); input.endFrame(); return; }
+        else dialog = { text: `아직 집이 없다. ${homeTown === 'kingdom' ? '왕국의' : homeTown === 'harbor' ? '항구 마을의' : '마을의'} 부동산에서 집을 살 수 있다. (마을과 왕국은 집이 따로 있다)`, t: 3.5 };
+      } else if (near && near.type === 'knock') { // 마을 사람의 집: 똑똑
+        knockHouse(near.house);
+        input.endFrame();
+        return;
       } else if (near && near.type === 'enter') { // 마을 동굴로
         enterMine();
         input.endFrame();
@@ -4683,15 +4795,17 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         input.endFrame();
         return;
       } else if (near && near.type === 'exit') { // 마을로 (들어왔던 입구 앞에서 시작)
-        loadStage(stageName === 'home' && homeFrom ? homeFrom : (STAGES[stageName].exitTo || 'village'), true, STAGES[stageName].returnNear || 'D');
+        loadStage(stageName === 'home' && homeFrom ? homeFrom : (STAGES[stageName].exitTo || 'village'), true, stageName === 'home' && homeKey ? 'Z' : (STAGES[stageName].returnNear || 'D'));
         input.endFrame();
         return;
       } else if (near) {
         const lines = stageName === 'sea' ? (terrain.villagers[near.index] && terrain.villagers[near.index].col < seaLv.left ? HARBOR_LINES : SEA_LINES) : stageName === 'harbor' ? HARBOR_LINES : stageName === 'kingdom' ? KINGDOM_LINES : story.revealed && !story.cleared ? DARK_VILLAGER_LINES : VILLAGER_LINES; // 시크너 이야기 뒤에는 마을 사람들 말이 달라진다
         dialog = { text: lines[near.index % lines.length], t: 4 };
+        if (near.type === 'talk') { const v = terrain.villagers[near.index]; v.freeze = 5; v.walk = false; v.face = Math.sign(player.x + player.w / 2 - villagerX(v)) || v.face; } // 말을 걸면 멈춰서 이야기한다
       }
     }
     updateQuest(dt);
+    updateVillagers(dt);
     buffT -= dt; // 음식 효과: 시간이 다 된 것은 지우고, 재생은 5초마다 피 ½칸
     if (buffT <= 0) { buffT = 1; const act = G.Shop.buffList(inv); if (act.length !== (inv.buffs || []).length) { inv.buffs = act; applyEquipment(); applySpeed(); popups.push({ x: player.x + player.w / 2, y: player.y - 40, text: '음식 효과가 끝났어요', t: 1.6, color: 'rgba(255,225,160,A)' }); } }
     if (G.Shop.buffVal(inv, 'regen') > 0) { buffRegenT += dt; if (buffRegenT >= 5) { buffRegenT = 0; if (lives < maxLives()) { lives = Math.min(maxLives(), lives + 0.5); popups.push({ x: player.x + player.w / 2, y: player.y - 30, text: '재생 +½', t: 1.1, color: 'rgba(255,140,170,A)' }); } } } else buffRegenT = 0;
@@ -4768,7 +4882,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
     if (sword) updateSword(dt);
     G.Magic.update(magic, dt, terrain, magicTargets(), magicHooks);
-    if (player.swingFx) { const wn = G.Shop.ITEMS[inv.equipped.weapon]; if (wn && wn.type === 'net') netSwing(wn); if (wn && wn.sea) seaSwing(wn); } // 잠자리채 / 바다의 작살·그물
+    if (player.swingFx) { const wn = G.Shop.ITEMS[inv.equipped.weapon]; if (wn && wn.type === 'net') netSwing(wn); if (wn && wn.sea) seaSwing(wn); crackHit(); } // 잠자리채 / 바다의 작살·그물
     if (player.swingFx) { // 검을 휘두르기 시작하는 순간 바람 이펙트
       player.swingFx = false;
       inv.used[inv.equipped.weapon] = (inv.used[inv.equipped.weapon] || 0) + 1; // 휘두른(쏜) 횟수
@@ -5048,11 +5162,12 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   }
 
   function drawFrame() {
+    syncHome();
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !adminUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
     const near = !shop && !equipUI && !devUI && !adminUI && !mini && !ag && !sg && !wc && !fp && !dialog && !won && !cutscene ? nearbyInteract() : null;
-    const PROMPTS = { seacave: `E: 해저 동굴 탐험 (끝의 상자 +${seaCaveCoins()} G)`, seaportal: near && near.dest === 'harbor' ? 'E: 포털 타고 항구 마을로' : 'E: 포털 타고 수중 마을로', stranger: 'E: ……', palace: 'E: 왕궁으로 들어가기', talk: 'E: 대화', king: (missions.owed || 0) > 0 ? `E: 왕에게 가서 보상 받기 (${Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin))} G)` : 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
-    const prompt = near ? (near.type === 'shop' ? (near.shop.sub ? (near.shop.sub === 'seadex' ? `E: ${near.shop.label} (새로 잡은 해산물 ${G.Sea.SEAFOOD.filter((s) => (inv.seaSeen || {})[s.id] && !(inv.seaDex || {})[s.id]).length}종 · 등록 ${Object.keys(inv.seaDex || {}).length}/${G.Sea.SEAFOOD.length})` : `E: ${near.shop.label}`) : near.shop.kind === 'gacha' ? `E: 뽑기 (한 번에 ${G.Gacha.PRICE} G · 장비와 무기가 걸려 있어요)` : near.shop.kind === 'dexhall' ? `E: 도감 보기 (새로 등록할 것 ${G.Dex.pendingIds(inv).length}개 · +${G.Dex.pendingIds(inv).length * G.Dex.REWARD} G)` : near.shop.kind === 'fishmonger' ? `E: 잡은 물고기 팔기 (${Object.values(inv.fish || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind === 'collector' ? `E: 잡은 곤충 팔기 (${Object.values(inv.bugs || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${STAGES[near.stage].label}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
+    const PROMPTS = { knock: 'E: 똑똑! 문을 두드린다 (집에 누가 있어요)', seacave: `E: 해저 동굴 탐험 (끝의 상자 +${seaCaveCoins()} G)`, seaportal: near && near.dest === 'harbor' ? 'E: 포털 타고 항구 마을로' : 'E: 포털 타고 수중 마을로', stranger: 'E: ……', palace: 'E: 왕궁으로 들어가기', talk: 'E: 대화', king: (missions.owed || 0) > 0 ? `E: 왕에게 가서 보상 받기 (${Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin))} G)` : 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
+    const prompt = near ? (near.type === 'shop' ? (near.shop.sub ? (near.shop.sub === 'seadex' ? `E: ${near.shop.label} (새로 잡은 해산물 ${G.Sea.SEAFOOD.filter((s) => (inv.seaSeen || {})[s.id] && !(inv.seaDex || {})[s.id]).length}종 · 등록 ${Object.keys(inv.seaDex || {}).length}/${G.Sea.SEAFOOD.length})` : `E: ${near.shop.label}`) : near.shop.kind === 'gacha' ? `E: 뽑기 (한 번에 ${G.Gacha.PRICE} G · 장비와 무기가 걸려 있어요)` : near.shop.kind === 'dexhall' ? `E: 도감 보기 (새로 등록할 것 ${G.Dex.pendingIds(inv).length}개 · +${G.Dex.pendingIds(inv).length * G.Dex.REWARD} G)` : near.shop.kind === 'fishmonger' ? `E: 잡은 물고기 팔기 (${Object.values(inv.fish || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind === 'collector' ? `E: 잡은 곤충 팔기 (${Object.values(inv.bugs || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${areaNameOf(near.stage)}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
     const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }, isMergeTab() ? { merge: mergeView() } : {}) : null;
     const jobNow = G.Forge.jobOf(inv);
@@ -5072,11 +5187,12 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       settings: settingsUI,
       fishing: fishUI,
       quest: questHud(),
-      dive: inSea() && player.swim ? { depth: seaDepth, o2: seaO2, max: diveMax(), speed: diveSpeed(), zone: G.Sea.zoneAt(seaDepth), inTown: seaInTown } : null,
+      dive: inSea() && player.swim ? { depth: seaDepth, o2: seaO2, max: diveMax(), speed: diveSpeed(), zone: G.Sea.zoneAt(seaDepth), inTown: seaInTown, inPocket: seaInPocket } : null,
       bossHint: stageName === 'dungeon' ? (() => { const s = bossSignFor(); return s ? { head: s[0], text: s[1], all: Object.keys(G.Dark.BOSS_FLOORS).map((f) => `${f}층 ${bossName(G.Dark.BOSS_FLOORS[f]).replace('정의의 ', '').replace('어둠의 기사 ', '')}`).join('  ·  '), cur: darkFloor } : null; })() : null,
       dex: dexUI ? Object.assign({}, dexUI, { inv }) : null,
       gacha: gachaUI ? Object.assign({}, gachaUI, { board: inv.gacha, coins }) : null,
       cook: cookUI ? { ui: cookUI, inv } : null,
+      visit: visitUI,
       buffs: G.Shop.buffList(inv).map((b) => ({ name: G.Cook.EFF[b.kind] ? G.Cook.EFF[b.kind].name : b.kind, text: G.Cook.EFF[b.kind] ? G.Cook.EFF[b.kind].fmt(b.val, b.n) : '', left: Math.ceil((b.until - Date.now()) / 1000), n: b.n })),
       ach: achUI ? { page: achUI.page, ctx: Object.assign(questCtx(), { playSec }) } : null,
       floorSel: floorUI ? { sel: floorUI.sel, max: floorUI.max, buf: floorUI.buf, best: darkBest, cleared: story.cleared } : null,
@@ -5091,7 +5207,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       crabCount: monsters.filter((m) => m.kind === 'crab' && m.alive).length,
       summon: !!st.summon, monsterless: !!st.monsterless,
       canRestart: gameOver && gameOverTime >= C.GAME_OVER_DELAY,
-      won, cutscene: !!cutscene, goal: st.goal, banner: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI || achUI || cookUI ? null : banner, prompt: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : prompt, dialog: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
+      won, cutscene: !!cutscene, goal: st.goal, banner: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI || achUI || cookUI || visitUI ? null : banner, prompt: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI || visitUI ? null : prompt, dialog: settingsUI || pwUI || titleUI || fishUI || dexUI || mapUI || gachaUI || floorUI ? null : dialog, shop: shopView, forgePick: fp ? fpView() : null, job: jobHud, attach: ag ? Object.assign({}, ag, { agPos: ATTACH_UPDATE[ag.mode] ? 0 : agPos(), smith: smithInfo() }) : null, smelt: sg ? Object.assign({}, sg, { band: sgBand(), smith: smithInfo() }) : null, work: wc ? Object.assign({}, wc, { coins, smith: smithInfo() }) : null, equip: equipView, boss: bossOn() ? boss : null,
     }, sword, { cutscene, chest, ending, npcs, allies, bugs, popups: settingsUI || pwUI || fishUI || dexUI || mapUI || gachaUI || floorUI || achUI || cookUI ? [] : popups, magic, boss: bossOn() ? boss : null, pickups, enemyShots, sea: inSea() ? seaSt : null, stranger: strangerSpot() && !cutscene ? strangerSpot() : null, events: stageName === 'dungeon' ? dungeonEvents : null, legion: stageName === 'legion' ? legionSt : null, ores: stageName === 'orecave' ? oreNodes : null, darken: stageName === 'village' && story.revealed && !story.cleared ? 0.42 : 0 });
   }
   if (!noSave()) { openTitle(); G.Audio.setMusic('title'); } // 처음 화면: 저장 칸 3개 + 타이틀 노래
@@ -5147,6 +5263,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     set blue(v) { blue = v; },
     useConsumable, loseLife,
     get cookUI() { return cookUI; },
+    get visitUI() { return visitUI; },
     set cookUI(v) { cookUI = v; },
     get seaLv() { return seaLv; },
     get seaO2() { return seaO2; },

@@ -76,6 +76,8 @@
           if (ch === 'R') this.shops.push({ col: c, row: r, kind: 'estate' });
           if (ch === 'Q') this.shops.push({ col: c, row: r, kind: 'decor' });
           if (ch === 'Y') this.homeLots.push({ col: c, row: r });
+          if (ch === '7') this.homeLots.push({ col: c, row: r, lux: true }); // 고급 집 터 (엄청 비싼 집)
+          if (ch === '9') this.shops.push({ col: c, row: r, kind: 'estate', lux: true, label: '고급 부동산' });
           if (ch === 'b') this.ponds.push({ col: c, row: r });
           if (ch === '2') this.shops.push({ col: c, row: r, kind: 'gacha' }); // 마을의 뽑기
           if (ch === '1') this.shops.push({ col: c, row: r, kind: 'dexhall' }); // 왕국의 도감관

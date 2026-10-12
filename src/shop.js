@@ -416,6 +416,7 @@
   const upMaxed = (item, inv) => !!item.upgrade && levelOf(item, inv) >= maxLevelOf(item);
   // 다음 레벨로 올리는 가격 (최고 레벨이면 0). 업그레이드가 아닌 아이템은 원래 가격
   function priceOf(item, inv) {
+    if (item.house) return item.price * ((G.Shop && G.Shop.estateMul) || 1); // 고급 부동산은 훨씬 비싸다
     if (!item.upgrade) return item.price;
     if (item.expCost && item.base) { const b = ITEMS[item.base]; return upMaxed(b, inv) ? 0 : Math.max(10, Math.round(priceOf(b, inv) / 4 / 10) * 10); } // EXP 업그레이드는 코인 값의 1/4
     if (upMaxed(item, inv)) return 0;
@@ -772,8 +773,9 @@
     if (item.house) { // 집 사기: 이미 사는 집이면 안 되고, 다른 집이면 이사 (놓았던 장식품은 새 집의 자리에 그대로 옮겨진다)
       const home = wallet.inv.home;
       if (home.type === item.id) return { ok: false, msg: '이미 살고 있는 집이에요.' };
-      if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
-      wallet.coins -= item.price;
+      const cost = priceOf(item, wallet.inv);
+      if (wallet.coins < cost) return { ok: false, msg: '코인이 부족해요.' };
+      wallet.coins -= cost;
       home.type = item.id;
       home.placed.floor.length = Math.min(home.placed.floor.length, item.floor);
       home.placed.wall.length = Math.min(home.placed.wall.length, item.wall);

@@ -18,7 +18,7 @@
 
   // ===== 해산물 56종: [이름, 구역, 모양, 값, 크기(px), 색1, 색2] =====
   // 구역 0: 0~200m / 1: 200~500m / 2: 500~1000m / 3: 1000~1500m 심해 / 4: 1500m~ 수중 마을 아래
-  const ZONES = [[0, 220], [180, 520], [480, 1020], [980, 1520], [1480, 2100]];
+  const ZONES = [[0, 220], [180, 520], [480, 1020], [980, 1420], [1380, 1560]]; // 수중 마을 아래는 바위로 막혀 있어서 가장 깊은 곳은 1540m쯤
   const ZONE_NAME = ['얕은 바다', '푸른 바다', '어두운 바다', '심해', '깊은 심해'];
   const RAW = [
     ['멸치', 0, 'fish', 40, 16, '#c8d4e0', '#7a8aa0'], ['정어리', 0, 'fish', 50, 20, '#aeb8c8', '#5a6a82'], ['고등어', 0, 'fish', 70, 28, '#4a7ab0', '#c8d8e8'], ['전갱이', 0, 'fish', 80, 26, '#8aa8c0', '#e8e0b0'],
@@ -100,7 +100,7 @@
       this.moveX(dt, terrain);
       this.moveY(dt, terrain);
       if (this.hitWall) this.vx = -this.vx * 0.5;
-      if (inTown(curLevel, this.x + this.w / 2, this.y + this.h / 2)) { this.x = ox; this.y = oy; this.vx = -this.vx; this.vy = -this.vy; } // 수중 마을 안(공기 방울)에는 못 들어온다
+      if (inAir(curLevel, this.x + this.w / 2, this.y + this.h / 2)) { this.x = ox; this.y = oy; this.vx = -this.vx; this.vy = -this.vy; } // 수중 마을 안(공기 방울)에는 못 들어온다
     }
   }
 
@@ -143,6 +143,18 @@
     for (let c = 4; c <= 16; c += 6) for (let r = SURFACE; r < SURFACE + 5; r++) g[r][c] = '#'; // 부두 기둥
     if (!L) { g[SURFACE - 2][3] = 'X'; g[SURFACE - 2][6] = 'P'; }
     g[SURFACE - 2][9] = '6'; g[SURFACE - 2][13] = '5'; // 다이빙 상점, 해산물 가게
+    // 공기 동굴: 내려가는 길 곳곳(수심 140~1320m)에 바위 속 방이 있고, 큰 공기방울이 차 있다. 바닥의 구멍으로 헤엄쳐 올라가면 숨을 쉴 수 있다
+    const pockets = [];
+    [[140, 0], [330, 1], [520, 0], [760, 1], [940, 0], [1130, 1], [1320, 0]].forEach(([dep, side], k) => {
+      const w = 18 + (k % 3) * 3, h = 8 + (k % 2) * 2; // 방 안쪽 크기
+      const c0 = side ? W - 14 - w : 10, c1 = c0 + w - 1;
+      const r1 = SURFACE + dep, r0 = r1 - h + 1;
+      for (let r = r0 - 3; r <= r1 + 3; r++) for (let c = c0 - 3; c <= c1 + 3; c++) g[r][c] = '#'; // 바위 덩어리
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) g[r][c] = '.'; // 큰 공기방울이 찬 방
+      const cm = Math.floor((c0 + c1) / 2);
+      for (let r = r1 + 1; r <= r1 + 3; r++) for (let c = cm - 2; c <= cm + 1; c++) g[r][c] = '.'; // 아래의 입구 구멍
+      pockets.push({ c0, c1, r0, r1, cm });
+    });
     // 수중 마을 돔 (공기가 차 있는 방)
     const F = SURFACE + TOWN_DEPTH + 30; // 마을 바닥 줄 (더 크고 높은 돔)
     const x0 = 8, x1 = W - 8, top = F - 34;
@@ -151,15 +163,22 @@
     for (let r = top + 1; r < F; r++) for (let c = x0; c <= x1 - 1; c++) g[r][c] = '.';
     for (let r = top - 2; r <= top + 1; r++) for (let c = sc - 3; c <= sc + 2; c++) g[r][c] = '.'; // 위에서 들어오는 입구
     for (let r = top - 40; r < top - 2; r++) for (let c = sc - 4; c <= sc + 3; c++) if (g[r][c] === '#') g[r][c] = '.'; // 입구 위쪽 물길
+    // 수중 마을 아래와 양옆은 바위로 메운다 (돔이 바다 밑바닥의 바위 속에 박혀 있다)
+    for (let r = top - 2; r <= F + 3; r++) { for (let c = 0; c < x0 - 2; c++) g[r][c] = '#'; for (let c = x1 + 2; c < W; c++) g[r][c] = '#'; }
+    for (let r = F + 4; r < ROWS; r++) for (let c = 0; c < W; c++) g[r][c] = '#';
+    // 수중 마을 바닥의 금 간 바위: 여러 번 치면 무너지고, 아래 숨은 방이 열린다 (부수기 전에는 그냥 바위)
+    const ck = x0 + 14;
+    pockets.push({ c0: ck - 6, c1: ck + 9, r0: F, r1: F + 12, cm: ck, secret: true });
+    const crackInfo = { col: ck, row: F, w: 2, h: 4, hits: 0, broken: false, room: { c0: ck - 6, c1: ck + 9, r0: F + 4, r1: F + 12 } };
     // 해저 동굴 입구: 수심 약 620m의 바위 덩어리 아래쪽에 입을 벌리고 있다
     const ce = { col: 36 + L, row: SURFACE + 620 };
     for (let r = ce.row - 8; r <= ce.row; r++) for (let c = 29; c <= 43; c++) g[r][c] = '#';
     for (let r = ce.row - 4; r <= ce.row; r++) for (let c = 34; c <= 37; c++) g[r][c] = '.';
     const row = F - 1;
-    for (const [c, ch] of [[16, 'V'], [20, 'H'], [26, '5'], [32, 'V'], [44, 'H'], [68, '6'], [74, 'V'], [86, 'H'], [96, 'i'], [99, 'V']]) g[row][c] = ch;
+    for (const [c, ch] of [[10, 'H'], [13, 'V'], [16, '5'], [34, 'H'], [37, 'V'], [51, 'V'], [62, '6'], [65, 'V'], [68, 'H'], [77, 'V'], [86, '9'], [92, 'i'], [98, '7']]) g[row][c] = ch;
     // 마을에만 있는 새 가게 4곳 (겉모습은 기존 가게를 빌리고 이름표만 다르다) + 항구 마을로 가는 포털
-    const extraShops = [{ col: 38 + L, row, kind: 'dexhall', sub: 'seadex', label: '해산물 도감관' }, { col: 62 + L, row, kind: 'tackle', sub: 'divegear2', label: '잠수 장비점' }, { col: 80 + L, row, kind: 'food', sub: 'searest', label: '해물 요리점' }, { col: 92 + L, row, kind: 'decor', sub: 'seadecor', label: '수족관 꾸밈' }];
-    const portals = L ? [{ kind: 'toHarbor', col: 49 + L, row }, { kind: 'toTown', col: L - 4, row: SURFACE - 2 }] : [];
+    const extraShops = [{ col: 28 + L, row, kind: 'dexhall', sub: 'seadex', label: '해산물 도감관' }, { col: 40 + L, row, kind: 'tackle', sub: 'divegear2', label: '잠수 장비점' }, { col: 74 + L, row, kind: 'food', sub: 'searest', label: '해물 요리점' }, { col: 80 + L, row, kind: 'decor', sub: 'seadecor', label: '수족관 꾸밈' }];
+    const portals = L ? [{ kind: 'toHarbor', col: 46 + L, row }, { kind: 'toTown', col: L - 4, row: SURFACE - 2 }] : [];
     // 항구 마을: 바다 부두와 같은 높이로 이어진 땅 (집, 주민, 왼쪽 끝 출구). 부두 끝에서 그냥 뛰어내리면 바다다
     const rowsOut = g.map((row, r) => (r >= SURFACE - 1 ? '#'.repeat(L) : '.'.repeat(L)) + row.join(''));
     if (L) {
@@ -169,12 +188,17 @@
       for (const c of [11, 22, 52, 70, 88]) put(c, 'H');
       put(104, 'Y'); put(110, 'R'); // 항구 마을의 내 집 터와 부동산
     }
-    return { rows: rowsOut, left: L, townTop: top, townFloor: F, townX0: x0 + L, townX1: x1 + L, shaft0: sc - 3 + L, shaft1: sc + 3 + L, extraShops, portals, caveEntrance: { col: ce.col, row: ce.row } };
+    const pk = pockets.map((p) => ({ c0: p.c0 + L, c1: p.c1 + L, r0: p.r0, r1: p.r1, cm: p.cm + L, secret: !!p.secret }));
+    const crack = { col: crackInfo.col + L, row: crackInfo.row, w: crackInfo.w, h: crackInfo.h, hits: 0, broken: false, room: { c0: crackInfo.room.c0 + L, c1: crackInfo.room.c1 + L, r0: crackInfo.room.r0, r1: crackInfo.room.r1 } };
+    return { rows: rowsOut, left: L, pockets: pk, crack, townTop: top, townFloor: F, townX0: x0 + L, townX1: x1 + L, shaft0: sc - 3 + L, shaft1: sc + 3 + L, extraShops, portals, caveEntrance: { col: ce.col, row: ce.row } };
   }
 
-  const zoneAt = (m) => (m < 200 ? 0 : m < 500 ? 1 : m < 1000 ? 2 : m < 1500 ? 3 : 4);
+  const zoneAt = (m) => (m < 200 ? 0 : m < 500 ? 1 : m < 1000 ? 2 : m < 1400 ? 3 : 4);
   const depthOf = (y) => Math.max(0, Math.round(y / T - SURFACE)); // 발 높이 y(px) -> 수심(m)
   const inTown = (lv, x, y) => !!lv && y / T > lv.townTop && y / T < lv.townFloor && x / T > lv.townX0 && x / T < lv.townX1;
+  // 가는 길 곳곳의 공기 동굴: 바위 속 방에 큰 공기방울이 차 있다. 안에서는 걸어 다니고 숨을 쉴 수 있다
+  const inPocket = (lv, x, y) => !!lv && !!lv.pockets && lv.pockets.some((p) => y / T > p.r0 && y / T < p.r1 + 1 && x / T > p.c0 && x / T < p.c1 + 1);
+  const inAir = (lv, x, y) => inTown(lv, x, y) || inPocket(lv, x, y);
 
   // 이 수심에서 나올 해산물 하나 고르기 (구역이 맞는 것만, 희귀할수록 드물다)
   function pickSeafood(depth, rnd = Math.random) {
@@ -213,7 +237,7 @@
         const ang = Math.random() * Math.PI * 2, dist = 240 + Math.random() * 380;
         const x = px + Math.cos(ang) * dist, y = py + Math.sin(ang) * dist * 0.75;
         const c = Math.floor(x / T), r = Math.floor(y / T);
-          if (r <= minRow || r >= maxRow || c < left + 3 || c >= left + cols - 3 || terrain.isSolid(c, r) || inTown(lv, x, y)) continue;
+          if (r <= minRow || r >= maxRow || c < left + 3 || c >= left + cols - 3 || terrain.isSolid(c, r) || inAir(lv, x, y)) continue;
         const sp = pickSeafood(depthAt(lv, y));
         st.crits.push({ sp, x, y, vx: (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 30), vy: 0, t: Math.random() * 10, size: 0.8 + Math.random() * 0.6, gone: false });
         break;
@@ -229,22 +253,22 @@
       if (d < 150 && c.sp.zone >= 1) { tvx = (dx / (d || 1)) * sp * 1.6; tvy = (dy / (d || 1)) * sp * 1.2; } // 가까이 가면 달아난다
       c.vx += (tvx - c.vx) * Math.min(1, dt * 2); c.vy += (tvy - c.vy) * Math.min(1, dt * 2);
       const nx = c.x + c.vx * dt, ny = c.y + c.vy * dt;
-      if (terrain.isSolid(Math.floor(nx / T), Math.floor(c.y / T)) || inTown(lv, nx, c.y)) c.vx = -c.vx; else c.x = nx;
-      if (terrain.isSolid(Math.floor(c.x / T), Math.floor(ny / T)) || ny < minRow * T || inTown(lv, c.x, ny)) c.vy = -c.vy; else c.y = ny;
+      if (terrain.isSolid(Math.floor(nx / T), Math.floor(c.y / T)) || inAir(lv, nx, c.y)) c.vx = -c.vx; else c.x = nx;
+      if (terrain.isSolid(Math.floor(c.x / T), Math.floor(ny / T)) || ny < minRow * T || inAir(lv, c.x, ny)) c.vy = -c.vy; else c.y = ny;
     }
     // 거품
     if (Math.random() < dt * 6 && (lv.cave || py > SURFACE * T)) st.bubbles.push({ x: px + (Math.random() - 0.5) * 600, y: py + 360, vy: 40 + Math.random() * 40, r: 1.5 + Math.random() * 3, t: 0 });
     for (const b of st.bubbles) { b.y -= b.vy * dt; b.t += dt; }
-    st.bubbles = st.bubbles.filter((b) => (lv.cave || b.y > (SURFACE * T)) && b.t < 12 && Math.abs(b.y - py) < 600 && !inTown(lv, b.x, b.y));
+    st.bubbles = st.bubbles.filter((b) => (lv.cave || b.y > (SURFACE * T)) && b.t < 12 && Math.abs(b.y - py) < 600 && !inAir(lv, b.x, b.y));
     // 공기방울: 가끔 떠 있다. 닿으면 산소 10초가 찬다 (main이 닿는지 본다)
     st.air = st.air.filter((a) => Math.hypot(a.x - px, a.y - py) < 1100 && !a.gone);
-    if (st.airT <= 0 && st.air.filter((a) => !a.fixed).length < 3 && (lv.cave || py > SURFACE * T + 120) && !inTown(lv, px, py)) {
+    if (st.airT <= 0 && st.air.filter((a) => !a.fixed).length < 3 && (lv.cave || py > SURFACE * T + 120) && !inAir(lv, px, py)) {
       st.airT = 7 + Math.random() * 7;
       for (let tries = 0; tries < 8; tries++) {
         const ang = Math.random() * Math.PI * 2, dist = 260 + Math.random() * 360;
         const x = px + Math.cos(ang) * dist, y = py + Math.sin(ang) * dist * 0.7;
         const c = Math.floor(x / T), r = Math.floor(y / T);
-        if (r <= minRow + 4 || r >= maxRow || c < left + 4 || c >= left + cols - 4 || terrain.isSolid(c, r) || inTown(lv, x, y)) continue;
+        if (r <= minRow + 4 || r >= maxRow || c < left + 4 || c >= left + cols - 4 || terrain.isSolid(c, r) || inAir(lv, x, y)) continue;
         st.air.push({ x, y, t: Math.random() * 6, gone: false });
         break;
       }
@@ -265,7 +289,7 @@
           const ang = Math.random() * Math.PI * 2, dist = 420 + Math.random() * 260;
           const x = px + Math.cos(ang) * dist, y = py + Math.sin(ang) * dist * 0.7;
           const c = Math.floor(x / T), r = Math.floor(y / T);
-          if (r <= minRow + 1 || r >= maxRow || c < left + 4 || c >= left + cols - 4 || terrain.isSolid(c, r) || terrain.isSolid(c + 1, r) || terrain.isSolid(c, r + 1) || inTown(lv, x, y)) continue;
+          if (r <= minRow + 1 || r >= maxRow || c < left + 4 || c >= left + cols - 4 || terrain.isSolid(c, r) || terrain.isSolid(c + 1, r) || terrain.isSolid(c, r + 1) || inAir(lv, x, y)) continue;
           const m = new SeaFish(x, y, kind);
           m.stageSpeed = 1 + Math.min(0.5, depth / 4000);
           m.extraHits = Math.min(25, Math.floor(depth / 80)); // 깊이 내려갈수록 딴딴한 물고기 (80m마다 딴딴함 1)
@@ -415,6 +439,42 @@
         for (let x = camera.x - 20; x <= camera.x + view; x += 16) ctx.lineTo(x, sy + Math.sin(x * 0.05 + time * 2) * 3);
         ctx.lineTo(camera.x + view, sy + 40); ctx.closePath(); ctx.fill();
       }
+      // 공기 동굴: 큰 공기방울이 차 있는 바위 속 방
+      if (caveBase === null && curLevel && curLevel.crack) { // 금 간 바위와 비밀의 방
+        const ck = curLevel.crack;
+        const cx0 = ck.col * T, cy0 = ck.row * T;
+        if (cx0 > camera.x - 400 && cx0 < camera.x + view && cy0 > camera.y - 800 && cy0 < camera.y + 1100) {
+          if (!ck.broken) {
+            const dmg = ck.hits / 6;
+            ctx.strokeStyle = `rgba(15,8,8,${0.75 + 0.2 * dmg})`; ctx.lineWidth = 2.5 + dmg * 2; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(cx0 + T * 0.9, cy0 + 2); ctx.lineTo(cx0 + T * 0.5, cy0 + T * 0.9); ctx.lineTo(cx0 + T * 1.2, cy0 + T * 1.6); ctx.lineTo(cx0 + T * 0.7, cy0 + T * 2.5); ctx.lineTo(cx0 + T * 1.3, cy0 + T * 3.4); ctx.lineTo(cx0 + T * 1.0, cy0 + T * 4 - 2); ctx.stroke();
+            if (ck.hits > 0) { ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx0 + T * 1.2, cy0 + T * 1.6); ctx.lineTo(cx0 + T * 1.8, cy0 + T * 2.0); ctx.moveTo(cx0 + T * 0.7, cy0 + T * 2.5); ctx.lineTo(cx0 + T * 0.1, cy0 + T * 2.9); ctx.stroke(); }
+            if (ck.hits > 2) { ctx.beginPath(); ctx.moveTo(cx0 + T * 0.5, cy0 + T * 0.9); ctx.lineTo(cx0 + T * 0.05, cy0 + T * 0.6); ctx.moveTo(cx0 + T * 1.3, cy0 + T * 3.4); ctx.lineTo(cx0 + T * 1.9, cy0 + T * 3.7); ctx.stroke(); }
+            ctx.lineCap = 'butt';
+          } else {
+            const r = ck.room, rx0 = r.c0 * T, ry0 = r.r0 * T, rx1 = (r.c1 + 1) * T, ry1 = (r.r1 + 1) * T;
+            const gr = ctx.createLinearGradient(0, ry0, 0, ry1); gr.addColorStop(0, 'rgba(14,18,34,0.96)'); gr.addColorStop(1, 'rgba(8,10,22,0.98)');
+            ctx.fillStyle = gr; ctx.fillRect(rx0, ry0, rx1 - rx0, ry1 - ry0);
+            const lg = ctx.createRadialGradient((rx0 + rx1) / 2, ry0 + T * 3, 10, (rx0 + rx1) / 2, ry0 + T * 3, T * 9); lg.addColorStop(0, 'rgba(255,230,160,0.35)'); lg.addColorStop(1, 'rgba(255,230,160,0)');
+            ctx.fillStyle = lg; ctx.fillRect(rx0, ry0, rx1 - rx0, ry1 - ry0);
+            if (G.TextLayer) G.TextLayer.add('시험', (rx0 + rx1) / 2, ry0 + T * 4.2, 'bold 72px sans-serif', '#ffe9a0');
+          }
+        }
+      }
+      if (caveBase === null && curLevel && curLevel.pockets) for (const p of curLevel.pockets) {
+        if (p.secret) continue;
+        const x0 = p.c0 * T, x1 = (p.c1 + 1) * T, y0 = p.r0 * T, y1 = (p.r1 + 1) * T;
+        if (x1 < camera.x - 50 || x0 > camera.x + view || y1 < camera.y - 50 || y0 > camera.y + 800) continue;
+        const g = ctx.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, 'rgba(120,180,230,0.78)'); g.addColorStop(1, 'rgba(190,230,250,0.62)');
+        ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2, ry = (y1 - y0) / 2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(cx, cy, rx - 6, ry - 6, 0, 0, Math.PI * 2); ctx.stroke(); // 방울 막
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(cx - rx * 0.45, cy - ry * 0.45, rx * 0.16, ry * 0.1, -0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let i = 0; i < 7; i++) { const bx = x0 + 20 + ((i * 97 + time * 14) % (x1 - x0 - 40)), by = y1 - 10 - ((time * 20 + i * 41) % (y1 - y0 - 20)); ctx.beginPath(); ctx.arc(bx, by, 2 + (i % 3), 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = 'rgba(40,110,170,0.9)'; ctx.fillRect(p.cm * T - T * 2 + T * 0, y1, T * 4, T * 0.4); // 입구 구멍
+        if (G.TextLayer) G.TextLayer.add('공기 동굴 (큰 공기방울: 숨을 쉴 수 있어요)', cx, y0 + 18, 'bold 13px sans-serif', '#ffffff');
+        if (G.TextLayer) G.TextLayer.add('▲ 아래 구멍으로 올라와요', p.cm * T + T / 2 - T, y1 + 26, 'bold 11px sans-serif', '#cfeeff');
+      }
       // 수중 마을 돔: 유리 천장, 가로등 빛
       if (caveBase === null && curLevel && curLevel.townTop !== undefined) {
         const L = curLevel, x0 = L.townX0 * T, x1 = L.townX1 * T, top = L.townTop * T, fl = L.townFloor * T;
@@ -440,17 +500,18 @@
   // ===== 화면 위 표시: 수심, 산소 게이지 =====
   function drawHud(ctx, W, H, d) {
     ctx.save();
-    const w = 320, x = W / 2 - w / 2, y = 124;
-    ctx.fillStyle = 'rgba(4,16,40,0.72)'; ctx.fillRect(x, y, w, 62);
-    ctx.strokeStyle = d.o2 / d.max < 0.25 ? '#ff6a6a' : '#6ad0ff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, 62);
+    const w = 400, x = W / 2 - w / 2, y = 124;
+    ctx.fillStyle = 'rgba(4,16,40,0.72)'; ctx.fillRect(x, y, w, 78);
+    ctx.strokeStyle = d.o2 / d.max < 0.25 ? '#ff6a6a' : '#6ad0ff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, 78);
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
     ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(`수심 ${d.depth} m`, x + 12, y + 17);
-    ctx.textAlign = 'right'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = d.depth >= DEEP ? '#c8a0ff' : '#9ad8ff'; ctx.fillText(d.inTown ? '수중 마을 (공기가 찬다)' : d.depth >= DEEP ? `심해 · ${ZONE_NAME[d.zone]}` : ZONE_NAME[d.zone], x + w - 12, y + 17);
+    ctx.textAlign = 'right'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = d.depth >= DEEP ? '#c8a0ff' : '#9ad8ff'; ctx.fillText(d.inTown ? '수중 마을 (공기가 찬다)' : d.inPocket ? '공기 동굴 (공기가 찬다)' : d.depth >= DEEP ? `심해 · ${ZONE_NAME[d.zone]}` : ZONE_NAME[d.zone], x + w - 12, y + 17);
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x + 12, y + 30, w - 24, 12);
     const k = clamp(d.o2 / d.max, 0, 1);
     ctx.fillStyle = k > 0.5 ? '#6ad0ff' : k > 0.25 ? '#ffd54a' : '#ff5a5a'; ctx.fillRect(x + 13, y + 31, (w - 26) * k, 10);
     ctx.textAlign = 'left'; ctx.font = '12px sans-serif'; ctx.fillStyle = '#cfe8ff'; ctx.fillText(`산소 ${Math.ceil(d.o2)} / ${d.max}초`, x + 12, y + 53);
-    ctx.textAlign = 'right'; ctx.fillText(`헤엄 속도 ${d.speed}   ·   E: 맨손 잡기 · 공격: 작살/그물`, x + w - 12, y + 53);
+    ctx.textAlign = 'right'; ctx.fillText(`헤엄 속도 ${d.speed}`, x + w - 12, y + 53);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#9ac0e0'; ctx.fillText('E: 맨손 잡기  ·  공격: 작살/그물', x + w / 2, y + 68);
     ctx.restore();
   }
 
@@ -593,5 +654,5 @@
     return { rows: g.map((r) => r.join('')), cave: true, depthBase: 700, cols: CW, left: 0, fishSpots, airSpots };
   }
 
-  G.Sea = { drawCritter, makeCave, depthAt, DIVE_ORES, DORE, diveBonus, ELEM_COLOR, BASE_COUNT: 56, DISH_IDS, shaftOf, GEAR_IDS, SURFACE, DEPTH, W, ROWS, DEEP, TOWN_DEPTH, SEAFOOD, BY_ID, FISH, ZONES, ZONE_NAME, SeaFish, makeLevel, zoneAt, depthOf, inTown, pickSeafood, pickHostile, makeState, updateState, nearest, draw, paintFish, Theme, drawHud };
+  G.Sea = { inPocket, inAir, drawCritter, makeCave, depthAt, DIVE_ORES, DORE, diveBonus, ELEM_COLOR, BASE_COUNT: 56, DISH_IDS, shaftOf, GEAR_IDS, SURFACE, DEPTH, W, ROWS, DEEP, TOWN_DEPTH, SEAFOOD, BY_ID, FISH, ZONES, ZONE_NAME, SeaFish, makeLevel, zoneAt, depthOf, inTown, pickSeafood, pickHostile, makeState, updateState, nearest, draw, paintFish, Theme, drawHud };
 })(window.Game);
