@@ -425,6 +425,7 @@
       underwater = on;
       if (ctx && musicFilter) musicFilter.frequency.setTargetAtTime(on ? 420 : 22000, ctx.currentTime, 0.18);
     },
+    info() { return { state: ctx && ctx.state, underwater, filter: musicFilter ? Math.round(musicFilter.frequency.value) : null, sfx: sfxOut ? sfxOut.gain.value : null, music: musicOut ? musicOut.gain.value : null, muted }; }, // 시험용
     setSfxVolume(v) {
       G.Settings.sfx = Math.max(0, Math.min(1, v));
       if (sfxOut) sfxOut.gain.value = G.Settings.sfx;
