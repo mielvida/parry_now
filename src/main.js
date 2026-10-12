@@ -3775,6 +3775,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (inDome && stageName === 'sea' && G.Sea.shaftOf(seaLv, player.x + player.w / 2) && (input.down.has('KeyW') || input.down.has('ArrowUp'))) { player.vy = -260; player.onGround = false; } // 입구 통로에서 W: 위로 올라간다
     player.swimSpeed = diveSpeed();
     if (player.swim && !was) { effects.sparkle(player.x + player.w / 2, player.y + player.h / 2); G.Audio.play('catch'); }
+    if (!player.swim && was) { effects.sparkle(player.x + player.w / 2, player.y + player.h); G.Audio.play('splash'); } // 물에서 나올 때 철푸덕
     if (!player.swim && was && player.vy < 0) player.vy = -600; // 수면 위로 3칸 높이로 폴짝 뛰어오른다
   }
   function updateSea(dt) {
