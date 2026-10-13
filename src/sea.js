@@ -76,7 +76,8 @@
     update(dt, player, terrain) {
       if (this.tickLifecycle(dt, terrain)) return;
       this.time += dt;
-      const px = player.x + player.w / 2, py = player.y + player.h / 2;
+      const surf = curLevel && curLevel.cave ? -1e9 : SURFACE * T; // 물고기는 물속에만 산다: 수면 위(하늘)로는 올라가지 못한다
+      const px = player.x + player.w / 2, py = Math.max(player.y + player.h / 2, surf + 40); // 내가 부두나 공중에 있어도 수면 아래까지만 쫓아온다
       const cx = this.x + this.w / 2, cy = this.y + this.h / 2;
       const dx = px - cx, dy = py - cy, d = Math.hypot(dx, dy) || 1;
       const V = this.V;
@@ -100,6 +101,7 @@
       this.moveX(dt, terrain);
       this.moveY(dt, terrain);
       if (this.hitWall) this.vx = -this.vx * 0.5;
+      if (this.y + this.h * 0.5 < surf + 4) { this.y = surf + 4 - this.h * 0.5; if (this.vy < 0) this.vy = 0; } // 수면에서 멈춘다
       if (inAir(curLevel, this.x + this.w / 2, this.y + this.h / 2)) { this.x = ox; this.y = oy; this.vx = -this.vx; this.vy = -this.vy; } // 수중 마을 안(공기 방울)에는 못 들어온다
     }
   }

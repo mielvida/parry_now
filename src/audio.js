@@ -100,6 +100,19 @@
       noise(0.06, 0.25, 4000, 2000, 'highpass');
     },
     spawn: () => tone('sine', 120, 380, 0.25, 0.25), // 슬라임 뽕
+    // ---- 게임쇼 효과음 ----
+    tick: () => tone('square', 1500, 1300, 0.03, 0.06), // 째깍 (섞기, 박자)
+    ding: () => { tone('sine', 1320, 1320, 0.14, 0.26); tone('sine', 1760, 1760, 0.22, 0.2, 0.07); }, // 땡! (성공)
+    buzzer: () => { tone('sawtooth', 160, 110, 0.3, 0.26); tone('square', 120, 90, 0.3, 0.12); }, // 삑- (틀렸다)
+    whoosh: () => { noise(0.4, 0.55, 250, 5200, 'bandpass', 0, 2.5); noise(0.3, 0.3, 4000, 900, 'bandpass', 0.18, 2); }, // 휘익 (코너 전환)
+    fanfare: () => { for (const [f, d, l] of [[523, 0, 0.12], [659, 0.1, 0.12], [784, 0.2, 0.12], [1047, 0.32, 0.4]]) { tone('square', f, f, l, 0.1, d); tone('triangle', f * 2, f * 2, l, 0.08, d); } }, // 빰빠라밤!
+    cheer: () => { noise(0.9, 0.45, 2200, 3200, 'bandpass', 0, 0.7); noise(0.7, 0.35, 1200, 2500, 'bandpass', 0.15, 0.6); for (let k = 0; k < 6; k++) noise(0.05, 0.4, 3000, 1500, 'highpass', 0.1 + k * 0.09); }, // 와아아! 짝짝짝
+    drum: () => { tone('sine', 170, 60, 0.22, 0.5); noise(0.08, 0.3, 900, 200, 'lowpass'); }, // 둥! (결투 신호)
+    bell: () => { tone('sine', 1568, 1568, 0.5, 0.2); tone('sine', 2349, 2349, 0.4, 0.12, 0.01); }, // 딩동
+    flip: () => tone('triangle', 800, 1500, 0.07, 0.2), // 돌이 뒤집힌다
+    stone: () => { tone('triangle', 520, 300, 0.07, 0.22); noise(0.04, 0.35, 3000, 1500, 'bandpass'); }, // 딱! (판에 돌을 놓는다)
+    reel: () => { tone('square', 900, 1100, 0.03, 0.05); noise(0.03, 0.15, 5000, 3000, 'highpass'); }, // 드르륵 (낚시/풀무)
+    thud: () => { tone('sine', 140, 50, 0.16, 0.35); noise(0.06, 0.3, 600, 150, 'lowpass'); }, // 퍽 (빗나감)
     splash: () => { // 물에서 나올 때: 철푸덕! 하고 물이 튀고 뚝뚝 떨어진다
       noise(0.42, 1.5, 2200, 220, 'bandpass', 0, 1.2); // 촤악
       noise(0.2, 0.9, 5200, 1200, 'highpass', 0.03); // 튀는 물
@@ -398,7 +411,7 @@
   }
 
   // 멜로디가 있는 소리는 음높이를 흔들지 않는다
-  const FIXED_PITCH = new Set(['gameover', 'treasure', 'pickup', 'charge', 'orebreak_rare']);
+  const FIXED_PITCH = new Set(['gameover', 'treasure', 'pickup', 'charge', 'orebreak_rare', 'ding', 'fanfare', 'bell', 'cheer']);
 
   const Audio = {
     play(name) {

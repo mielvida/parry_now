@@ -115,6 +115,18 @@
         if (bx < camera.x - 120 || bx > camera.x + camera.viewW + 120) continue;
         G.Beach.drawShop(ctx, s, bx, (s.row + 1) * TILE, time, false);
       }
+      const fe = terrain.facEnd; // 맨 끝: 체크포인트 깃발과 망토를 쓴 정체 모를 사람
+      if (fe && fe.cp.x > camera.x - 100 && fe.cp.x < camera.x + camera.viewW + 100) {
+        const { x, y, reached } = fe.cp, pulse = 0.5 + 0.5 * Math.sin(time * 4);
+        const gl = ctx.createRadialGradient(x, y - 36, 4, x, y - 36, 70); gl.addColorStop(0, reached ? `rgba(120,255,160,${0.35 + 0.15 * pulse})` : `rgba(255,230,120,${0.3 + 0.15 * pulse})`); gl.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = gl; ctx.fillRect(x - 70, y - 110, 140, 130);
+        ctx.fillStyle = '#7a8088'; ctx.fillRect(x - 3, y - 70, 6, 70); ctx.fillStyle = '#4a5058'; ctx.fillRect(x - 14, y - 6, 28, 6);
+        ctx.fillStyle = reached ? '#4aff8a' : '#ffd24a'; ctx.beginPath(); ctx.moveTo(x + 3, y - 70); ctx.lineTo(x + 36 + Math.sin(time * 5) * 2, y - 60); ctx.lineTo(x + 3, y - 48); ctx.closePath(); ctx.fill();
+        G.TextLayer.add(reached ? '체크포인트 ✔' : '체크포인트', x, y - 84, 'bold 12px sans-serif', reached ? '#8dffa8' : '#ffe9a0'); ctx.textAlign = 'start';
+        const h = fe.host;
+        const hg = ctx.createRadialGradient(h.x, h.y - 30, 4, h.x, h.y - 30, 80); hg.addColorStop(0, 'rgba(200,120,255,0.22)'); hg.addColorStop(1, 'rgba(200,120,255,0)'); ctx.fillStyle = hg; ctx.fillRect(h.x - 80, h.y - 110, 160, 130);
+        ctx.save(); ctx.translate(h.x, h.y); ctx.scale(-1, 1); G.GameShow.drawDog(ctx, 0, 0, 0.8, h.down ? 'down' : 'idle', time, true); ctx.restore(); // 개 (쓰러뜨린 뒤에는 벌러덩 누워 있다)
+        G.TextLayer.add(h.down ? '쓰러진 개' : '개', h.x, h.y - 96, 'bold 12px sans-serif', h.down ? '#aaa' : '#ffd0a0'); ctx.textAlign = 'start';
+      }
     },
 
     // 공장 안은 초록빛 어둠: 가장자리가 어둡다 (동굴 기본 비네트에 초록 기운을 더한다)

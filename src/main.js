@@ -117,8 +117,7 @@
     },
     factory: { // 방사능 공장: 하수구 끝. 방사능을 만들어 내는 공장. 20배 센 실험체와 강한 직원들. 끝의 상자를 먹으면 바다로 돌아온다
       music: 'cave', label: '방사능 공장', level: G.Levels.factory, theme: G.Factory, monsterless: false, repeatChest: true, returnNear: null, exitTo: 'sewer', exitLabel: '하수구',
-      goal: '방사능 공장: 앞쪽 휴게 구역에 가게 9곳이 있다 (방호복·병기·클리닉·충전·분류·급식·개조·룰렛·보급). 그 너머 생산 라인에서 직원과 20배 센 실험체를 헤치고 맨 끝 상자까지 (+20000 G, 경험치 1500). 왼쪽 출구에서 E: 하수구로',
-      chest: { mode: 'mine', coins: 20000, exp: 1500, next: 'sea', near: 'bossdoor' },
+      goal: '방사능 공장: 앞쪽 휴게 구역에 가게 9곳이 있다 (방호복·병기·클리닉·충전·분류·급식·개조·룰렛·보급). 그 너머 생산 라인에서 직원과 20배 센 실험체를 헤치고 맨 끝의 개에게: 30개의 미니게임을 모두 깨고 엔터로 쓰러뜨리면 엔딩! 왼쪽 출구에서 E: 하수구로',
       banner: { title: '방사능 공장', sub: '하수구 끝의 비밀 공장', dur: 3.5, caption: '…초록빛 통 속에서 무언가 꿈틀거린다. 방호복을 입은 직원들이 이쪽을 보고 있다.' },
     },
     duelarena: { // 결투장: 보스전처럼 AI 용사와 싸운다
@@ -590,6 +589,8 @@
     { name: '전설의 용사 하랑', armor: 'darmor3', helmet: 'dhelmet4', weapon: 'great4' },
   ];
   let mini = null;
+  let showUI = null;  // 게임쇼 (방사능 공장 끝의 정체 모를 사람) 진행 상태
+  let facEnd = null;  // 공장 맨 끝: 체크포인트와 정체 모를 사람 {cp, host}
   const rand3 = () => Math.floor(Math.random() * 3);
   const miniGo = (m, st) => { m.st = st; m.t = 0; };
   function openMini(kind) {
@@ -1390,6 +1391,13 @@
     if (name === 'sea' && near === 'seacave') spawn = terrain.placeOnTile(seaLv.caveEntrance.col, seaLv.caveEntrance.row - 1, C.PLAYER_W, C.PLAYER_H);
     const arrive = near === 'bossdoor' && seaLv && seaLv.bossDoor ? { col: seaLv.bossDoor.col + 2, row: seaLv.bossDoor.row } : near === 'D' ? terrain.caveEntrances[0] : near === 'Y' ? (terrain.homeLots.find((l) => !l.lux) || terrain.homeLots[0]) : near === 'Z' ? (terrain.homeLots.find((l) => l.lux) || terrain.homeLots[0]) : near === 'palace' ? terrain.castles[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
     if (arrive) spawn = terrain.placeOnTile(arrive.col - 2, arrive.row, C.PLAYER_W, C.PLAYER_H);
+    facEnd = null; showUI = null;
+    if (name === 'factory') { // 맨 끝(상자 바로 앞): 체크포인트 하나, 그 옆에 망토를 쓴 정체 모를 사람
+      const T2 = C.TILE, cc = terrain.cols - 19, hc = terrain.cols - 13;
+      facEnd = { cp: { col: cc, row: 15, x: cc * T2 + T2 / 2, y: 16 * T2, reached: !!story.facCp }, host: { col: hc, row: 15, x: hc * T2 + T2 / 2, y: 16 * T2, down: !!story.dogDefeated } };
+      terrain.facEnd = facEnd;
+      if (story.facCp) spawn = terrain.placeOnTile(cc - 1, 15, C.PLAYER_W, C.PLAYER_H); // 체크포인트를 지났다면 죽어도 여기서 다시 시작
+    }
 
     chest = terrain.treasure && !chestTaken[name] && !st.boss ? makeChest() : null; // 보스가 있는 스테이지는 보스를 쓰러뜨려야 상자가 나온다
     const house = terrain.houses[0];
@@ -1901,6 +1909,7 @@
     const T = C.TILE;
     const px = player.x + player.w / 2;
     const feet = player.y + player.h;
+    if (stageName === 'factory' && facEnd && Math.abs(px - facEnd.host.x) < 70 && Math.abs(feet - facEnd.host.y) < 90) return { type: 'facHost' }; // 정체 모를 사람
     if (stageName === 'sea' && seaLv && seaLv.caveEntrance && Math.abs(px - (seaLv.caveEntrance.col * T + T / 2)) < T * 2.4 && Math.abs(feet - (seaLv.caveEntrance.row + 1) * T) < T * 3) return { type: 'seacave' };
     if (stageName === 'sea' && seaLv && seaLv.bossDoor && Math.abs(px - (seaLv.bossDoor.col * T + T / 2)) < T * 2.4 && Math.abs(feet - (seaLv.bossDoor.row + 1) * T) < T * 2.2) return { type: 'seabossdoor' }; // 바다 오른쪽 끝의 문
     if (stageName === 'sea' && seaLv) { // 수중 마을 <-> 항구 마을 포털
@@ -3121,6 +3130,12 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { label: '수중 마을 (1500m)로 가기', hint: '', run: goto(() => { story.cleared = true; loadStage('sea', true); const c = G.Sea.TOWN_DEPTH + G.Sea.SURFACE; player.placeAt((seaLv.left + 36) * C.TILE, (c + 18) * C.TILE); }) },
       { label: '하수구로 가기', hint: '보스 3마리 뒤의 지역 · 지렁이', run: goto(() => { story.cleared = true; loadStage('sewer', true); }) },
       { label: '방사능 공장으로 가기', hint: '하수구 끝 · 실험체(20배)와 직원', run: goto(() => { story.cleared = true; loadStage('factory', true); }) },
+      { head: '보드게임 · 코너 연습 (피 안 깎임)' },
+      ...[['omok', '오목'], ['connect4', '사목'], ['tictactoe', '틱택토'], ['dots', '점 잇기'], ['checkers', '체커'], ['battleship', '전함']].map(([id, nm]) => ({ label: `보드게임: ${nm}`, hint: '컴퓨터와 한 판 (끝나면 다시 하기)', run: goto(() => openPractice('board', id)) })),
+      ...[['fps', '3D 총게임'], ['maze', '3D 미로 탈출'], ['range', '3D 풍선 사격'], ['runner', '3D 복도 달리기']].map(([id, nm]) => ({ label: `${nm} 연습`, hint: 'WASD · 우클릭 누른 채 돌기 · 좌클릭 쏘기', run: goto(() => openPractice('fps', id)) })),
+      { label: '엔딩 컷신 보기 (개를 쓰러뜨린 뒤)', hint: '쾅! → 엔딩 문장 → THE END · 보상 없음 · Esc로 나가기', run: goto(() => openEndingCutscene()) },
+      { label: '게임쇼 시작 (방사능 공장 끝의 쇼)', hint: '코너 20여 개 · 틀리면 피 -1', run: goto(() => { openShow(); }) },
+      { label: '공장 맨 끝으로 가기', hint: '체크포인트 + 정체 모를 사람', run: goto(() => { story.cleared = true; loadStage('factory', true); player.placeAt((terrain.cols - 22) * C.TILE, 15 * C.TILE - player.h); camera.follow(player, terrain, C.DT, true); }) },
       { label: '해일의 방으로 가기', hint: '보스 3마리 (아귀 → 게 → 문어)', run: goto(() => { story.cleared = true; story.seaBossOpen = true; loadStage('seaboss', true); }) },
       { label: '다이빙 장비 최대', hint: '산소통·오리발·잠수복·랜턴 Lv 10', run: give('다이빙 장비 최대', () => { inv.dive = { tank: 10, fins: 10, suit: 10, lamp: 10 }; }) },
       { label: '수중 마을 방문 처리', hint: '항구 마을 포털이 열린다', run: give('수중 마을 방문 처리', () => { story.seaTownVisited = true; G.Sea.Theme.setVisited(true); }) },
@@ -3251,8 +3266,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       equipUI.msgT = 0;
     }
   });
-  canvas.addEventListener('mousedown', () => { if (sg && !sg.result) sg.mouse = true; if (ag && ag.mode === 'fill' && !ag.result) ag.mouse = true; }); // 제련: 누르는 동안 풀무질 / 폭탄 화약 채우기
-  window.addEventListener('mouseup', () => { if (sg) sg.mouse = false; if (ag) ag.mouse = false; });
+  canvas.addEventListener('mousedown', (ev) => { if (showUI && ev.button === 0) showUI.mdown = true; if (showUI && ev.button === 2) showUI.rdown = true; if (sg && !sg.result) sg.mouse = true; if (ag && ag.mode === 'fill' && !ag.result) ag.mouse = true; }); // 제련: 누르는 동안 풀무질 / 폭탄 화약 채우기
+  window.addEventListener('mouseup', (ev) => { if (showUI) { if (ev.button === 0) showUI.mdown = false; if (ev.button === 2) showUI.rdown = false; } if (sg) sg.mouse = false; if (ag) ag.mouse = false; });
   canvas.addEventListener('mousemove', (ev) => {
     const p = canvasPoint(ev);
     if (cookUI) { cookMouse('move', p); return; }
@@ -3263,6 +3278,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       if (fp.step === 'cat') { const i = g.cats.findIndex((r) => inRect(p, r)); if (i >= 0) fp.cur = i; }
       else { const k = g.cells.findIndex((r) => inRect(p, r)); const idx = (fp.scroll || 0) * FP_COLS + k; if (k >= 0 && idx < fp.list.length) fp.cur = idx; }
     }
+    if (showUI) showUI.mouse = p; // 게임쇼: 마우스 위치
     if (mini) { mini.mouse = p; mini.useMouse = true; } // 놀이마당: 마우스로 조준/선택
     if (equipUI && equipUI.drag) {
       const d = equipUI.drag;
@@ -3378,6 +3394,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     }
     if (ag) { ag.click = true; ag.clickPos = p; return; } // 부착 미니게임: 클릭 = 망치질 (보드게임은 칸 고르기)
     if (sg) { if (sg.result) sg.click = true; return; } // 제련 미니게임: 결과 닫기 (풀무질은 마우스를 누르고 있는 동안)
+    if (showUI) { showUI.click = p; showUI.mouse = p; return; } // 게임쇼
     if (mini) { mini.click = p; mini.mouse = p; mini.useMouse = true; return; }
     if (settingsUI) { // 설정 창: 줄 클릭 = 토글, 음량 막대 클릭 = 그 위치로
       const L = G.Renderer.settingsRows(C.VIEW_W, C.VIEW_H);
@@ -3480,6 +3497,99 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     G.Audio.play('parry');
     if (crit) critFx(s.x + s.w / 2, s.y + s.h * 0.4);
   }
+  // ---------- 방사능 공장 끝: 체크포인트와 정체 모를 사람의 게임쇼 ----------
+  function updateFacCheckpoint() {
+    if (stageName !== 'factory' || !facEnd || facEnd.cp.reached) return;
+    const cp = facEnd.cp;
+    if (Math.abs(player.x + player.w / 2 - cp.x) < 50 && Math.abs(player.y + player.h - cp.y) < 90) { // 체크포인트: 죽으면 여기서 다시 시작
+      cp.reached = true; story.facCp = true;
+      spawn = terrain.placeOnTile(cp.col - 1, cp.row, C.PLAYER_W, C.PLAYER_H);
+      lives = Math.min(maxLives(), lives + 2);
+      G.Audio.play('treasure'); effects.treasure(cp.x, cp.y - 40);
+      popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '체크포인트! 피 +2 (죽으면 여기서 다시 시작)', t: 3, color: 'rgba(125,255,160,A)' });
+    }
+  }
+  const showHost = {
+    // 하나 틀릴 때마다 피 한 칸: 쿨타임·무적·막기·보호막과 상관없다 (파란 피가 있으면 그것부터)
+    hurt() {
+      effects.playerHit(player.x + player.w / 2, player.y + player.h / 2);
+      if (blue > 0) blue -= 1; else lives -= 1;
+      return Math.max(0, lives);
+    },
+    lives: () => Math.max(0, lives) + blue,
+    heal() { lives = Math.min(maxLives(), lives + 1); G.Audio.play('pickup'); effects.sparkle(player.x + player.w / 2, player.y); }, // 네 코너를 넘길 때마다 관객이 응원해 피 +1
+    maxLives: () => maxLives(),
+    sound(n) { G.Audio.play(n); },
+    shake(m, d) { effects.shake(m, d); },
+    done(win, info) {
+      showUI = null;
+      input.endFrame();
+      if (info && (info.practice || info.cutscene)) return; // 연습·컷신 보기: 보상도 죽음도 없다
+      if (lives <= 0) { // 피가 다했다: 보통의 죽음 (체크포인트에서 다시 시작)
+        G.Audio.play('gameover'); player.dead = true; player.invuln = 0; player.shadowTime = 0; gameOver = true; gameOverTime = 0;
+        return;
+      }
+      if (info && info.quit) { popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '쇼를 포기했다…', t: 2.5, color: 'rgba(255,200,160,A)' }); return; }
+      if (win && info && info.ending) { // 엔딩: 30개를 모두 깨고 엔터로 개를 쓰러뜨렸다. 끝난 뒤에도 이 저장 그대로 이어서 한다
+        story.dogDefeated = true; story.facShowWins = (story.facShowWins || 0) + 1;
+        if (facEnd) facEnd.host.down = true;
+        coins += 300000; exp += 20000;
+        const pool2 = G.Forge.ORES.filter((o) => o.tier === 4 && !o.kingdom);
+        for (let i = 0; i < 5; i++) { const o = pool2[Math.floor(Math.random() * pool2.length)]; inv.ingots[o.id] = (inv.ingots[o.id] || 0) + 1; }
+        G.Forge.markDirty();
+        lives = maxLives();
+        G.Audio.play('treasure'); effects.treasure(player.x + player.w / 2, player.y);
+        popups.push({ x: player.x + player.w / 2, y: player.y - 80, text: 'THE END · 엔딩을 봤다! +300000 G, +20000 EXP, 4단계 주괴 5개', t: 5, color: 'rgba(255,225,120,A)' });
+        startDialogs(['(개는 벌러덩 누워 꼼짝도 하지 않는다. 그 옆에 검은 망토가 떨어져 있다)', '…그 의문의 사람은 강아지였다. 이제 이야기는 끝났다. 하지만 모험은 이어진다. 가고 싶은 곳으로 가자!', '(쓰러진 개에게 E로 말을 걸면 다시 도전할 수 있다)']);
+        return;
+      }
+      if (win) {
+        const first = !story.facShowWins;
+        story.facShowWins = (story.facShowWins || 0) + 1;
+        const gc = first ? 100000 : 30000, gx = first ? 8000 : 2000;
+        coins += gc; exp += gx;
+        const pool = G.Forge.ORES.filter((o) => o.tier === 4 && !o.kingdom);
+        for (let i = 0; i < 3; i++) { const o = pool[Math.floor(Math.random() * pool.length)]; inv.ingots[o.id] = (inv.ingots[o.id] || 0) + 1; }
+        G.Forge.markDirty();
+        lives = maxLives();
+        G.Audio.play('treasure'); effects.treasure(player.x + player.w / 2, player.y);
+        popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `게임쇼 우승! +${gc} G, +${gx} EXP, 4단계 주괴 3개`, t: 4, color: 'rgba(255,225,120,A)' });
+        startDialogs(['???: …훌륭하다. 정말로 끝까지 해냈군.', '???: 이 쇼의 우승자는 오랜만이야. 마음에 들었어. 또 도전하고 싶으면 언제든 와라!']);
+      } else {
+        popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: `탈락… (성공한 코너 ${info ? info.cleared : 0}개)`, t: 3, color: 'rgba(255,150,150,A)' });
+      }
+    },
+  };
+  function openShow() { showUI = G.GameShow.create(showHost, { firstEnding: !story.dogDefeated }); input.endFrame(); }
+  function openEndingCutscene() { showUI = G.GameShow.createCutscene(showHost); input.endFrame(); } // 관리자 메뉴: 개를 쓰러뜨린 뒤의 컷신과 엔딩만 본다 (보상 없음)
+  function openPractice(kind, id) { showUI = G.GameShow.create(showHost, { practice: { kind, id } }); input.endFrame(); } // 관리자 메뉴: 한 코너만 연습 (틀려도 피가 깎이지 않는다)
+  function talkShowHost() {
+    const first = !story.facHostMet;
+    story.facHostMet = true;
+    const lines = story.dogDefeated ? ['(쓰러진 개 옆에 벗겨진 검은 망토가 놓여 있다)', '개: …멍. 그래, 그 망토는 내 거였다. 군단 요새 앞에서 널 차원문으로 던진 것도 나다.', '개: 한 판 더 하겠다고? 30개를 다시 깨면 또 쓰러져 줄게. 하나 틀릴 때마다 피 -1이다, 멍!']
+      : first ? [
+      '(커다란 개가 체크포인트 옆에서 으르렁거린다. 눈이 붉게 빛난다)',
+      '(어디선가 본 적이 있는 듯한 눈빛이다…)',
+      '개: …멍. 용케 여기까지 찾아왔군.',
+      '개: 하수구를 지나, 실험체와 직원들을 헤치고… 대단해. 하지만 여기가 네 무덤이다.',
+      '개: 이 쇼는 널 죽이려고 만들었다. 지금까지 해 본 놀이를 전부, 훨씬 빠르게! 새 보드게임에, 가끔 3D 게임에, 제한 시간 퍼즐까지! 미니게임 30개다!',
+      '개: 하나 틀릴 때마다 쿨타임 따위 없이 피가 한 칸씩 깎인다. 피가 다하면 끝이야.',
+      '개: 30개를 모두 깨면… 엔터 한 번으로 날 쓰러뜨릴 수 있다. 할 수 있다면 말이야. 멍!',
+    ] : ['개: 또 왔나. 으르렁… 죽이러 와 줘서 고맙다, 멍!', '개: 30개를 다 깨야 한다. 하나 틀릴 때마다 피 -1!'];
+    startDialogs(lines, openShow);
+  }
+  // 게임쇼(3D): 오른쪽 버튼으로 시선을 돌린다. 브라우저 메뉴·자동 스크롤·선택 같은 것이 켜지지 않게 화면 어디서든 막는다
+  window.addEventListener('contextmenu', (ev) => { if (showUI) { ev.preventDefault(); ev.stopPropagation(); } }, true);
+  window.addEventListener('mousedown', (ev) => { if (showUI && ev.button === 2) ev.preventDefault(); }, true);
+  window.addEventListener('auxclick', (ev) => { if (showUI) ev.preventDefault(); }, true);
+  window.addEventListener('selectstart', (ev) => { if (showUI) ev.preventDefault(); }, true);
+  function updateShowUI(dt) {
+    const st = showUI;
+    const io = { pressed: (...c) => c.some((k) => input.wasPressed(k)), down: (...c) => c.some((k) => input.down.has(k)), click: st.click || null, mouse: st.mouse || null, mouseDown: !!st.mdown, rightDown: !!st.rdown, W: C.VIEW_W, H: C.VIEW_H };
+    st.click = null;
+    G.GameShow.update(st, io, dt);
+  }
+
   // 하수구 지렁이: 가끔 천장에서 떨어지고, 갈라진 지렁이는 두 마리가 된다
   let wormT = 6, wormStage = '';
   function updateWorms(dt) {
@@ -4768,6 +4878,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       input.endFrame();
       return;
     }
+    if (showUI) { updateShowUI(dt); input.endFrame(); return; } // 게임쇼 중에는 게임이 멈춘다
     if (mini) { // 놀이(야바위/표적/결투) 중에는 게임이 멈춘다
       updateMini(dt);
       input.endFrame();
@@ -4860,6 +4971,8 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         loadStage('seacave', true);
         input.endFrame();
         return;
+      } else if (near && near.type === 'facHost') { // 공장 끝의 정체 모를 사람: 말을 걸면 게임쇼가 시작된다
+        talkShowHost();
       } else if (near && near.type === 'seabossdoor') { // 바다 오른쪽 끝의 문: 10000 G를 넣으면 열린다
         if (story.seaBossOpen) { loadStage('seaboss', true); input.endFrame(); return; }
         if (coins >= 10000) {
@@ -5162,6 +5275,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       if (lives < maxLives()) { homeHealT += dt; if (homeHealT >= 0.5) { homeHealT -= 0.5; lives = Math.min(maxLives(), lives + 1); effects.sparkle(player.x + player.w / 2, player.y + 6); G.Audio.play('pickup'); } } else homeHealT = 0;
     } else homeHealT = 0;
     updateWorms(dt);
+    updateFacCheckpoint();
     updateMissions(dt);
     recordHistory(dt);
     playSec += dt;
@@ -5316,7 +5430,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !adminUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
     const near = !shop && !equipUI && !devUI && !adminUI && !mini && !ag && !sg && !wc && !fp && !dialog && !won && !cutscene ? nearbyInteract() : null;
-    const PROMPTS = { seabossdoor: story.seaBossOpen ? 'E: 해일의 방으로 들어가기' : 'E: 10000 G를 넣고 문 열기', knock: 'E: 똑똑! 문을 두드린다 (집에 누가 있어요)', seacave: `E: 해저 동굴 탐험 (끝의 상자 +${seaCaveCoins()} G)`, seaportal: near && near.dest === 'harbor' ? 'E: 포털 타고 항구 마을로' : 'E: 포털 타고 수중 마을로', stranger: 'E: ……', palace: 'E: 왕궁으로 들어가기', talk: 'E: 대화', king: (missions.owed || 0) > 0 ? `E: 왕에게 가서 보상 받기 (${Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin))} G)` : 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
+    const PROMPTS = { facHost: story.dogDefeated ? 'E: 쓰러진 개에게 말 걸기 (다시 도전)' : 'E: 으르렁거리는 개에게 말 걸기', seabossdoor: story.seaBossOpen ? 'E: 해일의 방으로 들어가기' : 'E: 10000 G를 넣고 문 열기', knock: 'E: 똑똑! 문을 두드린다 (집에 누가 있어요)', seacave: `E: 해저 동굴 탐험 (끝의 상자 +${seaCaveCoins()} G)`, seaportal: near && near.dest === 'harbor' ? 'E: 포털 타고 항구 마을로' : 'E: 포털 타고 수중 마을로', stranger: 'E: ……', palace: 'E: 왕궁으로 들어가기', talk: 'E: 대화', king: (missions.owed || 0) > 0 ? `E: 왕에게 가서 보상 받기 (${Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin))} G)` : 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
     const prompt = near ? (near.type === 'shop' ? (near.shop.sub ? (near.shop.sub === 'seadex' ? `E: ${near.shop.label} (새로 잡은 해산물 ${G.Sea.SEAFOOD.filter((s) => (inv.seaSeen || {})[s.id] && !(inv.seaDex || {})[s.id]).length}종 · 등록 ${Object.keys(inv.seaDex || {}).length}/${G.Sea.SEAFOOD.length})` : `E: ${near.shop.label}`) : near.shop.kind === 'gacha' ? `E: 뽑기 (한 번에 ${G.Gacha.PRICE} G · 장비와 무기가 걸려 있어요)` : near.shop.kind === 'dexhall' ? `E: 도감 보기 (새로 등록할 것 ${G.Dex.pendingIds(inv).length}개 · +${G.Dex.pendingIds(inv).length * G.Dex.REWARD} G)` : near.shop.kind === 'fishmonger' ? `E: 잡은 물고기 팔기 (${Object.values(inv.fish || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind === 'collector' ? `E: 잡은 곤충 팔기 (${Object.values(inv.bugs || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${areaNameOf(near.stage)}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
     const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }, isMergeTab() ? { merge: mergeView() } : {}) : null;
@@ -5330,6 +5444,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     renderer.draw(terrain, player, camera, monsters, effects, {
       lives, blue, maxLives: maxLives(), coins, exp, potions: inv.potions, gameOver,
       stamina, staminaMax: stMax(), consumables: inv.consumables,
+      show: showUI,
       mini: mini ? Object.assign({}, mini, { coins, me: { weaponId: inv.equipped.weapon, armorId: inv.equipped.armor, helmetId: inv.equipped.helmet, glovesId: inv.equipped.gloves, pantsId: inv.equipped.pants, bootsId: inv.equipped.boots } }) : null,
       caveInfo: stageName === 'mine' ? { level: mineRun, coins: Math.round(STAGES.mine.chest.coins * (1 + G.Shop.homeBonuses(inv).coin)) } : null,
       weakText: analysisText(),
@@ -5370,6 +5485,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     get baseMonsterCount() { return baseMonsterCount; },
     get stage() { return stageName; },
     get ending() { return ending; },
+    get show() { return showUI; },
     get slimes() { return monsters.filter((m) => m.kind === 'slime'); },
     get bats() { return monsters.filter((m) => m.kind === 'bat'); },
     get lives() { return lives; },

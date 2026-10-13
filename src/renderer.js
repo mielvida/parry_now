@@ -156,7 +156,7 @@
       if (this.hideHud) return; // 지역 사진을 찍을 때는 인터페이스를 숨긴다
       this._drawHud(main, hud);
       this._drawEdgeTexts(main, hud);
-      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel || hud.ach || hud.cook || hud.visit));
+      const windowOpen = !!(hud && (hud.equip || hud.shop || hud.dev || hud.mini || hud.show || hud.admin || hud.fishing || hud.dex || hud.map || hud.gacha || hud.floorSel || hud.ach || hud.cook || hud.visit));
       if (!windowOpen && hud && hud.caveInfo) this._drawCaveInfo(main, hud.caveInfo); // 동굴의 레벨과 상자 보상 // 인벤토리/상점/개발 메뉴가 열려 있으면 보스 체력 막대와 스태미나 막대는 숨긴다 (창과 겹치지 않게)
       if (!windowOpen && hud && hud.stamina !== undefined) this._drawStamina(main, hud);
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
@@ -4439,6 +4439,7 @@
       if (hud.map) G.TownMap.draw(ctx, this.viewW, this.viewH, hud.map.terrain, hud.map.markers, hud.map.player, hud.map.title, performance.now() / 1000);
       if (hud.admin) G.Admin.draw(ctx, this.viewW, this.viewH, hud.admin, hud.admin.me);
       if (hud.mini) this._drawMini(ctx, hud.mini);
+      if (hud.show) G.GameShow.draw(ctx, hud.show, this.viewW, this.viewH); // 게임쇼: 화면 전체를 덮는다
       if (hud.settings) this._drawSettings(ctx, hud.settings);
       if (hud.pw) this._drawPassword(ctx, hud.pw);
 
