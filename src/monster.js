@@ -112,9 +112,9 @@
 
     // 첫 타: dirX 방향으로 PUSH_DIST만큼 밀려나 기절한다 (죽지 않는다)
     stagger(dirX) {
-      this.staggered = C.STAGGER_TIME;
+      this.staggered = C.STAGGER_TIME * (0.8 + Math.random() * 0.5); // 기절 시간도 매번 조금씩 달라서 박자를 맞출 수 없다
       this.hitGrace = C.HIT_GRACE;
-      this.pushLeft = C.PUSH_DIST;
+      this.pushLeft = C.PUSH_DIST * (0.35 + Math.random() * 1.5);      // 밀려나는 거리는 매번 무작위
       this.pushDir = dirX;
       this.vx = 0;
       this.chasing = false;
@@ -125,8 +125,12 @@
     knockback(dirX) {
       this.staggered = 0;
       this.pushLeft = 0;
-      this.vx = dirX * C.PARRY_KNOCK_VX;
-      this.vy = -C.PARRY_KNOCK_VY;
+      // 날아가는 힘과 각도가 매번 무작위라서 어디로 얼마나 날아갈지 박자를 읽을 수 없다 (가끔 거의 위로, 가끔 멀리, 드물게 반대쪽)
+      const r = Math.random();
+      const sp = C.PARRY_KNOCK_VX * (0.4 + Math.random() * 1.4);
+      this.vx = (r < 0.08 ? -dirX : dirX) * sp * (r < 0.25 ? 0.25 : 1);
+      this.vy = -C.PARRY_KNOCK_VY * (0.35 + Math.random() * 1.5);
+      this.spinK = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 22); // 도는 방향과 속도도 무작위
       this.onGround = false;
       this.flying = true;
       this.flightTime = 0;
@@ -165,7 +169,7 @@
         this.applyGravity(dt, 1);
         this.moveX(dt, terrain);
         this.moveY(dt, terrain);
-        this.spin += dt * 18 * Math.sign(this.vx || 1);
+        this.spin += dt * (this.spinK || 18 * Math.sign(this.vx || 1));
         // 벽/땅/천장에 닿으면 폭발. 구덩이로 떨어지거나 너무 오래 날아도 폭발
         const hit = this.hitWall || this.hitCeiling || this.onGround;
         if (hit || this.flightTime > C.PARRY_MAX_FLIGHT || this.y > terrain.height) this._die();

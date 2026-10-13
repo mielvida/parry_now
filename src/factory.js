@@ -107,6 +107,16 @@
       }
     },
 
+    // 출구 문(동굴 테마와 같다) + 휴게 구역의 가게 9곳
+    drawDecor(ctx, terrain, camera, time) {
+      Cave.drawDecor.call(this, ctx, terrain, camera, time);
+      for (const s of terrain.shops) {
+        const bx = s.col * TILE + TILE / 2;
+        if (bx < camera.x - 120 || bx > camera.x + camera.viewW + 120) continue;
+        G.Beach.drawShop(ctx, s, bx, (s.row + 1) * TILE, time, false);
+      }
+    },
+
     // 공장 안은 초록빛 어둠: 가장자리가 어둡다 (동굴 기본 비네트에 초록 기운을 더한다)
     drawVignette(ctx, w, h) {
       Cave.drawVignette.call(this, ctx, w, h);

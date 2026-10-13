@@ -117,7 +117,7 @@
     },
     factory: { // 방사능 공장: 하수구 끝. 방사능을 만들어 내는 공장. 20배 센 실험체와 강한 직원들. 끝의 상자를 먹으면 바다로 돌아온다
       music: 'cave', label: '방사능 공장', level: G.Levels.factory, theme: G.Factory, monsterless: false, repeatChest: true, returnNear: null, exitTo: 'sewer', exitLabel: '하수구',
-      goal: '방사능 공장: 방호복 직원과 20배 센 실험체를 헤치고 맨 끝의 보물 상자까지 (+20000 G, 경험치 1500). 실험체는 방사능 덩어리를 뱉는다 (패링!). 왼쪽 출구에서 E: 하수구로',
+      goal: '방사능 공장: 앞쪽 휴게 구역에 가게 9곳이 있다 (방호복·병기·클리닉·충전·분류·급식·개조·룰렛·보급). 그 너머 생산 라인에서 직원과 20배 센 실험체를 헤치고 맨 끝 상자까지 (+20000 G, 경험치 1500). 왼쪽 출구에서 E: 하수구로',
       chest: { mode: 'mine', coins: 20000, exp: 1500, next: 'sea', near: 'bossdoor' },
       banner: { title: '방사능 공장', sub: '하수구 끝의 비밀 공장', dur: 3.5, caption: '…초록빛 통 속에서 무언가 꿈틀거린다. 방호복을 입은 직원들이 이쪽을 보고 있다.' },
     },
@@ -1345,6 +1345,7 @@
     inv.home = inv.homes[homeTown];
   }
   function loadStage(name, keepLives = false, near = null) {
+    G.Shop.setDiscount(name === 'village' ? 0.65 : 1); // 처음 마을은 물가가 낮다 (모든 가게 35% 할인)
     if (name === 'harbor') name = 'sea'; // 항구 마을은 바다와 하나로 이어졌다 (옛 저장 호환)
     stageName = name;
     if (name === 'village' || name === 'kingdom') homeTown = name;
@@ -1480,13 +1481,15 @@
         const mo = mk(col, row); mo.stageSpeed = 1; mo.immune = {};
         monsters.push(mo);
       };
+      const hubRow = 15; // 휴게 구역: 가게 9곳 (몬스터 없음)
+      G.FacShops.SHOP_DEFS.forEach((d, i) => terrain.shops.push({ col: 12 + i * 10, row: hubRow, kind: 'fac', fac: true, sub: d.sub, label: d.label, npc: d.npc, color: d.color, icon: d.icon }));
       let k = 0;
-      for (let col = 26; col < terrain.cols - 16; col += 19, k++) { // 실험체
+      for (let col = 118; col < terrain.cols - 16; col += 19, k++) { // 실험체
         const v = k % 2 ? 'spitter' : 'brute', d = G.Subject.SIZE[v];
         put(col, (c, r) => { const p = terrain.placeOnTile(c, r, d.w, d.h); return new G.Subject(p.x, p.y, v); });
       }
       k = 0;
-      for (let col = 17; col < terrain.cols - 12; col += 14, k++) { // 직원
+      for (let col = 110; col < terrain.cols - 12; col += 14, k++) { // 직원
         const v = k % 2 ? 'guard' : 'sprayer', d = G.Employee.SIZE[v];
         put(col, (c, r) => { const p = terrain.placeOnTile(c, r, d.w, d.h); return new G.Employee(p.x, p.y, v); });
       }
@@ -3083,6 +3086,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { head: '장비' },
       { label: '낚싯대·잠자리채 모두 받기', hint: '1~8등급', run: give('낚시·채집 도구를 모두 받았다', () => { let n = 0; for (const id of G.Fishing.RODS.concat(G.Fishing.NETS)) if (!inv.items.includes(id)) { inv.items.push(id); n++; } }) },
       { label: '물고기·곤충 잔뜩 받기', hint: '팔아 보기용', run: give('물고기와 곤충을 받았다', () => { inv.fish = inv.fish || {}; inv.bugs = inv.bugs || {}; inv.catchVal = inv.catchVal || {}; for (const sp of G.Fishing.FISH.concat(G.Fishing.BUGS, G.Fishing.HERBS)) { const box = sp.kind === 'fish' ? inv.fish : inv.bugs; box[sp.id] = (box[sp.id] || 0) + 2; inv.catchVal[sp.id] = (inv.catchVal[sp.id] || 0) + 2 * sp.value; } }) },
+      ...G.Admin.LAUNCHERS.map((l) => ({ label: `관리자 ${l.label}`, hint: `발사기 · 대미지 ${l.dmg} (F2에서 고칠 수 있다)`, run: give(`${l.label}를 받았다 (관리자 무기)`, () => { G.Admin.preset(l.shot); if (!inv.items.includes('admin')) inv.items.push('admin'); inv.equipped.weapon = 'admin'; applyEquipment(); }) })),
       { label: '관리자 무기 초기화', hint: '설정을 처음 값으로 되돌린다', run: give('관리자 무기를 초기화했다', () => { G.Admin.reset(); applyEquipment(); }) },
       { label: '관리자 모드 다시 잠그기', hint: '다시 열려면 비밀번호', run: goto(() => { setAdminUnlocked(false); popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '관리자 모드를 잠갔다', t: 2.5, color: 'rgba(255,170,170,A)' }); G.Audio.play('deny'); }) },
       { label: '관리자 무기 편집', hint: 'F2: 대미지·범위·속성·색 전부 설정', run: goto(() => openAdmin()) },
@@ -3643,7 +3647,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
   const magicHooks = {
     hit(m, el, dir, x, y, shot) {
       m.byAlly = false; // 내 마법/총/활에 맞았다
-      if (el === 'bomb' || el === 'icebomb') return; // 폭탄은 터질 때 피해를 준다 (explode)
+      if (el === 'bomb' || el === 'icebomb' || el === 'rocket') return; // 폭탄·로켓은 터질 때 피해를 준다 (explode)
       const isBossHit = bossOn() && boss.targets().includes(m);
       if (m.extraHits > 0 && !m.flying && !isBossHit) { // 딴딴한 몬스터: 총·활·마법으로도 깎을 수 있지만 느리다 (딴딴함 1 = 단단함 3). 광석을 붙이면 더 빨리 깎고, 균열 광석이면 그냥 통한다
         if (!equipStats.ignoreCrack) {
@@ -3657,19 +3661,21 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         }
       }
       const weakX = (e) => (isBossHit && boss.weak && e === boss.weak ? 3 : 1); // 보스의 약점 속성이면 x3
-      if (el === 'arrow' || el === 'bullet') {
+      if (el === 'arrow' || el === 'bullet' || el === 'plasma') {
         m.damage((shot && shot.dmg ? shot.dmg : 3) * weakX(weaponElemOf()));
         if (m.alive && m.twoHit && !m.staggered && m.stagger) m.stagger(dir);
         effects.parryHit(x, y);
         effects.shake(3, 0.1);
         return;
       }
+      const sd = shot && shot.dmg ? shot.dmg : 0; // 관리자 발사기가 정한 대미지 (지팡이는 0 = 원래 값)
       if (el === 'fire') {
-        m.damage(C.FIRE_DAMAGE * weakX('fire'));
+        m.damage((sd || C.FIRE_DAMAGE) * weakX('fire'));
       } else if (el === 'poison') {
         m.applyPoison();
+        if (sd) m.damage(sd);
       } else { // 번개: 피해 + 기절(두 번 맞는 몬스터는 밀려나고 멍해진다)
-        m.damage(C.LIGHTNING_DAMAGE * weakX('light'));
+        m.damage((sd || C.LIGHTNING_DAMAGE) * weakX('light'));
         if (m.alive && m.twoHit && !m.staggered) m.stagger(dir);
       }
       effects.parryHit(x, y);
@@ -3690,7 +3696,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         const cx = mo.x + mo.w / 2;
         const cy = mo.y + mo.h / 2;
         if (Math.hypot(cx - s.x, cy - s.y) > rad + Math.max(mo.w, mo.h) / 2) continue;
-        if (ice) { if (mo.freeze) mo.freeze(); mo.damage(2); } else mo.damage(s.dmg);
+        if (ice) { if (mo.freeze) mo.freeze(); mo.damage(s.dmg || 2); } else mo.damage(s.dmg);
       }
     },
   };
@@ -5050,13 +5056,13 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
           stamina -= shotCost;
           staminaWait = 0.8;
           const h = player.hand;
-          G.Magic.cast(magic, weaponDef.shot, h.x + player.facing * 26, h.y - 2, player.facing, terrain, magicTargets(), magicHooks, { dmg: weaponDef.dmg + equipStats.dmgBonus, radius: weaponDef.radius ? (weaponDef.radius + equipStats.radiusAdd) * C.TILE : 0, pierce: weaponDef.pierce || equipStats.pierceAdd, count: weaponDef.count });
-          G.Audio.play(weaponDef.shot === 'bullet' ? 'gun' : weaponDef.shot === 'arrow' ? 'bow' : 'throw');
+          G.Magic.cast(magic, weaponDef.shot, h.x + player.facing * 26, h.y - 2, player.facing, terrain, magicTargets(), magicHooks, { dmg: weaponDef.dmg + equipStats.dmgBonus, radius: weaponDef.radius ? (weaponDef.radius + equipStats.radiusAdd) * C.TILE : 0, pierce: weaponDef.pierce || equipStats.pierceAdd, count: weaponDef.count, speed: equipStats.projSpeed });
+          G.Audio.play(weaponDef.shot === 'bullet' ? 'gun' : weaponDef.shot === 'arrow' ? 'bow' : weaponDef.shot === 'lightning' ? 'zap' : weaponDef.shot === 'fire' || weaponDef.shot === 'poison' ? weaponDef.shot : weaponDef.shot === 'plasma' ? 'zap' : 'throw');
         }
       } else if (weaponDef.element) { // 지팡이: 패링할 때마다 지팡이 끝에서 원소가 나간다
         const el = G.Magic.pickElement(weaponDef.element);
         const h = player.hand;
-        G.Magic.cast(magic, el, h.x + player.facing * 34, h.y, player.facing, terrain, magicTargets(), magicHooks);
+        G.Magic.cast(magic, el, h.x + player.facing * 34, h.y, player.facing, terrain, magicTargets(), magicHooks, { speed: equipStats.projSpeed });
         G.Audio.play(el === 'lightning' ? 'zap' : el);
       }
     }

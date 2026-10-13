@@ -5,7 +5,7 @@
 //  - 산 장비는 바로 장착되고, 인벤토리 창(I 키)에서 바꿔 낄 수 있다.
 (function (G) {
   const SLOT_NAMES = { weapon: '무기', helmet: '투구', armor: '갑옷', gloves: '장갑', pants: '바지', boots: '신발' };
-  const TYPE_NAMES = { sword: '검', great: '대검', dagger: '단검', staff: '지팡이', bomb: '폭탄', gun: '총', bow: '활', shield: '방패', scythe: '낫', spear: '창', axe: '도끼', pick: '곡괭이', hammer: '망치', katana: '도', rapier: '레이피어', whip: '채찍', crossbow: '석궁', shotgun: '산탄총' };
+  const TYPE_NAMES = { sword: '검', great: '대검', dagger: '단검', staff: '지팡이', bomb: '폭탄', gun: '총', bow: '활', shield: '방패', scythe: '낫', spear: '창', axe: '도끼', pick: '곡괭이', hammer: '망치', katana: '도', rapier: '레이피어', whip: '채찍', crossbow: '석궁', shotgun: '산탄총', launcher: '발사기' };
 
   const ITEMS = {};
   const add = (it) => { ITEMS[it.id] = it; };
@@ -390,11 +390,11 @@
   const buffVal = (inv, kind) => buffList(inv).filter((b) => b.kind === kind).reduce((a, b) => a + (b.val || 0), 0);
   function addBuff(inv, kind, val, durSec, n) { inv.buffs = buffList(inv).filter((b) => b.kind !== kind); inv.buffs.push({ kind, val, until: Date.now() + durSec * 1000, n: n || 0 }); }
   function takeShield(inv) { const b = buffList(inv).find((q) => q.kind === 'shield' && q.n > 0); if (!b) return false; b.n -= 1; if (b.n <= 0) inv.buffs = buffList(inv).filter((q) => q !== b); return true; }
-  const staminaMax = (inv) => C.STAMINA_MAX + C.STAMINA_MAX_STEP * Math.min(inv.stMaxLevel || 0, C.STAMINA_MAX_LEVELS);
-  const staminaRegen = (inv) => (1 + buffVal(inv, 'stamina')) * (C.STAMINA_REGEN + C.STAMINA_REGEN_STEP * Math.min(inv.stRegenLevel || 0, C.STAMINA_REGEN_LEVELS)) + (inv.equipped.pants && ITEMS[inv.equipped.pants].stamRegen ? ITEMS[inv.equipped.pants].stamRegen : 0);
+  const staminaMax = (inv) => C.STAMINA_MAX + C.STAMINA_MAX_STEP * Math.min(inv.stMaxLevel || 0, C.STAMINA_MAX_LEVELS) + ((inv.facUp && inv.facUp.st) || 0);
+  const staminaRegen = (inv) => (1 + buffVal(inv, 'stamina')) * (C.STAMINA_REGEN + C.STAMINA_REGEN_STEP * Math.min(inv.stRegenLevel || 0, C.STAMINA_REGEN_LEVELS)) + (inv.equipped.pants && ITEMS[inv.equipped.pants].stamRegen ? ITEMS[inv.equipped.pants].stamRegen : 0) + ((inv.facUp && inv.facUp.regen) || 0);
   const mineReward = (level) => C.MINE_COINS + C.MINE_COINS_PER_LEVEL * (Math.min(level, C.MINE_MAX_LEVEL) - 1);
   const speedMult = (level) => 1 + ((C.VILLAGE_SPEED_MAX - 1) * Math.min(level, C.VILLAGE_SPEED_LEVELS)) / C.VILLAGE_SPEED_LEVELS;
-  const critDamage = (inv) => C.CRIT_BASE_DAMAGE + Math.min(inv.critLevel, C.CRIT_MAX_LEVEL);
+  const critDamage = (inv) => C.CRIT_BASE_DAMAGE + Math.min(inv.critLevel, C.CRIT_MAX_LEVEL) + ((inv.facUp && inv.facUp.critDmg) || 0);
   const abyssReward = (lv) => 2000 + 800 * (lv - 1); // 심연 동굴 상자 코인: 보상 상점에서 올릴수록 늘어난다 (최대 레벨이 없다)
   const diveOf = (inv, k) => (inv.dive && inv.dive[k]) || 0;
   const DIVE = { // 업그레이드 종류 -> 저장 키, 이름, 값 식, 설명
@@ -415,7 +415,14 @@
   const trainLv = (inv, k) => (inv.train && inv.train[k]) || 0;
   const upMaxed = (item, inv) => !!item.upgrade && levelOf(item, inv) >= maxLevelOf(item);
   // 다음 레벨로 올리는 가격 (최고 레벨이면 0). 업그레이드가 아닌 아이템은 원래 가격
-  function priceOf(item, inv) {
+  // 물가: 처음 마을(village)에서는 값이 낮다. main이 스테이지를 불러올 때 정한다 (1 = 정가)
+  let discount = 1;
+  const setDiscount = (m) => { discount = m; };
+  function priceOf(item, inv) { // 화면에 보이는 값과 실제로 내는 값 (물가 반영)
+    const p = rawPriceOf(item, inv);
+    return discount === 1 || !p ? p : Math.max(1, Math.round(p * discount));
+  }
+  function rawPriceOf(item, inv) {
     if (item.house) return item.price * ((G.Shop && G.Shop.estateMul) || 1); // 고급 부동산은 훨씬 비싸다
     if (!item.upgrade) return item.price;
     if (item.expCost && item.base) { const b = ITEMS[item.base]; return upMaxed(b, inv) ? 0 : Math.max(10, Math.round(priceOf(b, inv) / 4 / 10) * 10); } // EXP 업그레이드는 코인 값의 1/4
@@ -733,12 +740,13 @@
     const ab = attachOf(inv, w); // 붙인 주괴 보너스
     const trn = { str: trainLv(inv, 'str') + (inv.devilPow || 0), foc: trainLv(inv, 'foc'), agi: trainLv(inv, 'agi'), end: trainLv(inv, 'end') }; // 훈련소 훈련
     const ai = armorInfo(inv);   // 방어구에 붙인 주괴 보너스
+    const fu = inv.facUp || {};  // 방사능 공장 가게에서 산 영구 업그레이드 (facshops.js)
     return {
       reachTiles: w.reach + (w.shot ? 0 : 0.05 * wl + ab.reach) + (g && g.reachAdd ? g.reachAdd : 0), // 강화: 근접 무기는 범위가 넓어진다
-      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg + trn.str + 0.05 * (inv.xmUsed || 0) + buffVal(inv, 'power') : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
+      dmgBonus: w.shot ? wBonus(wl) + ab.gdmg + trn.str + 0.05 * (inv.xmUsed || 0) + buffVal(inv, 'power') + (fu.dmg || 0) : 0,             // 강화: 쏘는 무기는 대미지가 늘어난다 (레벨이 오를수록 더 크게)
       bossBonus: w.shot ? 0 : wBonus(wl) + ab.boss,  // 강화: 근접 무기는 보스에게 더 아프다 (레벨이 오를수록 더 크게)
-      baseDmg: (w.shot ? 1 : meleeBase(w) + ab.dmg + trn.str) + 0.05 * (inv.xmUsed || 0) + (w.shot ? 0 : buffVal(inv, 'power')), // 경험돈으로 올린 영구 대미지(개당 0.05) + 음식 효과
-      hitPower: w.shot ? 1 : 1 + Math.floor(wBonus(wl) / 5) + Math.floor(meleeBase(w) / 4) + ab.hit + Math.floor(ab.dmg / 3), // 단단한 몬스터를 한 번에 깎는 횟수
+      baseDmg: (w.shot ? 1 : meleeBase(w) + ab.dmg + trn.str) + 0.05 * (inv.xmUsed || 0) + (w.shot ? 0 : buffVal(inv, 'power') + (fu.dmg || 0)), // 경험돈으로 올린 영구 대미지(개당 0.05) + 음식 효과
+      hitPower: w.shot ? 1 : 1 + Math.floor(wBonus(wl) / 5) + Math.floor(meleeBase(w) / 4) + ab.hit + Math.floor(ab.dmg / 3) + (fu.hit || 0), // 단단한 몬스터를 한 번에 깎는 횟수
       staminaAdd: ab.st,                              // 쏘는 무기: 한 번에 드는 스태미나 증감 (티타늄 등은 줄여 준다)
       radiusAdd: ab.radius,                           // 폭탄 폭발 범위 증가(칸)
       pierceAdd: !!ab.pierce,                         // 탄환 관통
@@ -746,15 +754,16 @@
       elems: ab.elems,                                // 붙인 원소 광석의 속성들 (무기 자체 속성에 더해진다)
       throwTiles: w.throwTiles,
       canThrow: ['sword', 'dagger', 'staff', 'spear', 'katana', 'rapier'].includes(w.type), // 대검/도끼/망치/채찍/폭탄/총/활/방패는 던질 수 없다
-      cooldownAdd: w.cd + (g && g.cdAdd ? g.cdAdd : 0) + ab.cd,
+      cooldownAdd: w.cd + (g && g.cdAdd ? g.cdAdd : 0) + ab.cd + (fu.cd || 0),
       dashCostAdd: b && b.dashCostAdd ? b.dashCostAdd : 0,
-      hearts: (a ? a.hearts : 0) + (pn ? pn.hearts || 0 : 0) + (inv.armorLevel || 0) + ai.hp,
-      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0) + ai.inv + 0.1 * trn.end + buffVal(inv, 'invuln'), // 투구 + 그림자 갑옷 + 음식 효과
+      hearts: (a ? a.hearts : 0) + (pn ? pn.hearts || 0 : 0) + (inv.armorLevel || 0) + ai.hp + (fu.hearts || 0),
+      invulnAdd: (h ? h.invuln : 0) + (a && a.invuln ? a.invuln : 0) + (pn && pn.invuln ? pn.invuln : 0) + ai.inv + 0.1 * trn.end + buffVal(inv, 'invuln') + (fu.invuln || 0), // 투구 + 그림자 갑옷 + 음식 효과
+      projSpeed: 1 + (fu.pspeed || 0),                 // 발사체 속도 배율: 방사능 공장 병기 연구소에서 산 만큼만 빨라진다
       perk: a && a.perk ? a.perk : null,
       perks: ai.perks, perkLv: ai.lv,                   // 속성 능력들과 단계 (갑옷 자체 + 붙인 속성 광석)
       elemLv: ab.elemLv,                                // 무기에 붙인 원소 광석의 속성별 개수               // 속성 갑옷의 능력 (thorn/fire/ice/volt/toxic/regen/gold)
-      windowAdd: (g ? g.window : 0) + (w.windowAdd || 0) + 0.015 * trn.foc,
-      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0) + ai.spd + 0.02 * trn.agi + buffVal(inv, 'speed'),
+      windowAdd: (g ? g.window : 0) + (w.windowAdd || 0) + 0.015 * trn.foc + (fu.window || 0),
+      speedAdd: (b ? b.speed : 0) + (pn && pn.speed ? pn.speed : 0) + ai.spd + 0.02 * trn.agi + buffVal(inv, 'speed') + (fu.speed || 0),
     };
   }
 
@@ -762,6 +771,7 @@
 
   // 구매 시도. wallet = { coins, lives, maxLives, inv }를 직접 고치고, 결과 메시지를 돌려준다
   function buy(item, wallet) {
+    if (discount !== 1 && item.price && !item.upgrade && !item.house && !item.onBuy) item = Object.assign({}, item, { price: Math.max(1, Math.round(item.price * discount)) }); // 값이 정해진 물건은 물가를 곱한다 (업그레이드·집은 priceOf가 곱한다)
     if (item.onBuy) return item.onBuy(item, wallet); // 길드 현상금, 경험돈 같은 자체 구입 처리가 있는 항목
     if (item.consumable) { // 소모품: 개수가 쌓인다
       if (wallet.coins < item.price) return { ok: false, msg: '코인이 부족해요.' };
@@ -957,7 +967,7 @@
   const CATEGORIES = [{ id: 'all', name: '전체' }, { id: 'weapon', name: '무기' }, { id: 'armor', name: '방어구' }, { id: 'consume', name: '소모품' }, { id: 'food', name: '음식' }, { id: 'catch', name: '채집' }, { id: 'material', name: '재료' }];
   const catOf = (it) => (it.catch ? 'catch' : it.quest || it.tool ? 'material' : it.food !== undefined ? 'food' : it.consumable || it.heal !== undefined ? 'consume' : it.slot === 'weapon' ? 'weapon' : 'armor');
   // 종류: 무기는 검 -> 대검 -> 단검 -> 낫 -> 지팡이 -> 폭탄 -> 총 -> 활 -> 방패, 방어구는 갑옷 -> 투구 -> 장갑 -> 신발 순으로 묶어서 보여준다
-  const WEAPON_TYPE_ORDER = ['sword', 'great', 'dagger', 'katana', 'rapier', 'spear', 'axe', 'hammer', 'whip', 'scythe', 'staff', 'bomb', 'gun', 'shotgun', 'bow', 'crossbow', 'shield', 'rod', 'net'];
+  const WEAPON_TYPE_ORDER = ['sword', 'great', 'dagger', 'katana', 'rapier', 'spear', 'axe', 'hammer', 'whip', 'scythe', 'staff', 'bomb', 'gun', 'shotgun', 'launcher', 'bow', 'crossbow', 'shield', 'rod', 'net'];
   const ARMOR_SLOT_ORDER = ['armor', 'helmet', 'gloves', 'pants', 'boots'];
   const kindOf = (it) => (it.slot === 'weapon' ? it.type : it.slot && it.slot !== 'weapon' ? it.slot : null); // 세부 종류
   const rankOf = (it) => (it.slot === 'weapon' ? WEAPON_TYPE_ORDER.indexOf(it.type) : it.slot ? 20 + ARMOR_SLOT_ORDER.indexOf(it.slot) : it.consumable || it.heal !== undefined ? 40 : 50);
@@ -1053,5 +1063,5 @@
   for (const k of ['dweapon', 'darmor', 'dupgrade', 'ditem']) for (const t of SHOPS[k].tabs) for (const it of t.items) darkIds.add(it.id);
   for (const it of Object.values(ITEMS)) if (it.price > 0 && !it.upgrade && !it.noMult && !it.catch && !darkIds.has(it.id)) it.price = Math.round((it.price * (C.PRICE_MULT || 1)) / 10) * 10;
 
-  G.Shop = { buffList, buffVal, addBuff, takeShield, CONSUMABLE_IDS, DARK_CONS_IDS, abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
+  G.Shop = { setDiscount, buffList, buffVal, addBuff, takeShield, CONSUMABLE_IDS, DARK_CONS_IDS, abyssReward, subList, SORTS, powerOf, sortValue, CATEGORIES, staminaMax, staminaRegen, holyMult, homeBonuses, critDamage, decorLeft, placeDecor, placeTabs, addMaterial: (inv, id) => { inv.materials[id] = (inv.materials[id] || 0) + 1; return inv.materials[id]; }, priceOf, mineReward, speedMult, upMaxed, ITEMS, SHOPS, SLOT_NAMES, TYPE_NAMES, newInventory, describe, stats, maxLivesFor, buy, gridEntries, usePotion, bestPotion };
 })(window.Game);

@@ -5,13 +5,15 @@
 (function (G) {
   const C = G.Config;
   const KEY = 'parry_admin_weapon';
-  const TYPES = ['sword', 'great', 'dagger', 'katana', 'rapier', 'spear', 'axe', 'hammer', 'scythe', 'whip', 'shield', 'staff', 'gun', 'shotgun', 'bow', 'crossbow', 'bomb'];
+  const TYPES = ['sword', 'great', 'dagger', 'katana', 'rapier', 'spear', 'axe', 'hammer', 'scythe', 'whip', 'shield', 'staff', 'gun', 'shotgun', 'bow', 'crossbow', 'bomb', 'launcher'];
   const ELEMS = [null, 'gold', 'crystal', 'light', 'quake', 'fire', 'ice', 'poison', 'thief', 'cleave', 'shadow', 'reap'];
   const ELEM_NAMES = { gold: '황금(코인+50%)', crystal: '수정(파편)', light: '빛(기절)', quake: '대지(기절)', fire: '화염', ice: '얼음', poison: '독', thief: '도둑(코인)', cleave: '관통', shadow: '그림자(무적)', reap: '수확(흡수)' };
   const STAFF = [null, 'poison', 'lightning', 'fire', 'random'];
   const STAFF_NAMES = { poison: '독', lightning: '번개', fire: '불덩이', random: '무작위' };
-  const SHOTS = [null, 'bullet', 'arrow', 'bomb'];
-  const SHOT_NAMES = { bullet: '탄환', arrow: '화살', bomb: '폭탄' };
+  // 발사체: 탄환·화살·폭탄에 더해 발사기 종류 (전기·독·화염·얼음·플라즈마·로켓)
+  const SHOTS = [null, 'bullet', 'arrow', 'bomb', 'lightning', 'poison', 'fire', 'icebomb', 'plasma', 'rocket'];
+  const SHOT_NAMES = { bullet: '탄환', arrow: '화살', bomb: '폭탄', lightning: '전기 발사기', poison: '독 발사기', fire: '화염 발사기', icebomb: '얼음 폭탄 발사기', plasma: '플라즈마 발사기 (관통)', rocket: '로켓 발사기 (폭발)' };
+  const BLAST = ['bomb', 'icebomb', 'rocket']; // 폭발 반경이 있는 발사체
 
   const DEFAULT = { type: 'sword', baseDmg: 100, reach: 1.5, throwTiles: 3, cd: 0, swingFrames: 0, slashFrame: 0, elem: null, oneHit: true, lightRadius: 4, staff: null, shot: null, dmg: 100, count: 1, pierce: false, radius: 3, stamina: 0, windowAdd: 0, hue: 300 };
   const cfg = Object.assign({}, DEFAULT);
@@ -42,7 +44,7 @@
     { key: 'dmg', label: '발사 대미지', kind: 'num', min: 1, max: 999999, step: 1, big: 100, fmt: (v) => `${v}` },
     { key: 'count', label: '한 번에 나가는 수', kind: 'num', min: 1, max: 30, step: 1, big: 5, fmt: (v) => `${v}발` },
     { key: 'pierce', label: '관통 (화살·탄환)', kind: 'bool' },
-    { key: 'radius', label: '폭발 반경 (칸)', kind: 'num', min: 1, max: 12, step: 1, big: 3, fmt: (v) => `${v}` },
+    { key: 'radius', label: '폭발 반경 (칸, 폭탄·로켓·얼음)', kind: 'num', min: 1, max: 12, step: 1, big: 3, fmt: (v) => `${v}` },
     { key: 'stamina', label: '스태미나 소모', kind: 'num', min: 0, max: 100, step: 1, big: 10, fmt: (v) => `${v}` },
     { key: 'windowAdd', label: '패링 지속 증가 (초)', kind: 'num', min: 0, max: 3, step: 0.05, big: 0.5, fmt: (v) => v.toFixed(2) },
     { key: 'hue', label: '색', kind: 'num', min: 0, max: 360, step: 10, big: 60, wrap: true, fmt: (v) => `${v}°`, swatch: true },
@@ -72,7 +74,7 @@
       it.shot = c.shot; it.dmg = c.dmg; it.stamina = c.stamina;
       set('count', c.count, c.count > 1);
       set('pierce', true, c.pierce);
-      set('radius', c.radius, c.shot === 'bomb');
+      set('radius', c.radius, BLAST.includes(c.shot));
       delete it.baseDmg;
     } else {
       delete it.shot; delete it.dmg; delete it.count; delete it.pierce; delete it.radius;
@@ -107,6 +109,21 @@
     load,
     apply,
     reset() { Object.assign(cfg, DEFAULT); apply(); save(); }, // 처음 값으로
+    // 발사기 한 번에 받기: 전기·독·화염·얼음·플라즈마·로켓 (색과 대미지가 알맞게 정해진다). 이후 F2에서 마음대로 고칠 수 있다
+    LAUNCHERS: [
+      { shot: 'lightning', label: '전기 발사기', hue: 55, dmg: 120, stamina: 6 },
+      { shot: 'poison', label: '독 발사기', hue: 110, dmg: 80, stamina: 5 },
+      { shot: 'fire', label: '화염 발사기', hue: 18, dmg: 150, stamina: 6 },
+      { shot: 'icebomb', label: '얼음 폭탄 발사기', hue: 195, dmg: 100, stamina: 10 },
+      { shot: 'plasma', label: '플라즈마 발사기', hue: 285, dmg: 200, stamina: 8 },
+      { shot: 'rocket', label: '로켓 발사기', hue: 0, dmg: 300, stamina: 14 },
+    ],
+    preset(shot) {
+      const p = Admin.LAUNCHERS.find((l) => l.shot === shot);
+      if (!p) return;
+      Object.assign(cfg, DEFAULT, { type: 'launcher', shot: p.shot, dmg: p.dmg, count: 1, pierce: false, radius: 3, stamina: p.stamina, hue: p.hue, oneHit: true });
+      apply(); save();
+    },
     open() { return { fresh: true, cur: 0, buf: '', t: 0, msg: '', msgT: 0, closed: false, hover: -1 }; },
 
     geometry(W, H) {

@@ -868,6 +868,133 @@
       }
     }
 
+    // 방사능 공장 가게 물건 그림 (원점이 가운데, 크기 약 ±22). L = [밝은색, 어두운색]
+    _drawFacIcon(ctx, name, L) {
+      const R = (c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+      const C = (c, x, y, r) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+      const P = (c, pts) => { ctx.fillStyle = c; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); };
+      const S = (c, w, pts) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.lineCap = 'butt'; };
+      const A = L[0] || '#ddd', B = L[1] || '#555';
+      switch (name) {
+        case 'suit': R(A, -11, -6, 22, 26); R(A, -19, -4, 8, 18); R(A, 11, -4, 8, 18); C(A, 0, -13, 9); R('#1c2024', -6, -16, 12, 7); R('#7dff6a', -5, -15, 4, 4); R('#7dff6a', 1, -15, 4, 4); R(B, -11, 8, 22, 3); break;
+        case 'lead': R('#8a909c', -18, -14, 36, 28); R('#6a707c', -18, -14, 36, 4); for (const [x, y] of [[-14, -10], [12, -10], [-14, 10], [12, 10]]) C('#d0d6de', x, y, 2.2); R(B, -10, -4, 20, 3); R(B, -10, 3, 20, 3); break;
+        case 'filter': C('#2a3036', 0, 0, 16); C('#4a545c', 0, 0, 11); for (let k = 0; k < 6; k++) { const a = k * 1.047; S('#7dff6a', 2, [[Math.cos(a) * 3, Math.sin(a) * 3], [Math.cos(a) * 9, Math.sin(a) * 9]]); } C('#16181a', 0, 0, 3); break;
+        case 'core': C(B, 0, 0, 17); C(A, 0, 0, 11); C('#fff', -3, -3, 4); S('#ffe34a', 2.5, [[-20, 0], [-12, 0]]); S('#ffe34a', 2.5, [[12, 0], [20, 0]]); S('#ffe34a', 2.5, [[0, -20], [0, -12]]); S('#ffe34a', 2.5, [[0, 12], [0, 20]]); break;
+        case 'vial': R('#dfe8ec', -6, -16, 12, 30); R('#8a909c', -8, -19, 16, 5); R(A, -5, -2, 10, 14); S('#2a0a3a', 2, [[-4, -14], [-1, -6], [-5, 2], [0, 10]]); break;
+        case 'speedshot': R('rgba(154,232,255,0.35)', -22, -2, 20, 4); R('rgba(154,232,255,0.55)', -16, -6, 14, 2); R('rgba(154,232,255,0.55)', -16, 4, 14, 2); P('#e8f4f8', [[-4, -7], [14, -7], [22, 0], [14, 7], [-4, 7]]); P(A, [[6, -4], [14, -4], [18, 0], [14, 4], [6, 4]]); S(B, 2, [[-24, -10], [-14, -10]]); S(B, 2, [[-24, 10], [-14, 10]]); break;
+        case 'gear': for (let k = 0; k < 8; k++) { const a = k * 0.785; P(A, [[Math.cos(a - 0.2) * 14, Math.sin(a - 0.2) * 14], [Math.cos(a - 0.15) * 20, Math.sin(a - 0.15) * 20], [Math.cos(a + 0.15) * 20, Math.sin(a + 0.15) * 20], [Math.cos(a + 0.2) * 14, Math.sin(a + 0.2) * 14]]); } C(A, 0, 0, 15); C('#2a3036', 0, 0, 6); S(B, 2, [[-8, 14], [-2, 20], [4, 14]]); break;
+        case 'syringe': R('#dfe8ec', -5, -12, 10, 26); R(A, -4, -2, 8, 14); R('#9aa4a8', -9, -14, 18, 3); R('#9aa4a8', -1.5, -24, 3, 11); R('#cfd8dc', -0.8, 14, 1.6, 10); R('#9aa4a8', -7, 12, 14, 2); break;
+        case 'neuro': C('#f0c8b0', 0, 0, 16); for (const [x, y] of [[-6, -4], [6, -2], [0, 6]]) C(A, x, y, 3); S(A, 1.8, [[-6, -4], [0, 6], [6, -2], [-6, -4]]); S('#ffe34a', 2.5, [[10, -18], [3, -8], [9, -8], [2, 4]]); break;
+        case 'fang': P('#f4efe0', [[-14, -16], [14, -16], [4, 18], [-4, 18]]); P(A, [[-14, -16], [14, -16], [11, -9], [-11, -9]]); S(B, 2, [[-14, -16], [14, -16]]); break;
+        case 'ampoule': P('#eaf4f8', [[-8, -6], [8, -6], [8, 14], [-8, 14]]); P('#eaf4f8', [[-3, -22], [3, -22], [5, -6], [-5, -6]]); R(A, -7, 2, 14, 11); R('#ffffff', -5, 4, 2, 7); S('#c0c8cc', 1.5, [[-8, -6], [8, -6]]); break;
+        case 'battery': R('#2a3036', -13, -13, 26, 32); R('#9aa4a8', -6, -18, 12, 5); for (let k = 0; k < 4; k++) R(k < 3 ? A : '#2a4a3a', -9, 12 - k * 7, 18, 5); break;
+        case 'plug': R('#3a4048', -10, -2, 20, 18); R('#9aa4a8', -7, -12, 4, 11); R('#9aa4a8', 3, -12, 4, 11); P(A, [[2, 0], [-6, 9], [-1, 9], [-4, 17], [6, 6], [1, 6]]); S('#2a3036', 3, [[0, 16], [0, 22]]); break;
+        case 'cell': R('#2a3036', -8, -12, 16, 26); R('#9aa4a8', -4, -16, 8, 4); R(A, -5, 6, 10, 5); R(A, -5, -1, 10, 5); R('#2a4a3a', -5, -8, 10, 5); break;
+        case 'fullcell': R('#2a3036', -10, -12, 20, 28); R('#9aa4a8', -5, -17, 10, 5); for (let k = 0; k < 4; k++) R(A, -7, 11 - k * 6, 14, 4); P('#fff', [[2, -6], [-4, 3], [0, 3], [-2, 11], [5, 0], [1, 0]]); break;
+        case 'crate': R('#7a6a42', -17, -12, 34, 28); S('#3a2e18', 2.5, [[-17, -12], [17, 16]]); S('#3a2e18', 2.5, [[17, -12], [-17, 16]]); R('#5a4a2a', -17, -12, 34, 4); R('#5a4a2a', -17, 12, 34, 4); C('#f0dc28', 0, 2, 6); C('#16181a', 0, 2, 2.5); break;
+        case 'cbottle': R('#cfe8f4', -9, -2, 18, 22); R('#cfe8f4', -4, -14, 8, 12); R('#8a6a3a', -5, -18, 10, 5); P(A, [[0, 2], [-5, 8], [-2, 16], [3, 16], [6, 8]]); R('#fff', -2, 5, 2, 5); break;
+        case 'pouch': P('#6a5030', [[-12, -4], [12, -4], [16, 16], [-16, 16]]); R('#4a3820', -9, -10, 18, 7); S('#c9a56a', 2, [[-8, -4], [8, -4]]); P(A, [[-4, 3], [0, -2], [4, 3], [0, 12]]); break;
+        case 'bars': R('#e8c860', -17, 6, 34, 10); R('#f4dc88', -17, 6, 34, 3); R('#e8c860', -13, -5, 26, 10); R('#f4dc88', -13, -5, 26, 3); R('#e8c860', -8, -14, 16, 8); R('#f4dc88', -8, -14, 16, 3); break;
+        case 'bar': R('#3a2a1a', -18, -8, 36, 18); R(A, -17, -7, 34, 16); R('#fff', -14, -5, 10, 3); R(B, -17, 6, 34, 3); P('#ffe34a', [[2, -2], [-4, 4], [0, 4], [-2, 10], [6, 2], [2, 2]]); break;
+        case 'drink': R('#e0e8ec', -9, -10, 18, 28); R(A, -8, -2, 16, 18); R('#e0e8ec', -4, -16, 8, 6); S('#e05a3a', 2, [[3, -16], [6, -24]]); S('#fff', 2, [[-5, 0], [-5, 12]]); break;
+        case 'jelly': R('#e8e8ee', -18, 12, 36, 5); P(A, [[-14, 12], [-10, -6], [10, -6], [14, 12]]); R('#7a4a2a', -10, -9, 20, 4); P('rgba(255,255,255,0.4)', [[-9, 8], [-8, -2], [-4, -2], [-5, 8]]); C('#e03a4a', 0, -13, 3.4); S('#3a7a3a', 1.5, [[0, -16], [2, -20]]); break;
+        case 'candy': C(A, 0, 0, 11); C(B, 0, 0, 6); C(A, 0, 0, 2.5); P(A, [[-11, 0], [-22, -9], [-22, 9]]); P(A, [[11, 0], [22, -9], [22, 9]]); break;
+        case 'capsule': ctx.save(); ctx.rotate(-0.6); R(A, -18, -8, 18, 16); R('#f4f1e8', 0, -8, 18, 16); C(A, -18, 0, 8); C('#f4f1e8', 18, 0, 8); R('rgba(255,255,255,0.5)', -14, -5, 22, 3); ctx.restore(); break;
+        case 'hammer': ctx.save(); ctx.rotate(-0.7); R('#8a5a2b', -3, -6, 6, 30); R('#6a707c', -14, -18, 28, 14); R('#9aa4a8', -14, -18, 28, 4); ctx.restore(); P('#c0c8d0', [[10, 14], [18, 6], [22, 10], [14, 18]]); break;
+        case 'plate': P('#9aa4b0', [[-16, -14], [16, -14], [16, 4], [0, 20], [-16, 4]]); P('#7a8490', [[0, -14], [16, -14], [16, 4], [0, 20]]); R('#e6c820', -3, -10, 6, 18); R('#e6c820', -10, -4, 20, 6); break;
+        case 'dumbbell': R('#5a606a', -12, -2, 24, 4); R('#3a4048', -20, -10, 8, 20); R('#3a4048', 12, -10, 8, 20); R('#7a8490', -24, -6, 4, 12); R('#7a8490', 20, -6, 4, 12); break;
+        case 'wheel1': case 'wheel2': case 'wheel3': { const n = name === 'wheel1' ? 6 : name === 'wheel2' ? 8 : 10; for (let k = 0; k < n; k++) { const a0 = (k / n) * Math.PI * 2, a1 = ((k + 1) / n) * Math.PI * 2; ctx.fillStyle = k % 2 ? B : A; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 18, a0, a1); ctx.closePath(); ctx.fill(); } ctx.strokeStyle = '#16181a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.stroke(); C('#16181a', 0, 0, 4); P('#f4f1e8', [[0, -24], [-4, -17], [4, -17]]); if (name === 'wheel3') C('#ffe34a', 0, 0, 2); break; }
+        case 'kit': R('#f4f1e8', -17, -8, 34, 24); ctx.strokeStyle = '#8a8f9a'; ctx.lineWidth = 2; ctx.strokeRect(-17, -8, 34, 24); R('#8a8f9a', -7, -14, 14, 6); R('#d03a3a', -3, -4, 6, 16); R('#d03a3a', -9, 1, 18, 6); break;
+        case 'ration': R('#6a7a4a', -16, -10, 32, 24); R('#4a5a30', -16, -10, 32, 5); R('#e8dcb0', -10, -2, 20, 10); R('#6a7a4a', -6, 0, 12, 2); R('#6a7a4a', -6, 4, 8, 2); break;
+        case 'bigamp': P('#eaf4f8', [[-9, -4], [9, -4], [9, 16], [-9, 16]]); P('#eaf4f8', [[-3, -24], [3, -24], [6, -4], [-6, -4]]); R('#ff6a8a', -8, 4, 16, 11); R('#fff', -6, 6, 2, 7); P('#fff', [[0, 6], [-3, 10], [0, 14], [3, 10]]); break;
+        case 'pad': P('#4a7ac0', [[-16, -14], [16, -14], [16, 6], [0, 20], [-16, 6]]); P('#8ac0ff', [[-12, -10], [12, -10], [12, 4], [0, 15], [-12, 4]]); S('#fff', 2, [[-6, -4], [0, 4], [6, -4]]); break;
+        default: C(A, 0, 4, 12); C(B, 0, 4, 6);
+      }
+    }
+
+    // 광석/주괴 그림: 종류(key)마다 모양이 다르다. refined=true면 제련한 주괴 (금속은 반짝이는 막대, 나머지는 윗면을 깎은 돌판)
+    _drawOreIcon(ctx, key, L, refined) {
+      const A = L[0] || '#ddd', B = L[1] || '#555';
+      const R = (c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+      const C = (c, x, y, r) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+      const E = (c, x, y, rx, ry) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); };
+      const P = (c, pts) => { ctx.fillStyle = c; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); };
+      const S = (c, w, pts) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.lineCap = 'butt'; };
+      const METAL = ['iron', 'copper', 'silver', 'gold', 'mythril', 'starsteel', 'platinum', 'titanium', 'lead', 'darksteel', 'royal', 'ironplate'];
+      const SCALE = ['dragonscale', 'emberscale', 'frostscale', 'toxscale', 'voltscale', 'titanscale'];
+      const SYM = { galestone: 'wind', lightspeed: 'bolt', diggerstone: 'dig', borestone: 'drill', bountystone: 'coin', swiftstone: 'wing', guardstone: 'shield', thornstone: 'thorn', greedstone: 'coin', lifestone: 'heart', crownstone: 'crown', kingward: 'shield', cleaver: 'crack', flame: 'flame', frost: 'snow', venom: 'drop', terra: 'cube', volt: 'bolt', umbra: 'swirl', abyss: 'eye', obsidian: 'shard', frostking: 'snow', cinderking: 'flame', thunderiron: 'bolt' };
+      const symbol = (sym, c1, c2) => { // 룬 돌에 새긴 무늬 (원점이 가운데)
+        switch (sym) {
+          case 'wind': S(c1, 2.4, [[-9, -5], [-2, -7], [5, -5]]); S(c1, 2.4, [[-10, 1], [0, -1], [9, 1]]); S(c1, 2.4, [[-7, 7], [1, 5], [8, 7]]); break;
+          case 'bolt': P(c1, [[3, -11], [-6, 2], [-1, 2], [-3, 11], [7, -3], [1, -3]]); break;
+          case 'dig': S(c1, 3, [[-8, 8], [4, -4]]); S(c1, 3, [[-4, -9], [3, -9], [9, -3]]); break;
+          case 'drill': S(c1, 2.4, [[0, -10], [6, -4], [-6, 2], [4, 8]]); break;
+          case 'coin': C(c1, 0, 0, 9); C(c2, 0, 0, 6); S(c1, 2, [[-3, 0], [3, 0]]); S(c1, 2, [[0, -4], [0, 4]]); break;
+          case 'wing': P(c1, [[-9, 6], [-3, -8], [9, -9], [3, 3]]); S(c2, 1.5, [[-5, 4], [4, -6]]); break;
+          case 'shield': P(c1, [[-8, -8], [8, -8], [7, 3], [0, 10], [-7, 3]]); P(c2, [[0, -8], [8, -8], [7, 3], [0, 10]]); break;
+          case 'thorn': for (let k = 0; k < 8; k++) { const a = k * 0.785; P(c1, [[Math.cos(a - 0.25) * 6, Math.sin(a - 0.25) * 6], [Math.cos(a) * 12, Math.sin(a) * 12], [Math.cos(a + 0.25) * 6, Math.sin(a + 0.25) * 6]]); } C(c2, 0, 0, 5); break;
+          case 'heart': C(c1, -4, -3, 5); C(c1, 4, -3, 5); P(c1, [[-9, -1], [9, -1], [0, 10]]); break;
+          case 'crown': P(c1, [[-9, 6], [-9, -5], [-4, 0], [0, -8], [4, 0], [9, -5], [9, 6]]); R(c2, -9, 4, 18, 3); break;
+          case 'crack': S(c1, 2.6, [[-2, -11], [3, -4], [-3, 0], [2, 5], [-1, 11]]); break;
+          case 'flame': P(c1, [[0, -11], [7, -1], [6, 7], [0, 10], [-6, 7], [-7, -1], [-2, -3]]); P(c2, [[0, -3], [3, 3], [0, 8], [-3, 3]]); break;
+          case 'snow': for (let k = 0; k < 3; k++) { const a = k * 1.047; S(c1, 2.2, [[Math.cos(a) * -10, Math.sin(a) * -10], [Math.cos(a) * 10, Math.sin(a) * 10]]); } break;
+          case 'drop': P(c1, [[0, -11], [8, 3], [0, 10], [-8, 3]]); C(c2, -2, 2, 2.4); break;
+          case 'cube': P(c1, [[0, -9], [9, -4], [0, 1], [-9, -4]]); P(c2, [[-9, -4], [0, 1], [0, 11], [-9, 6]]); P('rgba(0,0,0,0.35)', [[9, -4], [0, 1], [0, 11], [9, 6]]); break;
+          case 'swirl': ctx.strokeStyle = c1; ctx.lineWidth = 2.4; ctx.beginPath(); for (let t = 0; t < 12; t++) { const a = t * 0.7, r = 1 + t * 0.8; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.stroke(); break;
+          case 'eye': E(c1, 0, 0, 11, 6); C(c2, 0, 0, 4.5); C('#fff', -1.5, -1.5, 1.4); break;
+          case 'shard': P(c1, [[-3, -11], [6, -2], [2, 10], [-7, 4]]); P(c2, [[-3, -11], [0, 0], [-7, 4]]); break;
+          default: C(c1, 0, 0, 5);
+        }
+      };
+      if (METAL.includes(key)) {
+        if (refined) { // 윗면이 빛나는 사다리꼴 금속 막대
+          ctx.fillStyle = B; ctx.beginPath(); ctx.moveTo(-26, 10); ctx.lineTo(-20, -4); ctx.lineTo(20, -4); ctx.lineTo(26, 10); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = A; ctx.beginPath(); ctx.moveTo(-22, 4); ctx.lineTo(-18, -4); ctx.lineTo(18, -4); ctx.lineTo(22, 4); ctx.closePath(); ctx.fill();
+          R('rgba(255,255,255,0.55)', -14, -3, 18, 3); R(B, -26, 10, 52, 5); R('rgba(0,0,0,0.25)', -26, 13, 52, 2);
+        } else { // 금속이 박힌 거친 덩어리: 울퉁불퉁한 몸과 번쩍이는 결
+          P('#3e3a48', [[-22, 14], [-24, 0], [-14, -14], [2, -18], [18, -10], [24, 4], [20, 14]]);
+          P(B, [[-18, 12], [-19, 0], [-10, -10], [2, -13], [14, -7], [19, 3], [16, 12]]);
+          P(A, [[-10, -10], [2, -13], [8, -9], [-2, -2], [-10, 0]]);
+          S(A, 2, [[-14, 8], [-4, 2], [6, 6], [14, 0]]);
+          for (const [x, y] of [[-12, 6], [4, -6], [10, 8], [-4, -9]]) R('rgba(255,255,255,0.8)', x, y, 3, 3);
+        }
+      } else if (SCALE.includes(key)) { // 비늘: 겹쳐진 방패꼴 조각들
+        const scale = (x, y, r) => { P(B, [[x - r, y - r * 0.6], [x + r, y - r * 0.6], [x + r * 0.8, y + r * 0.5], [x, y + r * 1.2], [x - r * 0.8, y + r * 0.5]]); P(A, [[x - r * 0.7, y - r * 0.4], [x + r * 0.7, y - r * 0.4], [x + r * 0.5, y + r * 0.3], [x, y + r * 0.8], [x - r * 0.5, y + r * 0.3]]); S('rgba(0,0,0,0.3)', 1.2, [[x, y - r * 0.4], [x, y + r * 0.7]]); };
+        if (refined) { for (let k = 0; k < 3; k++) { R(B, -22 + k * 3, 8 - k * 7, 40, 6); R(A, -22 + k * 3, 8 - k * 7, 40, 2.5); } scale(18, -8, 6); } // 포개 쌓은 비늘판
+        else { scale(-9, 4, 11); scale(9, 4, 11); scale(0, -8, 11); }
+      } else if (SYM[key]) { // 룬 돌: 매끈한 돌에 무늬가 새겨져 있다 (주괴는 깎은 돌판)
+        if (refined) { P(B, [[-20, -12], [20, -12], [24, 12], [-24, 12]]); P(A, [[-16, -10], [16, -10], [19, 4], [-19, 4]]); R('rgba(255,255,255,0.4)', -14, -9, 16, 2); ctx.save(); ctx.translate(0, -3); ctx.scale(0.8, 0.8); symbol(SYM[key], B, A); ctx.restore(); }
+        else { E('#3e3a48', 0, 3, 23, 19); E(B, 0, 1, 21, 17); E(A, -2, -2, 17, 12); ctx.save(); ctx.translate(0, 0); symbol(SYM[key], B, '#ffffff'); ctx.restore(); R('rgba(255,255,255,0.5)', -14, -10, 8, 2); }
+      } else if (key === 'saltpeter' || key === 'sulfur') { // 가루/결정 더미
+        const heap = key === 'sulfur' ? ['#f0d83a', '#a8901a', '#fff4a0'] : ['#f4f6f8', '#b8c0c8', '#ffffff'];
+        P('#3e3a48', [[-24, 14], [-12, 0], [0, -6], [12, 0], [24, 14]]);
+        for (const [x, y, r] of [[-12, 6, 7], [0, -2, 8], [12, 6, 7], [-3, 8, 6], [6, 9, 5]]) { P(heap[1], [[x - r, y + r * 0.6], [x - r * 0.5, y - r], [x + r * 0.6, y - r * 0.7], [x + r, y + r * 0.6]]); P(heap[0], [[x - r * 0.7, y + r * 0.2], [x - r * 0.3, y - r * 0.7], [x + r * 0.3, y - r * 0.5], [x + r * 0.2, y + r * 0.3]]); R(heap[2], x - 2, y - r * 0.6, 2, 2); }
+        if (refined) { R(B, -20, 8, 40, 7); R(A, -20, 8, 40, 3); }
+      } else if (key === 'pyrite') { // 황철석: 반듯한 금빛 주사위 모양 결정 셋
+        const cube = (x, y, r) => { P('#d8c050', [[x, y - r], [x + r, y - r / 2], [x, y], [x - r, y - r / 2]]); P('#a8902a', [[x - r, y - r / 2], [x, y], [x, y + r], [x - r, y + r / 2]]); P('#7a661a', [[x + r, y - r / 2], [x, y], [x, y + r], [x + r, y + r / 2]]); };
+        cube(-9, 6, 10); cube(9, 6, 10); cube(0, -6, 11);
+        if (refined) R(B, -22, 12, 44, 5);
+      } else if (key === 'blastite') { // 폭렬석: 심지에 불이 붙은 붉은 돌
+        E('#5a1a1a', 0, 4, 18, 16); E('#c0302a', 0, 2, 16, 14); E('#ff7a5a', -4, -2, 8, 6);
+        S('#8a5a2b', 2.2, [[2, -12], [6, -17], [4, -21]]); C('#ffd54a', 4, -22, 3 + Math.sin(performance.now() / 70)); C('#fff', 4, -22, 1.4);
+        if (refined) R('#7a2a1a', -20, 14, 40, 5);
+      } else if (key === 'rapidstone' || key === 'burststone' || key === 'piercer' || key === 'ironhail' || key === 'chainshot') { // 총용 광석: 탄환 모양
+        if (key === 'ironhail') { for (const [x, y] of [[-10, 6], [8, 4], [-1, -7], [12, -8]]) { C('#3a3a44', x, y, 8); C(B, x - 1, y - 1, 6.5); C(A, x - 3, y - 3, 2.5); } }
+        else if (key === 'chainshot') { C(B, -12, 4, 8); C(A, -14, 2, 3); C(B, 12, 4, 8); C(A, 10, 2, 3); S('#9aa4a8', 3, [[-12, 4], [12, 4]]); }
+        else { for (const dx of key === 'burststone' ? [-14, 0, 14] : [0]) { const x = dx; P(B, [[x - 6, 12], [x - 6, -4], [x, -14], [x + 6, -4], [x + 6, 12]]); P(A, [[x - 4, 10], [x - 4, -3], [x, -10], [x - 0.5, 10]]); R('#c8a050', x - 6, 12, 12, 4); } if (key === 'piercer') P('#e8f0f4', [[-3, -3], [0, -22], [3, -3]]); }
+        if (refined) R(B, -22, 16, 44, 4);
+      } else if (key === 'pearlore') { E('#8a7a9a', 0, 8, 22, 10); P('#cfc0e0', [[-22, 8], [-18, -4], [0, -8], [18, -4], [22, 8]]); C('#fffaf8', 0, 0, 9); C('rgba(255,255,255,0.9)', -3, -3, 3); // 조개 속 진주
+      } else if (key === 'coralsteel') { S(B, 4, [[0, 14], [0, 0], [-10, -12]]); S(B, 4, [[0, 0], [10, -10]]); S(B, 4, [[0, 6], [-12, 0]]); for (const [x, y] of [[-10, -12], [10, -10], [-12, 0]]) C(A, x, y, 3.6);
+      } else if (key === 'deepiron') { P('#1e2a3a', [[-22, 14], [-20, -2], [-6, -16], [12, -14], [24, 0], [20, 14]]); P(B, [[-16, 12], [-15, -1], [-4, -11], [10, -9], [18, 2], [15, 12]]); for (const [x, y] of [[-8, 2], [4, -4], [10, 6]]) { C(A, x, y, 3); C('#fff', x - 1, y - 1, 1); }
+      } else if (key === 'starlight') { P(A, [[0, -16], [4, -5], [16, -4], [7, 3], [10, 15], [0, 8], [-10, 15], [-7, 3], [-16, -4], [-4, -5]]); P(B, [[0, -9], [2, -3], [9, -3], [4, 1], [5, 8], [0, 4], [-5, 8], [-4, 1], [-9, -3], [-2, -3]]);
+      } else if (key === 'seadrake') { S(B, 5, [[-16, 10], [-8, -6], [4, 6], [14, -10]]); S(A, 2.4, [[-16, 10], [-8, -6], [4, 6], [14, -10]]); P(B, [[12, -14], [22, -10], [14, -4]]); C('#fff', 17, -10, 1.6);
+      } else if (key === 'krakenore') { C(B, 0, -4, 12); C(A, 0, -4, 8); C('#fff', -3, -6, 2); for (let k = 0; k < 5; k++) S(B, 3.2, [[-10 + k * 5, 4], [-12 + k * 6, 12], [-8 + k * 5, 18]]);
+      } else { // 그 밖의 광석: 바위 덩어리 하나에 작은 결정 하나
+        P('#4a4656', [[-22, 14], [-18, -4], [-4, -16], [14, -12], [24, 2], [20, 14]]); P(A, [[-8, 8], [0, -10], [8, 8]]); P(B, [[0, -10], [8, 8], [2, 8]]);
+        if (refined) R(B, -22, 14, 44, 5);
+      }
+    }
+
     _drawItemIcon(ctx, item, cx, cy, s) {
       ctx.save();
       ctx.translate(cx, cy);
@@ -877,6 +1004,8 @@
         ctx.fillStyle = L[0]; ctx.fillRect(-20, -14, 40, 28); ctx.strokeStyle = L[1]; ctx.lineWidth = 3; ctx.strokeRect(-20, -14, 40, 28);
         ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-18, 6); ctx.lineTo(-8, -4); ctx.lineTo(2, 4); ctx.lineTo(16, -8); ctx.stroke();
         ctx.fillStyle = '#d02a2a'; ctx.beginPath(); ctx.arc(16, -8, 3, 0, Math.PI * 2); ctx.fill();
+      } else if (item.icon) { // 방사능 공장 가게의 물건: 보석이 아니라 물건마다 다른 그림
+        this._drawFacIcon(ctx, item.icon, L);
       } else if (item.catch) { // 잡은 물고기 / 곤충
         G.Fishing.drawCatchIcon(ctx, item, 1.6);
       } else if (item.slot === 'weapon' && item.type === 'rod') { // 낚싯대
@@ -977,22 +1106,8 @@
         ctx.fillStyle = L[0];
         ctx.beginPath(); ctx.moveTo(-24, -20); ctx.quadraticCurveTo(0, -38, 24, -20); ctx.lineTo(22, -16); ctx.quadraticCurveTo(0, -31, -22, -16); ctx.closePath(); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(-10, -30, 8, 3);
-      } else if (item.ore) { // 광석: 거친 바위 덩어리에 박힌 결정
-        ctx.fillStyle = '#4a4656';
-        ctx.beginPath(); ctx.moveTo(-24, 14); ctx.lineTo(-20, -6); ctx.lineTo(-6, -18); ctx.lineTo(12, -14); ctx.lineTo(24, -2); ctx.lineTo(22, 14); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#5e5a6e'; ctx.beginPath(); ctx.moveTo(-20, -6); ctx.lineTo(-6, -18); ctx.lineTo(0, -4); ctx.lineTo(-14, 6); ctx.closePath(); ctx.fill();
-        for (const [cx2, cy2, hh] of [[-8, 4, 12], [6, 0, 16], [14, 8, 10]]) {
-          ctx.fillStyle = L[1]; ctx.beginPath(); ctx.moveTo(cx2 - 5, cy2 + 8); ctx.lineTo(cx2, cy2 - hh); ctx.lineTo(cx2 + 5, cy2 + 8); ctx.closePath(); ctx.fill();
-          ctx.fillStyle = L[0]; ctx.beginPath(); ctx.moveTo(cx2 - 3, cy2 + 8); ctx.lineTo(cx2 - 0.5, cy2 - hh + 3); ctx.lineTo(cx2 + 1, cy2 + 8); ctx.closePath(); ctx.fill();
-        }
-      } else if (item.ingot) { // 주괴: 윗면이 빛나는 사다리꼴 금속 막대
-        ctx.fillStyle = L[1];
-        ctx.beginPath(); ctx.moveTo(-26, 10); ctx.lineTo(-20, -4); ctx.lineTo(20, -4); ctx.lineTo(26, 10); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = L[0];
-        ctx.beginPath(); ctx.moveTo(-22, 4); ctx.lineTo(-18, -4); ctx.lineTo(18, -4); ctx.lineTo(22, 4); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(-14, -3, 18, 3);
-        ctx.fillStyle = L[1]; ctx.fillRect(-26, 10, 52, 5);
-        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(-26, 13, 52, 2);
+      } else if (item.ore || item.ingot) { // 광석/주괴: 종류마다 다른 모양 (금속 덩어리, 비늘, 룬 돌, 가루 더미, 탄환 …). 전부 보석으로만 보이지 않게
+        this._drawOreIcon(ctx, item.ore || item.ingot, L, !!item.ingot);
       } else if (item.tool || item.lens) { // 약점 돋보기: 둥근 렌즈와 손잡이
         ctx.strokeStyle = L[1]; ctx.lineWidth = 6; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(10, 10); ctx.lineTo(26, 26); ctx.stroke();
@@ -1060,6 +1175,13 @@
         ctx.fillStyle = L[0]; ctx.fillRect(-18, -12, 40, 12);
         ctx.fillStyle = L[1]; ctx.fillRect(-18, -4, 40, 4);
         ctx.fillStyle = '#2a2f3a'; ctx.fillRect(18, -14, 8, 16);
+      } else if (item.slot === 'weapon' && item.type === 'launcher') {
+        ctx.fillStyle = '#3a3f4a'; ctx.fillRect(-20, -8, 16, 16);
+        ctx.fillStyle = L[1]; ctx.fillRect(-6, -10, 34, 16);
+        ctx.fillStyle = L[0]; ctx.fillRect(-6, -10, 34, 5);
+        ctx.fillStyle = '#2a2f3a'; ctx.fillRect(24, -13, 7, 22);
+        ctx.fillStyle = L[0]; ctx.beginPath(); ctx.arc(33, -1, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#4a2f1a'; ctx.fillRect(-4, 6, 7, 12);
       } else if (item.slot === 'weapon' && item.type === 'bow') {
         ctx.strokeStyle = L[0]; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(-6, 0, 28, -Math.PI * 0.45, Math.PI * 0.45); ctx.stroke();
         ctx.strokeStyle = L[1]; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(12, -20); ctx.lineTo(12, 20); ctx.stroke();
@@ -4052,37 +4174,37 @@
         else { ctx.moveTo(-6 - u * 3, -8); for (let k = 1; k <= 8; k++) ctx.lineTo(-6 - u * 3 + k * (12 + u * 6) / 8, -8 + (k % 2 ? 2.5 + u * 3 : -1)); }
         ctx.stroke();
         if (st === 'cute' && Math.floor(tt * 0.7) % 2 === 0) { const hp = (tt * 0.7) % 1; ctx.fillStyle = `rgba(255,90,140,${1 - hp})`; ctx.font = 'bold 9px sans-serif'; ctx.fillText('♥', 6, -28 - hp * 10); } // 하트
-        if (u > 0.3) { ctx.fillStyle = `rgba(120,255,90,${u})`; ctx.beginPath(); ctx.ellipse(-4, -3 + (tt * 6) % 4, 1.4, 2.6, 0, 0, Math.PI * 2); ctx.fill(); } // 징그러운 점액이 배어 나온다
-      } else { // 괴물
+      } else { // 괴물 (무섭지만 징그럽지는 않게: 짙은 보랏빛 몸, 뿔, 노랗게 빛나는 성난 눈, 크고 깨끗한 이빨)
         const w = m.w, h = m.h, f = flash ? '#fff' : null, stun = m.staggered > 0;
         ctx.scale(m.dir >= 0 ? 1 : -1, 1);
         ctx.lineCap = 'round';
-        for (let k = 0; k < 7; k++) { // 꿈틀거리는 촉수 다리
-          const bx = -w * 0.42 + k * w * 0.14, sw = Math.sin(tt * 9 + k * 1.7) * 5;
-          ctx.strokeStyle = f || '#3a0a1a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(bx, -h * 0.25); ctx.quadraticCurveTo(bx + sw, -h * 0.1, bx + sw * 1.6, 1); ctx.stroke();
-          ctx.strokeStyle = f || '#8a2a4a'; ctx.lineWidth = 2; ctx.stroke();
+        for (const sd of [-1, 1]) { // 짧고 튼튼한 다리
+          const sw = Math.sin(tt * 10 + sd) * (Math.abs(m.vx) > 5 ? 3 : 0.8);
+          ctx.fillStyle = f || '#2a1a4a'; ctx.beginPath(); ctx.ellipse(sd * w * 0.24, -5 + sw * 0.4, 9, 7, 0, 0, Math.PI * 2); ctx.fill();
         }
-        for (let k = 0; k < 6; k++) { // 등의 가시와 혹
-          const ax = -w * 0.38 + k * w * 0.15, ay = -h * 0.82 + Math.abs(k - 2.5) * 3;
-          ctx.fillStyle = f || '#1a0510'; ctx.beginPath(); ctx.moveTo(ax - 5, ay + 6); ctx.lineTo(ax, ay - 8 - (k % 2) * 5); ctx.lineTo(ax + 5, ay + 6); ctx.closePath(); ctx.fill();
+        for (const sd of [-1, 1]) { // 뿔 두 개
+          ctx.fillStyle = f || '#e8e0d0'; ctx.beginPath(); ctx.moveTo(sd * w * 0.18 - 5, -h * 0.86); ctx.lineTo(sd * w * 0.3, -h * 1.12); ctx.lineTo(sd * w * 0.18 + 6, -h * 0.84); ctx.closePath(); ctx.fill();
         }
-        const g = ctx.createLinearGradient(0, -h, 0, 0); g.addColorStop(0, f || '#6a1a3a'); g.addColorStop(1, f || '#240a18'); // 살덩이 같은 몸
-        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, -h * 0.5, w * 0.5, h * 0.48, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = f || '#10040a'; ctx.lineWidth = 2.5; ctx.stroke();
-        if (!f) { ctx.strokeStyle = 'rgba(210,60,90,0.6)'; ctx.lineWidth = 1.2; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(-w * 0.4 + k * 9, -h * 0.9); ctx.quadraticCurveTo(-w * 0.3 + k * 9, -h * 0.6, -w * 0.35 + k * 9 + 4, -h * 0.4); ctx.stroke(); } } // 핏줄
-        const open = stun ? 0.4 : 0.75 + 0.25 * Math.sin(tt * 14); // 쩍 벌어지는 입
-        ctx.fillStyle = f || '#1a0208'; ctx.beginPath(); ctx.ellipse(w * 0.1, -h * 0.32, w * 0.4, h * 0.24 * open + 2, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = f || '#e8e0b8'; // 들쭉날쭉한 이빨
-        for (let k = 0; k < 9; k++) { const tx = w * 0.1 - w * 0.36 + k * w * 0.09, th = 5 + (k % 3) * 2.5; ctx.beginPath(); ctx.moveTo(tx - 2.6, -h * 0.32 - h * 0.24 * open); ctx.lineTo(tx, -h * 0.32 - h * 0.24 * open + th); ctx.lineTo(tx + 2.6, -h * 0.32 - h * 0.24 * open); ctx.fill(); ctx.beginPath(); ctx.moveTo(tx - 2.6, -h * 0.32 + h * 0.24 * open); ctx.lineTo(tx + 1, -h * 0.32 + h * 0.24 * open - th * 0.9); ctx.lineTo(tx + 2.6, -h * 0.32 + h * 0.24 * open); ctx.fill(); }
-        if (!f) { ctx.fillStyle = '#c01838'; ctx.beginPath(); ctx.moveTo(w * 0.05, -h * 0.28); ctx.quadraticCurveTo(w * 0.3 + Math.sin(tt * 10) * 4, -h * 0.05 + Math.sin(tt * 8) * 3, w * 0.52, -h * 0.02 + Math.sin(tt * 12) * 3); ctx.quadraticCurveTo(w * 0.3, -h * 0.2, w * 0.05, -h * 0.34); ctx.fill(); } // 길게 늘어진 혀
-        const eyes = [[-w * 0.3, -h * 0.72, 6.5], [-w * 0.08, -h * 0.82, 4.2], [w * 0.16, -h * 0.74, 7.5], [w * 0.38, -h * 0.62, 3.6], [-w * 0.36, -h * 0.5, 3.2]]; // 눈알 다섯 개
-        eyes.forEach((e, i) => {
-          const wob = Math.sin(tt * 5 + i) * 1.2;
-          ctx.fillStyle = f || '#f0e070'; ctx.beginPath(); ctx.arc(e[0], e[1] + wob, e[2], 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = f || '#c01020'; ctx.lineWidth = 0.9; for (let k = 0; k < 5; k++) { const a = k * 1.26 + i; ctx.beginPath(); ctx.moveTo(e[0] + Math.cos(a) * e[2], e[1] + wob + Math.sin(a) * e[2]); ctx.lineTo(e[0] + Math.cos(a) * e[2] * 0.4, e[1] + wob + Math.sin(a) * e[2] * 0.4); ctx.stroke(); } // 핏발
-          if (!f) { ctx.fillStyle = '#100000'; ctx.fillRect(e[0] + (stun ? 0 : 1.5) - 1, e[1] + wob - e[2] * 0.85, 2, e[2] * 1.7); }
-        });
-        if (!f) { ctx.fillStyle = 'rgba(130,255,90,0.85)'; for (let k = 0; k < 3; k++) { const ph = (tt * 1.1 + k * 0.33) % 1; ctx.beginPath(); ctx.ellipse(-w * 0.2 + k * w * 0.25, -h * 0.1 + ph * h * 0.2, 1.8, 3.4, 0, 0, Math.PI * 2); ctx.fill(); } } // 뚝뚝 떨어지는 점액
+        for (let k = 0; k < 5; k++) { // 등의 뾰족한 돌기
+          const ax = -w * 0.3 + k * w * 0.15, ay = -h * 0.88 + Math.abs(k - 2) * 3;
+          ctx.fillStyle = f || '#1a1030'; ctx.beginPath(); ctx.moveTo(ax - 5, ay + 6); ctx.lineTo(ax, ay - 7); ctx.lineTo(ax + 5, ay + 6); ctx.closePath(); ctx.fill();
+        }
+        const g = ctx.createLinearGradient(0, -h, 0, 0); g.addColorStop(0, f || '#5a3a9a'); g.addColorStop(1, f || '#24164a'); // 짙은 보랏빛 몸
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, -h * 0.5, w * 0.5, h * 0.46, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = f || '#120a28'; ctx.lineWidth = 2.5; ctx.stroke();
+        const open = stun ? 0.35 : 0.7 + 0.2 * Math.sin(tt * 10); // 커다란 입
+        const my = -h * 0.3, mh = h * 0.2 * open + 2;
+        ctx.fillStyle = f || '#14061c'; ctx.beginPath(); ctx.ellipse(w * 0.08, my, w * 0.36, mh, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = f || '#fbf6ea'; // 가지런한 뾰족 이빨 (위아래 다섯 개씩)
+        for (let k = 0; k < 5; k++) { const tx = w * 0.08 - w * 0.26 + k * w * 0.13; ctx.beginPath(); ctx.moveTo(tx - 3, my - mh * 0.85); ctx.lineTo(tx, my - mh * 0.85 + 6); ctx.lineTo(tx + 3, my - mh * 0.85); ctx.fill(); ctx.beginPath(); ctx.moveTo(tx - 3 + 5, my + mh * 0.85); ctx.lineTo(tx + 5, my + mh * 0.85 - 6); ctx.lineTo(tx + 3 + 5, my + mh * 0.85); ctx.fill(); }
+        for (const sd of [-1, 1]) { // 성난 두 눈: 노랗게 빛난다
+          const ex = sd * w * 0.2 + w * 0.04, ey = -h * 0.68;
+          if (stun) { ctx.strokeStyle = f || '#120a28'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(ex - 5, ey - 5); ctx.lineTo(ex + 5, ey + 5); ctx.moveTo(ex + 5, ey - 5); ctx.lineTo(ex - 5, ey + 5); ctx.stroke(); continue; }
+          if (!f) { const eg = ctx.createRadialGradient(ex, ey, 1, ex, ey, 14); eg.addColorStop(0, 'rgba(255,230,80,0.7)'); eg.addColorStop(1, 'rgba(255,230,80,0)'); ctx.fillStyle = eg; ctx.fillRect(ex - 14, ey - 14, 28, 28); }
+          ctx.fillStyle = f || '#ffe85a'; ctx.beginPath(); ctx.ellipse(ex, ey, 6.5, 6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = f || '#1a0a2a'; ctx.beginPath(); ctx.ellipse(ex + 1.2, ey, 2, 4.6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = f || '#120a28'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ex - sd * 9, ey - 9 + (sd > 0 ? 0 : 3)); ctx.lineTo(ex + sd * 5, ey - 4); ctx.stroke(); // 성난 눈썹
+        }
       }
       ctx.restore();
     }

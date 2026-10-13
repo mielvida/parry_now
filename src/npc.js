@@ -29,6 +29,16 @@
     guard: { robe: '#3a4a7a', trim: '#c9d2dc', hat: '#c9d2dc', beard: null, hair: '#3a2f22', skin: '#e8b98a', staff: true },
     chef: { robe: '#f4f1e8', trim: '#d4a017', hat: '#ffffff', beard: null, hair: '#6b4423', skin: '#e8b98a', apron: '#e8e0d0' },
     smith: { robe: '#5b5f6b', trim: '#8b90a0', hat: null, beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070', apron: '#3a2f22' },
+    // 방사능 공장 가게 주인들 (방호복 차림)
+    hz_suit: { robe: '#e8c020', trim: '#8a7a10', hat: '#e8c020', beard: null, hair: '#3a2f22', skin: '#e8b98a' },
+    hz_lab: { robe: '#e0503a', trim: '#ffb0a0', hat: '#f4f1e8', beard: null, hair: '#3a2f22', skin: '#e8b98a', apron: '#f4f1e8' },
+    hz_doc: { robe: '#f4f1e8', trim: '#e05a8a', hat: '#e05a8a', beard: null, hair: '#6b4423', skin: '#e8b98a', apron: '#f4f1e8' },
+    hz_eng: { robe: '#3acfa0', trim: '#c8ffe8', hat: '#f0d020', beard: null, hair: '#3a2f22', skin: '#d9a070' },
+    hz_junk: { robe: '#6a7080', trim: '#a8b0c0', hat: '#4a5058', beard: '#6b4423', hair: '#3a2f22', skin: '#d9a070', apron: '#3a3f48' },
+    hz_cook: { robe: '#e0803a', trim: '#fff0c0', hat: '#ffffff', beard: null, hair: '#6b4423', skin: '#e8b98a', apron: '#f4f1e8' },
+    hz_smith: { robe: '#7a5a3a', trim: '#c9a56a', hat: '#2a2a30', beard: '#3a2f22', hair: '#3a2f22', skin: '#d9a070', apron: '#2a2118' },
+    hz_gamb: { robe: '#4a2a8a', trim: '#d4a0ff', hat: '#1a1030', beard: null, hair: '#1a1030', skin: '#e8b98a' },
+    hz_medic: { robe: '#f4f1e8', trim: '#d03a3a', hat: '#f4f1e8', beard: null, hair: '#8a5a2b', skin: '#e8b98a', apron: '#f4f1e8' },
   };
 
   const Npc = {

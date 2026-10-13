@@ -15,6 +15,8 @@
     bullet: { speed: 1100, life: 0.7, r: 5 },
     bomb: { speed: 340, life: 1.8, r: 24, gravity: 900 }, // r이 커서 가까운 적 위를 지나가도 터진다
     icebomb: { speed: 340, life: 1.8, r: 24, gravity: 900 },
+    plasma: { speed: 900, life: 0.9, r: 13 },  // 관리자 발사기: 곧게 날아가며 모두 꿰뚫는 에너지탄
+    rocket: { speed: 560, life: 1.6, r: 14 },  // 관리자 발사기: 곧게 날아가 닿으면 크게 터지는 로켓
   };
 
   const pickElement = (el, rnd = Math.random) => (el === 'random' ? ['fire', 'poison', 'lightning'][Math.floor(rnd() * 3)] : el);
@@ -35,17 +37,17 @@
   // 발사. (x, y) = 지팡이 끝. hooks.hit(monster, element, dir, x, y)
   // opts: 다크월드 무기용 {dmg, radius(px), pierce, count}
   function cast(state, el, x, y, dir, terrain, monsters, hooks, opts = {}) {
-    if (el === 'arrow' || el === 'bullet' || el === 'bomb' || el === 'icebomb') {
+    if (el === 'arrow' || el === 'bullet' || el === 'bomb' || el === 'icebomb' || el === 'plasma' || el === 'rocket') {
       const n = opts.count || 1;
       for (let i = 0; i < n; i++) {
         const spread = n === 1 ? 0 : (i - (n - 1) / 2) * 70;
         const bomb = el === 'bomb' || el === 'icebomb';
-        state.shots.push({ el, x, y, dir, vx: dir * EL[el].speed, vy: bomb ? -240 : spread, g: EL[el].gravity || 0, life: EL[el].life, t: 0, dead: false, dmg: opts.dmg || 3, radius: opts.radius || 0, pierce: !!opts.pierce, hitSet: new Set() });
+        state.shots.push({ el, x, y, dir, vx: dir * EL[el].speed * (opts.speed || 1), vy: bomb ? -240 : spread, g: EL[el].gravity || 0, life: EL[el].life, t: 0, dead: false, dmg: opts.dmg || 3, radius: opts.radius || 0, pierce: !!opts.pierce || el === 'plasma', hitSet: new Set() });
       }
       return;
     }
     if (el !== 'lightning') {
-      state.shots.push({ el, x, y, dir, vx: dir * EL[el].speed, life: EL[el].life, t: 0, dead: false });
+      state.shots.push({ el, x, y, dir, vx: dir * EL[el].speed * (opts.speed || 1), life: EL[el].life, t: 0, dead: false, dmg: opts.dmg || 0 }); // dmg: 관리자 발사기는 대미지를 정한다
       return;
     }
     // 번개: 벽에 막힐 때까지 곧게 뻗는다
@@ -64,7 +66,7 @@
     for (const m of monsters) {
       if (!alive(m)) continue;
       if (m.x + m.w >= x0 && m.x <= x1 && m.y + m.h >= y - EL.lightning.half && m.y <= y + EL.lightning.half) {
-        hooks.hit(m, 'lightning', dir, m.x + m.w / 2, m.y + m.h / 2);
+        hooks.hit(m, 'lightning', dir, m.x + m.w / 2, m.y + m.h / 2, { dmg: opts.dmg || 0 });
       }
     }
   }
@@ -153,6 +155,19 @@
         ctx.fillRect(-34, -2, 34, 4);
         ctx.fillStyle = '#fff6c0';
         ctx.fillRect(-12, -2, 12, 4);
+        ctx.restore();
+      } else if (s.el === 'plasma') { // 플라즈마: 보랏빛 에너지 구슬과 긴 꼬리
+        for (let i = 5; i >= 1; i--) { ctx.fillStyle = `rgba(200,120,255,${0.07 + 0.05 * (6 - i)})`; ctx.beginPath(); ctx.arc(s.x - s.dir * i * 8, s.y, 11 - i, 0, Math.PI * 2); ctx.fill(); }
+        const pg = ctx.createRadialGradient(s.x, s.y, 1, s.x, s.y, 18);
+        pg.addColorStop(0, '#ffffff'); pg.addColorStop(0.4, '#e0a0ff'); pg.addColorStop(1, 'rgba(150,60,255,0)');
+        ctx.fillStyle = pg; ctx.fillRect(s.x - 18, s.y - 18, 36, 36);
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(s.x, s.y, 7 + Math.sin(s.t * 50), 0, Math.PI * 2); ctx.stroke();
+      } else if (s.el === 'rocket') { // 로켓: 뾰족한 몸통과 불꽃 꼬리
+        ctx.save(); ctx.translate(s.x, s.y); ctx.scale(s.dir, 1);
+        ctx.fillStyle = 'rgba(255,170,60,0.85)'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-26 - Math.random() * 8, -4); ctx.lineTo(-26 - Math.random() * 8, 4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#c8d0dc'; ctx.fillRect(-12, -5, 22, 10);
+        ctx.fillStyle = '#d02a2a'; ctx.beginPath(); ctx.moveTo(10, -5); ctx.lineTo(20, 0); ctx.lineTo(10, 5); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#7a8494'; ctx.fillRect(-12, -8, 6, 4); ctx.fillRect(-12, 4, 6, 4);
         ctx.restore();
       } else if (s.el === 'bomb' || s.el === 'icebomb') { // 폭탄: 둥근 몸 + 타는 심지
         const ice = s.el === 'icebomb';

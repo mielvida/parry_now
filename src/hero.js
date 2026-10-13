@@ -200,6 +200,14 @@
       rect(ctx, blade[0], 0, -3, 22, 5);
       rect(ctx, blade[1], 0, 0, 22, 2);
       rect(ctx, '#2a2f3a', 20, -4, 5, 7);
+    } else if (weaponType === 'launcher') { // 발사기: 어깨에 얹은 굵은 발사관, 아가리의 빛, 손잡이와 탄창
+      rect(ctx, '#3a3f4a', -6, -6, 14, 12);
+      rect(ctx, blade[1], 4, -7, 24, 12);
+      rect(ctx, blade[0], 4, -7, 24, 4);
+      rect(ctx, '#2a2f3a', 26, -9, 5, 16);
+      ctx.fillStyle = blade[0]; ctx.beginPath(); ctx.arc(32, -1, 3, 0, Math.PI * 2); ctx.fill();
+      rect(ctx, '#4a2f1a', 4, 5, 5, 8);
+      rect(ctx, '#1a1d24', 14, 5, 9, 6);
     } else if (weaponType === 'bow') { // 활: 휘어진 몸 + 시위
       ctx.strokeStyle = blade[0]; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(8, 0, 13, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();

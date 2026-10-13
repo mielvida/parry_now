@@ -253,9 +253,50 @@
     ctx.textAlign = 'start';
   }
 
+  // 방사능 공장의 가게: 강철 부스에 가게마다 다른 색 차양, 벽에 걸린 물건 그림, 방호복 차림의 주인
+  function drawFacShop(ctx, shop, baseX, baseY, time) {
+    const w = 140, x = baseX - w / 2, col = shop.color || '#e8c020';
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(baseX, baseY, w * 0.6, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3a4248'; ctx.fillRect(x + 4, baseY - 88, w - 8, 88); // 강철 뒷벽
+    ctx.fillStyle = '#2a3036'; for (let k = 0; k < 4; k++) ctx.fillRect(x + 4, baseY - 78 + k * 20, w - 8, 2);
+    ctx.fillStyle = '#566068'; ctx.fillRect(x, baseY - 100, 6, 100); ctx.fillRect(x + w - 6, baseY - 100, 6, 100); // 기둥
+    ctx.fillStyle = 'rgba(210,220,225,0.5)'; for (const [rx, ry] of [[10, 12], [w - 14, 12], [10, 60], [w - 14, 60]]) ctx.fillRect(x + rx, baseY - 90 + ry, 3, 3);
+    const gl = ctx.createRadialGradient(baseX, baseY - 60, 4, baseX, baseY - 60, 70); gl.addColorStop(0, 'rgba(150,255,110,0.18)'); gl.addColorStop(1, 'rgba(150,255,110,0)');
+    ctx.fillStyle = gl; ctx.fillRect(x - 20, baseY - 130, w + 40, 140);
+    // 차양: 가게 색과 검정 줄무늬
+    ctx.fillStyle = col; ctx.fillRect(x - 6, baseY - 112, w + 12, 14);
+    ctx.fillStyle = '#16181a'; for (let k = 0; k < 8; k++) { ctx.beginPath(); ctx.moveTo(x - 6 + k * 19, baseY - 112); ctx.lineTo(x - 6 + k * 19 + 9, baseY - 112); ctx.lineTo(x - 6 + k * 19 + 4, baseY - 98); ctx.lineTo(x - 6 + k * 19 - 5, baseY - 98); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = col; for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.arc(x + 4 + k * 20, baseY - 98, 7, 0, Math.PI); ctx.fill(); }
+    // 벽에 걸린 그림
+    const ix = x + w - 40, iy = baseY - 64;
+    ctx.save(); ctx.translate(ix, iy);
+    switch (shop.icon) {
+      case 'suit': ctx.fillStyle = '#e8c020'; ctx.fillRect(-12, -2, 24, 28); ctx.fillRect(-20, 0, 8, 20); ctx.fillRect(12, 0, 8, 20); ctx.beginPath(); ctx.arc(0, -8, 10, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#1c2024'; ctx.fillRect(-6, -10, 12, 7); ctx.fillStyle = '#7dff6a'; ctx.fillRect(-5, -9, 4, 4); ctx.fillRect(1, -9, 4, 4); break;
+      case 'bolt': ctx.fillStyle = '#ffe34a'; ctx.strokeStyle = '#7a1a0a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(4, -18); ctx.lineTo(-12, 4); ctx.lineTo(-2, 4); ctx.lineTo(-8, 24); ctx.lineTo(14, -2); ctx.lineTo(3, -2); ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+      case 'syringe': ctx.fillStyle = '#dfe8ec'; ctx.fillRect(-4, -14, 9, 28); ctx.fillStyle = '#7dff6a'; ctx.fillRect(-3, -4, 7, 16); ctx.fillStyle = '#9aa4a8'; ctx.fillRect(-8, -16, 17, 3); ctx.fillRect(-1, -24, 3, 9); ctx.fillStyle = '#cfd8dc'; ctx.fillRect(0, 14, 1.5, 12); break;
+      case 'battery': ctx.fillStyle = '#2a3036'; ctx.fillRect(-14, -14, 28, 32); ctx.fillStyle = '#9aa4a8'; ctx.fillRect(-6, -19, 12, 5); for (let k = 0; k < 4; k++) { ctx.fillStyle = k < 3 ? '#4aff9a' : '#2a4a3a'; ctx.fillRect(-10, 10 - k * 7, 20, 5); } break;
+      case 'crate': ctx.fillStyle = '#6a5a3a'; ctx.fillRect(-18, 2, 20, 18); ctx.fillRect(2, 8, 18, 12); ctx.fillRect(-10, -14, 18, 16); ctx.strokeStyle = '#2a2218'; ctx.lineWidth = 1.5; ctx.strokeRect(-18, 2, 20, 18); ctx.strokeRect(2, 8, 18, 12); ctx.strokeRect(-10, -14, 18, 16); G.Factory && G.Factory.trefoil(ctx, -1, -6, 5, 0.9); break;
+      case 'can': for (const [dx, c2] of [[-14, '#e05a3a'], [0, '#e8c020'], [14, '#3ab0e0']]) { ctx.fillStyle = c2; ctx.fillRect(dx - 6, -10, 12, 26); ctx.fillStyle = '#e8e8e8'; ctx.fillRect(dx - 6, -12, 12, 3); ctx.fillRect(dx - 6, 14, 12, 2); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(dx - 4, -6, 2, 14); } break;
+      case 'anvil': ctx.fillStyle = '#4a4f58'; ctx.fillRect(-16, 4, 32, 7); ctx.fillRect(-6, 11, 12, 10); ctx.fillRect(-20, -4, 30, 8); ctx.beginPath(); ctx.moveTo(10, -4); ctx.lineTo(22, 0); ctx.lineTo(10, 4); ctx.fill(); ctx.fillStyle = '#ffb040'; for (let k = 0; k < 4; k++) ctx.fillRect(-4 + k * 6 + Math.sin(time * 9 + k) * 2, -12 - (k % 2) * 6, 2, 2); break;
+      case 'dice': ctx.fillStyle = '#f4f1e8'; ctx.fillRect(-18, -4, 18, 18); ctx.fillRect(2, -14, 18, 18); ctx.fillStyle = '#2a1a4a'; for (const [dx, dy] of [[-14, 0], [-6, 8], [-14, 8], [-6, 0], [6, -10], [14, 0], [10, -5]]) ctx.fillRect(dx - 1, dy - 1, 3, 3); break;
+      case 'kit': ctx.fillStyle = '#f4f1e8'; ctx.fillRect(-16, -8, 32, 26); ctx.strokeStyle = '#8a8f9a'; ctx.lineWidth = 2; ctx.strokeRect(-16, -8, 32, 26); ctx.fillStyle = '#d03a3a'; ctx.fillRect(-3, -4, 6, 18); ctx.fillRect(-9, 2, 18, 6); ctx.fillStyle = '#8a8f9a'; ctx.fillRect(-6, -12, 12, 4); break;
+    }
+    ctx.restore();
+    G.Npc.draw(ctx, shop.npc || 'villager', baseX - 24, baseY - 28, 1, time); // 계산대 뒤의 주인
+    ctx.fillStyle = '#4a545c'; ctx.fillRect(x + 2, baseY - 28, w - 4, 28); // 계산대
+    ctx.fillStyle = '#6a747c'; ctx.fillRect(x, baseY - 32, w, 6);
+    ctx.fillStyle = col; for (let k = 0; k < 7; k++) ctx.fillRect(x + 6 + k * 20, baseY - 18, 10, 4); // 계산대 앞 줄무늬
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x + 2, baseY - 4, w - 4, 4);
+    ctx.fillStyle = '#16181a'; ctx.fillRect(baseX - 38, baseY - 128, 76, 18); // 간판
+    ctx.fillStyle = col; ctx.fillRect(baseX - 38, baseY - 128, 76, 3); ctx.fillRect(baseX - 38, baseY - 113, 76, 3);
+    G.TextLayer.add(shop.label || '가게', baseX, baseY - 119, 'bold 12px sans-serif', '#e8f4e8');
+    ctx.textAlign = 'start';
+  }
+
   // 상점 가판대: baseX = 가운데, baseY = 땅 윗면. 뒤에 주인이 서 있고 앞에 계산대가 있다
   function drawShop(ctx, shop, baseX, baseY, time, closed) {
     if (shop.kind === 'furnace') { drawFurnace(ctx, baseX, baseY, time); return; }
+    if (shop.fac) { drawFacShop(ctx, shop, baseX, baseY, time); return; }
     const potion = shop.kind === 'potion';
     const armor = shop.kind === 'armor';
     const mine = shop.kind === 'mine';
@@ -900,5 +941,6 @@
     ctx.fillStyle = '#9aa4c0'; ctx.fillText('E / Esc: 인사하고 나가기', W / 2, py + ph + 36);
     ctx.restore();
   };
+  Beach.drawShop = drawShop; // 다른 테마(방사능 공장)도 가게를 그릴 수 있게
   G.Beach = Beach;
 })(window.Game);
