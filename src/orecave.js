@@ -152,7 +152,7 @@
       const h = this.host;
       const tier = h.pickTier();
       if (tier <= 0) {
-        h.say('곡괭이를 장착하지 않았어요! 인벤토리(I)에서 장착하거나 대장간에서 사세요', 'rgba(255,170,170,A)');
+        h.say('곡괭이를 손에 들어야 캘 수 있어요! (검으로는 못 캐요) 인벤토리(I)나 1~5 키로 곡괭이를 드세요. 곡괭이는 대장간에서 살 수 있어요', 'rgba(255,170,170,A)');
         h.sound('deny');
         return true;
       }
@@ -168,7 +168,7 @@
         h.fx.sparkle(nd.x + rand(-10, 10), nd.y - 20);
         return true;
       }
-      const power = POWER[tier];
+      const power = POWER[tier] + (h.pickDig ? h.pickDig() : 0); // 채굴 속도 주괴를 붙이면 한 번에 더 판다
       nd.hp -= power;
       nd.shake = 1;
       nd.flash = 0.1;
@@ -189,6 +189,8 @@
       let n = 1;
       if (!o.mat) { // 어둠 결정은 항상 1개
         if (Math.random() < 0.4) n += 1;
+        const dp = h.pickDrop ? h.pickDrop() : 0; // 곡괭이에 붙인 주괴: 더 많이 떨어질 확률
+        for (let k = 0; k < 3; k++) if (Math.random() < dp) n += 1;
         if (o.tier >= 3 && Math.random() < 0.2) n += 1;
       }
       // 큰 폭발: 파편, 번쩍임, 흔들림, 잠깐 멈춤

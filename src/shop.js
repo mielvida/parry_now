@@ -5,7 +5,7 @@
 //  - 산 장비는 바로 장착되고, 인벤토리 창(I 키)에서 바꿔 낄 수 있다.
 (function (G) {
   const SLOT_NAMES = { weapon: '무기', helmet: '투구', armor: '갑옷', gloves: '장갑', pants: '바지', boots: '신발' };
-  const TYPE_NAMES = { sword: '검', great: '대검', dagger: '단검', staff: '지팡이', bomb: '폭탄', gun: '총', bow: '활', shield: '방패', scythe: '낫', spear: '창', axe: '도끼', hammer: '망치', katana: '도', rapier: '레이피어', whip: '채찍', crossbow: '석궁', shotgun: '산탄총' };
+  const TYPE_NAMES = { sword: '검', great: '대검', dagger: '단검', staff: '지팡이', bomb: '폭탄', gun: '총', bow: '활', shield: '방패', scythe: '낫', spear: '창', axe: '도끼', pick: '곡괭이', hammer: '망치', katana: '도', rapier: '레이피어', whip: '채찍', crossbow: '석궁', shotgun: '산탄총' };
 
   const ITEMS = {};
   const add = (it) => { ITEMS[it.id] = it; };
@@ -517,7 +517,7 @@
       const own = inv ? inv.home.owned[item.id] || 0 : 0;
       return { name: item.name, desc: item.id === 'd_rack' ? '위에 작은 가구를 올릴 수 있는 선반' : item.place === 'floor' ? '바닥에 놓는 가구' : '벽에 거는 장식', slotName: '장식품', note: inv ? `보유 ${own}개 · 남은 ${decorLeft(inv, item.id)}개` : '' };
     }
-    if (item.pickaxe) return { name: item.name, desc: item.desc, slotName: '곡괭이', note: inv && inv.items.includes(item.id) ? (inv.equipped.pick === item.id ? '장착 중 (누르면 뺀다)' : '누르면 장착한다') : '사서 장착하면 광석을 캘 수 있다' };
+    if (item.pickaxe && !item.slot) return { name: item.name, desc: item.desc, slotName: '곡괭이', note: inv && inv.items.includes(item.id) ? (inv.equipped.pick === item.id ? '장착 중 (누르면 뺀다)' : '누르면 장착한다') : '사서 장착하면 광석을 캘 수 있다' };
     if (item.tool) return { name: item.name, desc: item.desc, slotName: '도구', note: inv && inv.items.includes(item.id) ? '가지고 있어요 (계속 쓰인다)' : '한 번 사면 계속 쓴다' };
     if (item.quest) return { name: item.name, desc: item.desc, slotName: '소중한 물건', note: '장착하거나 쓸 수 없는 보물' };
     if (item.heal !== undefined) return { name: item.name, desc: item.desc, slotName: '물약', note: POTION_NOTE };
@@ -924,10 +924,9 @@
       wallet.inv.potions[item.id] = n;
       return { ok: true, msg: `${item.name} 구매! (보유 ${n}개)` };
     }
-    if (item.pickaxe) { // 곡괭이: 가장 좋은 것이 자동으로 쓰인다
+    if (item.pickaxe) { // 곡괭이는 무기: 가방에 넣는다. 손에 들면(인벤토리·1~5 키) 광물 동굴에서 E로 캔다
       wallet.inv.items.push(item.id);
-      G.Forge.autoEquipPick(wallet.inv);
-      return { ok: true, msg: `${item.name} 구매! 인벤토리에서 장착하면 광물 동굴에서 ${item.pickaxe}단계 광석까지 캘 수 있다.` };
+      return { ok: true, msg: `${item.name} 구매! 무기처럼 손에 들면 광물 동굴에서 ${item.pickaxe}단계 광석까지 캘 수 있다 (검으로는 못 캔다).` };
     }
     if (item.townmap) { // 마을 지도
       wallet.inv.items.push(item.id);

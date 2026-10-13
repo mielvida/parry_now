@@ -25,6 +25,7 @@
     { id: 'boss_stone', name: '정의의 어둠돌', desc: '[보스] 어둠의 탑 33층의 거대한 돌.' },
     { id: 'boss_justice', name: '정의의 어둠', desc: '[보스] 어둠의 탑 66층의 어둠의 기사.' },
     { id: 'boss_sikner', name: '시크너', desc: '[보스] 어둠의 탑 100층에서 기다리는 어둠의 기사.' },
+    { id: 'boss_sealord', name: '해일의 군주', desc: '[보스] 바다 위 맨 오른쪽 끝 문 안의 방에 사는 거대한 심해 괴물. 약점은 얼음.' },
   ];
   const mobKey = (s) => (s.kind === 'slime' ? 'slime_' + (s.variant || 'green') : s.kind === 'bat' ? (s.golden ? 'goldbat' : 'bat') : s.kind === 'raider' ? 'raider_' + s.variant : s.kind);
 
@@ -92,6 +93,16 @@
       case 'boss_stone': {
         ctx.fillStyle = c('#3a3a4a'); ctx.beginPath(); ctx.moveTo(-20, 18); ctx.lineTo(-24, -4); ctx.lineTo(-8, -22); ctx.lineTo(12, -20); ctx.lineTo(24, -2); ctx.lineTo(20, 18); ctx.closePath(); ctx.fill();
         ctx.fillStyle = c('#ff4a6a'); ctx.fillRect(-12, -6, 7, 5); ctx.fillRect(4, -6, 7, 5); break;
+      }
+      case 'boss_sealord': { // 해일의 군주: 심해 아귀
+        ctx.fillStyle = c('#1a5a72'); ctx.beginPath(); ctx.ellipse(0, 4, 22, 15, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = c('#17606e'); ctx.beginPath(); ctx.moveTo(-18, 4); ctx.lineTo(-30, -6); ctx.lineTo(-30, 14); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = c('#2a0a10'); ctx.beginPath(); ctx.moveTo(4, 4); ctx.lineTo(22, -2); ctx.lineTo(22, 14); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = c('#f4f4ea'); for (let k = 0; k < 4; k++) { ctx.fillRect(7 + k * 4, 3 + k * 0.6, 2, 4); }
+        ctx.fillStyle = c('#f4f0d0'); ctx.beginPath(); ctx.arc(2, -3, 4, 0, Math.PI * 2); ctx.fill(); eye(3, -3, 1.6);
+        ctx.strokeStyle = c('#0e4150'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -10); ctx.quadraticCurveTo(4, -24, 14, -20); ctx.stroke();
+        ctx.fillStyle = c('#fffbb0'); ctx.beginPath(); ctx.arc(14, -20, 3.5, 0, Math.PI * 2); ctx.fill();
+        break;
       }
       case 'boss_justice': case 'boss_sikner': {
         const col = id === 'boss_sikner' ? '#2a2038' : '#3a3a58';

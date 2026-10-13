@@ -102,6 +102,13 @@
       get goal() { return story.kingMet ? ((missions.owed || 0) > 0 ? `왕궁: 옥좌의 왕에게 E로 말을 걸어 의뢰 보상 ${missions.owed} G를 받자` : '왕궁: 옥좌의 왕에게 E로 말을 걸자. 왼쪽 문에서 E: 나가기') : '왕궁 알현실: 왕 앞으로 걸어가자'; },
       banner: { title: '왕궁', sub: '왕이 계신 곳', dur: 2.5, caption: '…붉은 융단 끝, 옥좌에 왕이 앉아 있다.' },
     },
+    seaboss: { // 해일의 방: 바다 위 맨 오른쪽 끝 문(10000 G) 안. 지금까지 없던 패턴의 보스 해일의 군주
+      music: 'cave', label: '해일의 방', level: G.Levels.seaboss, theme: G.Beach, monsterless: true, repeatChest: true, returnNear: 'bossdoor', exitTo: 'sea',
+      boss: { col: 2, kind: 'sea' },
+      goal: '해일의 군주! 해일은 점프로 넘고, 해파리 사이의 번개 줄과 촉수 휘두르기를 피하고, 먹물 속에서는 쫓아오는 거품을 쳐내자. 약점은 얼음',
+      chest: { mode: 'mine', coins: 30000, exp: 3000, next: 'sea', near: 'bossdoor' },
+      banner: { title: '해일의 방', sub: '해일의 군주', dur: 3.5, caption: '…바닷물이 벽을 타고 울린다. 방 안쪽에서 거대한 그림자가 몸을 일으킨다.' },
+    },
     duelarena: { // 결투장: 보스전처럼 AI 용사와 싸운다
       music: 'cave', label: '결투장', level: G.Levels.duelarena, theme: G.Beach, monsterless: true, returnNear: 'village', exitTo: 'village',
       boss: { col: 2, kind: 'duel' },
@@ -481,7 +488,7 @@
       boss = new G.DuelRival(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE * 2, (terrain.treasure.row + 1) * C.TILE, bossEv, duelRun.cfg);
       return;
     }
-    const Cls = st.boss && ({ ape: G.ApeBoss, king: G.KingSlime }[bk] || G.Boss);
+    const Cls = st.boss && ({ ape: G.ApeBoss, king: G.KingSlime, sea: G.SeaLord }[bk] || G.Boss);
     boss = st.boss ? new Cls(st.boss.col * C.TILE, terrain.width - st.boss.col * C.TILE, (terrain.treasure.row + 1) * C.TILE, bossEv) : null;
   }
   const bossOn = () => !!(boss && boss.started);
@@ -1059,6 +1066,7 @@
   function makeDexBoss(id, st) {
     const L = st.boss.col * C.TILE, W = terrain.width - st.boss.col * C.TILE * 2, gy = (terrain.treasure.row + 1) * C.TILE;
     if (id === 'boss_king') return new G.KingSlime(L, W, gy, bossEv);
+    if (id === 'boss_sealord') return new G.SeaLord(L, W, gy, bossEv);
     if (id === 'boss_ape') return new G.ApeBoss(L, W, gy, bossEv);
     if (id === 'boss_dragon') return new G.Boss(L, W, gy, bossEv);
     if (id === 'boss_sikner') return new G.Sikner(L, W, gy, bossEv, 'sikner');
@@ -1285,7 +1293,9 @@
     giveOre(id, n) { inv.ores[id] = (inv.ores[id] || 0) + n; G.Forge.markDirty(); },
     pickTier: () => G.Forge.bestPick(inv),
     hasLens: () => inv.equipped.weapon === 'magnifier', // 약점 돋보기를 끼면 광석 단계가 보인다
-    pickLook: () => { const id = inv.equipped.pick; return id && G.Shop.ITEMS[id] ? G.Shop.ITEMS[id].look : null; },
+    pickLook: () => { const w = G.Shop.ITEMS[inv.equipped.weapon]; return w && w.pickaxe ? w.look : null; }, // 손에 든 곡괭이 모양
+    pickDig: () => { const w = G.Shop.ITEMS[inv.equipped.weapon]; return w && w.pickaxe ? G.Forge.attachBonus(inv, w).dig : 0; },   // 곡괭이에 붙인 채굴 속도
+    pickDrop: () => { const w = G.Shop.ITEMS[inv.equipped.weapon]; return w && w.pickaxe ? G.Forge.attachBonus(inv, w).drop : 0; }, // 광석이 더 떨어질 확률
     hitStop: (sec) => { hitStop = Math.max(hitStop, sec); },
   });
 
@@ -1351,7 +1361,7 @@
     spawn = terrain.spawnFor(C.PLAYER_W, C.PLAYER_H);
     // near: 마을로 돌아올 때 어느 입구 앞에서 시작할지 ('D' 동굴 입구, 또는 스테이지 이름 = 그 스테이지의 문)
     if (name === 'sea' && near === 'seacave') spawn = terrain.placeOnTile(seaLv.caveEntrance.col, seaLv.caveEntrance.row - 1, C.PLAYER_W, C.PLAYER_H);
-    const arrive = near === 'D' ? terrain.caveEntrances[0] : near === 'Y' ? (terrain.homeLots.find((l) => !l.lux) || terrain.homeLots[0]) : near === 'Z' ? (terrain.homeLots.find((l) => l.lux) || terrain.homeLots[0]) : near === 'palace' ? terrain.castles[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
+    const arrive = near === 'bossdoor' && seaLv && seaLv.bossDoor ? { col: seaLv.bossDoor.col + 2, row: seaLv.bossDoor.row } : near === 'D' ? terrain.caveEntrances[0] : near === 'Y' ? (terrain.homeLots.find((l) => !l.lux) || terrain.homeLots[0]) : near === 'Z' ? (terrain.homeLots.find((l) => l.lux) || terrain.homeLots[0]) : near === 'palace' ? terrain.castles[0] : near ? terrain.gates.find((g) => g.stage === near) : null;
     if (arrive) spawn = terrain.placeOnTile(arrive.col - 2, arrive.row, C.PLAYER_W, C.PLAYER_H);
 
     chest = terrain.treasure && !chestTaken[name] && !st.boss ? makeChest() : null; // 보스가 있는 스테이지는 보스를 쓰러뜨려야 상자가 나온다
@@ -1411,6 +1421,7 @@
       seaSt.air = seaCaveLv.airSpots.map((a) => ({ x: a.x, y: a.y, t: 0, gone: false, fixed: true }));
       for (const sp of seaCaveLv.fishSpots) { const kind = G.Sea.pickHostile(G.Sea.depthAt(seaCaveLv, sp.y)); if (!kind) continue; const m = new G.Sea.SeaFish(sp.x, sp.y, kind); m.stageSpeed = 1.15; m.extraHits = Math.min(25, Math.floor(G.Sea.depthAt(seaCaveLv, sp.y) / 80)); monsters.push(m); }
     }
+    if (name === 'sea') G.Sea.Theme.setDoorOpen(!!story.seaBossOpen);
     if (name === 'sea') { for (const sh of seaLv.extraShops) terrain.shops.push(Object.assign({ sea: true }, sh)); G.Sea.Theme.setVisited(story.seaTownVisited); }
     if (name === 'sea') { seaSt = G.Sea.makeState(); seaO2 = diveMax(); seaDrown = 0; seaDepth = 0; }
     if (name === 'sea' && story.seaCrack) openCrack(true); // 이미 무너뜨린 금 간 바위
@@ -1493,9 +1504,9 @@
   let slot = null;     // 지금 하고 있는 저장 칸 (0~2). 처음 화면에서 고른다
   let playSec = 0;     // 이 칸의 플레이 시간 (초)
   let titleUI = null;  // 처음 화면 {cur, slots:[meta|null x3], del, copy, quit, t}
-  const AREA_NAMES = { meadow: '성 밖 숲', abyss: '심연 동굴', palace: '왕궁', cave: '시작 동굴', beach: '낯선 해변', village: '해변 마을', mine: '마을 동굴', orecave: '광물 동굴', home: '우리 집', forest: '속삭이는 숲', snow: '얼음 산', volcano: '불꽃 화산', darkhub: '다크월드 입구', kingdom: '왕이 다스리는 도시', duelarena: '결투장' };
+  const AREA_NAMES = { meadow: '성 밖 숲', abyss: '심연 동굴', palace: '왕궁', cave: '시작 동굴', beach: '낯선 해변', village: '해변 마을', mine: '마을 동굴', orecave: '광물 동굴', home: '우리 집', forest: '속삭이는 숲', snow: '얼음 산', volcano: '불꽃 화산', darkhub: '다크월드 입구', kingdom: '왕이 다스리는 도시', duelarena: '결투장', seaboss: '해일의 방' };
   const areaNameOf = (st, fl) => (st === 'dungeon' ? `어둠의 탑 ${fl || 1}층` : AREA_NAMES[st] || (STAGES[st] && STAGES[st].label) || st);
-  const areaImgOf = (st, fl) => (st === 'dungeon' ? 'd' + ([1, 3, 10, 33, 50, 66, 90, 100].filter((x) => x <= (fl || 1)).pop() || 1) : ({ duelarena: 'mg_duel', palace: 'kingdom', abyss: 'cave', meadow: 'forest' }[st] || st)); // 지역 그림 (assets/regions)
+  const areaImgOf = (st, fl) => (st === 'dungeon' ? 'd' + ([1, 3, 10, 33, 50, 66, 90, 100].filter((x) => x <= (fl || 1)).pop() || 1) : ({ duelarena: 'mg_duel', palace: 'kingdom', abyss: 'cave', meadow: 'forest', seaboss: 'sea' }[st] || st)); // 지역 그림 (assets/regions)
   const noSave = () => window.NO_SAVE || /[?&](nosave|stage=)/.test(window.location.search);
   let saveBlocked = false; // 처음부터 다시하기 중에는 창을 닫을 때 다시 저장하지 않는다
   function buildSave() {
@@ -1527,7 +1538,7 @@
   const replaceObj = (dst, src) => { for (const k of Object.keys(dst)) delete dst[k]; Object.assign(dst, JSON.parse(JSON.stringify(src || {}))); };
   const RESTORABLE = ['village', 'kingdom', 'palace', 'meadow', 'darkhub', 'beach', 'cave', 'forest', 'snow', 'volcano', 'home', 'sea', 'legion']; // 같은 모양으로 다시 만들 수 있는 곳 (바다·군단 요새 포함)
   // 매번 새로 만들어지는 곳은 그곳으로 들어가는 입구 앞으로 돌아온다 [스테이지, 입구]
-  const RESUME_NEAR = () => ({ seacave: ['sea', 'seacave'], mine: [story.mineFrom || 'village', 'D'], orecave: [story.oreFrom || 'village', 'orecave'], abyss: ['kingdom', 'abyss'], dungeon: ['darkhub', null], duelarena: ['village', null] });
+  const RESUME_NEAR = () => ({ seacave: ['sea', 'seacave'], mine: [story.mineFrom || 'village', 'D'], orecave: [story.oreFrom || 'village', 'orecave'], abyss: ['kingdom', 'abyss'], dungeon: ['darkhub', null], duelarena: ['village', null], seaboss: ['sea', 'bossdoor'] });
   // 저장 내용을 게임에 적용한다. exact = 저장한 자리(스테이지와 위치) 그대로, 아니면 마을에서 시작
   function applySave(d, exact = true) {
     coins = d.coins || 0; exp = d.exp || 0;
@@ -1833,6 +1844,7 @@
     const px = player.x + player.w / 2;
     const feet = player.y + player.h;
     if (stageName === 'sea' && seaLv && seaLv.caveEntrance && Math.abs(px - (seaLv.caveEntrance.col * T + T / 2)) < T * 2.4 && Math.abs(feet - (seaLv.caveEntrance.row + 1) * T) < T * 3) return { type: 'seacave' };
+    if (stageName === 'sea' && seaLv && seaLv.bossDoor && Math.abs(px - (seaLv.bossDoor.col * T + T / 2)) < T * 2.4 && Math.abs(feet - (seaLv.bossDoor.row + 1) * T) < T * 2.2) return { type: 'seabossdoor' }; // 바다 오른쪽 끝의 문
     if (stageName === 'sea' && seaLv) { // 수중 마을 <-> 항구 마을 포털
       for (const pt of seaLv.portals) {
         if (pt.kind === 'toTown' && !story.seaTownVisited) continue;
@@ -3911,6 +3923,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       const mo = new G.Raider(p.x, p.y, variant);
       mo.marchX = p.x + V.w / 2;
       mo.hold = true; // 군단 병사도 오락가락하지 않고 가만히 서 있는다
+      mo.legion = true; // 군단 병사는 새까만 갑옷
       mo.stageSpeed = 1.15 + 0.12 * f;
       mo.contactDmg = 1;
       mo.immune = {};
@@ -4721,6 +4734,15 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         loadStage('seacave', true);
         input.endFrame();
         return;
+      } else if (near && near.type === 'seabossdoor') { // 바다 오른쪽 끝의 문: 10000 G를 넣으면 열린다
+        if (story.seaBossOpen) { loadStage('seaboss', true); input.endFrame(); return; }
+        if (coins >= 10000) {
+          coins -= 10000; story.seaBossOpen = true; G.Sea.Theme.setDoorOpen(true);
+          effects.shake(8, 0.5); G.Audio.play('treasure'); effects.treasure(player.x + player.w / 2, player.y);
+          popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: '10000 G를 넣었다… 문이 열린다!', t: 3, color: 'rgba(160,255,190,A)' });
+        } else { dialog = { text: `문에 동전 구멍이 있다. 10000 G를 넣으면 열릴 것 같다. (지금 ${coins} G)`, t: 3.5 }; G.Audio.play('deny'); }
+        input.endFrame();
+        return;
       } else if (near && near.type === 'seaportal') { // 포털: 수중 마을 <-> 항구 마을
         const toTown = near.dest === 'town';
         effects.flash = 0.5; effects.flashColor = toTown ? '170,240,255' : '255,236,170';
@@ -5167,7 +5189,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     const st = STAGES[stageName];
     const banner = st.banner && stageTime < st.banner.dur && !shop && !equipUI && !devUI && !adminUI && !mini && !skipBanner ? Object.assign({ t: stageTime }, st.banner) : null;
     const near = !shop && !equipUI && !devUI && !adminUI && !mini && !ag && !sg && !wc && !fp && !dialog && !won && !cutscene ? nearbyInteract() : null;
-    const PROMPTS = { knock: 'E: 똑똑! 문을 두드린다 (집에 누가 있어요)', seacave: `E: 해저 동굴 탐험 (끝의 상자 +${seaCaveCoins()} G)`, seaportal: near && near.dest === 'harbor' ? 'E: 포털 타고 항구 마을로' : 'E: 포털 타고 수중 마을로', stranger: 'E: ……', palace: 'E: 왕궁으로 들어가기', talk: 'E: 대화', king: (missions.owed || 0) > 0 ? `E: 왕에게 가서 보상 받기 (${Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin))} G)` : 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
+    const PROMPTS = { seabossdoor: story.seaBossOpen ? 'E: 해일의 방으로 들어가기' : 'E: 10000 G를 넣고 문 열기', knock: 'E: 똑똑! 문을 두드린다 (집에 누가 있어요)', seacave: `E: 해저 동굴 탐험 (끝의 상자 +${seaCaveCoins()} G)`, seaportal: near && near.dest === 'harbor' ? 'E: 포털 타고 항구 마을로' : 'E: 포털 타고 수중 마을로', stranger: 'E: ……', palace: 'E: 왕궁으로 들어가기', talk: 'E: 대화', king: (missions.owed || 0) > 0 ? `E: 왕에게 가서 보상 받기 (${Math.round(missions.owed * (1 + G.Shop.homeBonuses(inv).coin))} G)` : 'E: 왕에게 말하기', enter: 'E: 동굴로 들어가기', exit: stageName === 'home' ? 'E: 밖으로 나가기 (마을)' : 'E: 마을로 나가기', home: inv.home.type ? 'E: 우리 집으로 들어가기' : 'E: 빈 터 (부동산에서 집을 살 수 있어요)', water: 'E: 샘물로 어둠의 크리스탈 씻기', altar: 'E: 신성의 제단: 정화된 크리스탈을 신성 크리스탈로' };
     const prompt = near ? (near.type === 'shop' ? (near.shop.sub ? (near.shop.sub === 'seadex' ? `E: ${near.shop.label} (새로 잡은 해산물 ${G.Sea.SEAFOOD.filter((s) => (inv.seaSeen || {})[s.id] && !(inv.seaDex || {})[s.id]).length}종 · 등록 ${Object.keys(inv.seaDex || {}).length}/${G.Sea.SEAFOOD.length})` : `E: ${near.shop.label}`) : near.shop.kind === 'gacha' ? `E: 뽑기 (한 번에 ${G.Gacha.PRICE} G · 장비와 무기가 걸려 있어요)` : near.shop.kind === 'dexhall' ? `E: 도감 보기 (새로 등록할 것 ${G.Dex.pendingIds(inv).length}개 · +${G.Dex.pendingIds(inv).length * G.Dex.REWARD} G)` : near.shop.kind === 'fishmonger' ? `E: 잡은 물고기 팔기 (${Object.values(inv.fish || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind === 'collector' ? `E: 잡은 곤충 팔기 (${Object.values(inv.bugs || {}).reduce((a, b) => a + b, 0)}마리)` : near.shop.kind.startsWith('mg') ? `E: ${G.Shop.SHOPS[near.shop.kind].title} 하기 (돈 벌기)` : `E: ${G.Shop.SHOPS[near.shop.kind].title} 열기`) : near.type === 'gate' ? `E: ${areaNameOf(near.stage)}(으)로 들어가기` : near.type === 'slot' ? (near.slot.kind === 'floor' ? 'E: 바닥 가구 놓기 / 치우기' : 'E: 벽 장식 걸기 / 치우기') : PROMPTS[near.type]) : null;
     const slotItem = shop && shop.mode === 'place' ? inv.home.placed[shop.slot.kind][shop.slot.index] || null : null;
     const shopView = shop ? Object.assign({}, shop, { coins, exp, lives, maxLives: maxLives(), inv, slotItem }, isMergeTab() ? { merge: mergeView() } : {}) : null;
@@ -5264,6 +5286,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     set blue(v) { blue = v; },
     useConsumable, loseLife,
     get cookUI() { return cookUI; },
+    get oreNodes() { return oreNodes; },
     get visitUI() { return visitUI; },
     set cookUI(v) { cookUI = v; },
     get seaLv() { return seaLv; },

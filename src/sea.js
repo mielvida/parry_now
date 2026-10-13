@@ -143,6 +143,10 @@
     for (let c = 4; c <= 16; c += 6) for (let r = SURFACE; r < SURFACE + 5; r++) g[r][c] = '#'; // 부두 기둥
     if (!L) { g[SURFACE - 2][3] = 'X'; g[SURFACE - 2][6] = 'P'; }
     g[SURFACE - 2][9] = '6'; g[SURFACE - 2][13] = '5'; // 다이빙 상점, 해산물 가게
+    // 바다 위 맨 오른쪽 끝: 부두와 해일의 방으로 가는 문 (10000 G를 넣으면 열린다)
+    for (let c = W - 24; c <= W - 6; c++) g[SURFACE - 1][c] = '#';
+    for (let c = W - 21; c <= W - 8; c += 6) for (let r = SURFACE; r < SURFACE + 5; r++) g[r][c] = '#';
+    const bossDoor = { col: W - 12, row: SURFACE - 2 };
     // 공기 동굴: 내려가는 길 곳곳(수심 140~1320m)에 바위 속 방이 있고, 큰 공기방울이 차 있다. 바닥의 구멍으로 헤엄쳐 올라가면 숨을 쉴 수 있다
     const pockets = [];
     [[140, 0], [330, 1], [520, 0], [760, 1], [940, 0], [1130, 1], [1320, 0]].forEach(([dep, side], k) => {
@@ -190,7 +194,7 @@
     }
     const pk = pockets.map((p) => ({ c0: p.c0 + L, c1: p.c1 + L, r0: p.r0, r1: p.r1, cm: p.cm + L, secret: !!p.secret }));
     const crack = { col: crackInfo.col + L, row: crackInfo.row, w: crackInfo.w, h: crackInfo.h, hits: 0, broken: false, room: { c0: crackInfo.room.c0 + L, c1: crackInfo.room.c1 + L, r0: crackInfo.room.r0, r1: crackInfo.room.r1 } };
-    return { rows: rowsOut, left: L, pockets: pk, crack, townTop: top, townFloor: F, townX0: x0 + L, townX1: x1 + L, shaft0: sc - 3 + L, shaft1: sc + 3 + L, extraShops, portals, caveEntrance: { col: ce.col, row: ce.row } };
+    return { rows: rowsOut, left: L, pockets: pk, crack, bossDoor: { col: bossDoor.col + L, row: bossDoor.row }, townTop: top, townFloor: F, townX0: x0 + L, townX1: x1 + L, shaft0: sc - 3 + L, shaft1: sc + 3 + L, extraShops, portals, caveEntrance: { col: ce.col, row: ce.row } };
   }
 
   const zoneAt = (m) => (m < 200 ? 0 : m < 500 ? 1 : m < 1000 ? 2 : m < 1400 ? 3 : 4);
@@ -371,12 +375,14 @@
     for (let i = 1; i < STOPS.length; i++) if (depth <= STOPS[i][0]) { const [d0, c0] = STOPS[i - 1], [d1, c1] = STOPS[i]; return [c0, c1, (depth - d0) / (d1 - d0)]; }
     return [STOPS[STOPS.length - 1][1], STOPS[STOPS.length - 1][1], 0];
   }
+  let doorOpen = false;
   let curLevel = null, darkness = 0, lampLv = 0, townVisited = false, caveBase = null; // caveBase: 동굴 안이면 기준 수심(m)
   const Theme = {
     setLevel(lv) { curLevel = lv; },
     setCave(base) { caveBase = base; },
     setLamp(n) { lampLv = n; },
     setVisited(v) { townVisited = !!v; },
+    setDoorOpen(v) { doorOpen = !!v; },
     drawBackground(ctx, w, h, camera, time) {
       const cy = camera.y || 0;
       const bands = 28;
@@ -438,6 +444,27 @@
         ctx.fillStyle = 'rgba(190,235,255,0.55)'; ctx.beginPath(); ctx.moveTo(camera.x - 20, sy + 40);
         for (let x = camera.x - 20; x <= camera.x + view; x += 16) ctx.lineTo(x, sy + Math.sin(x * 0.05 + time * 2) * 3);
         ctx.lineTo(camera.x + view, sy + 40); ctx.closePath(); ctx.fill();
+      }
+      // 해일의 방 문: 바다 위 맨 오른쪽 끝
+      if (caveBase === null && curLevel && curLevel.bossDoor) {
+        const d = curLevel.bossDoor, dx = d.col * T + T / 2, dy = (d.row + 1) * T;
+        if (dx > camera.x - 120 && dx < camera.x + view) {
+          ctx.save(); ctx.translate(dx, dy);
+          ctx.fillStyle = '#3a3e4a'; ctx.fillRect(-46, -112, 92, 112); ctx.fillStyle = '#505564'; ctx.fillRect(-46, -112, 92, 10); // 돌 문틀
+          ctx.beginPath(); ctx.arc(0, -96, 36, Math.PI, 0); ctx.fillStyle = '#505564'; ctx.fill();
+          if (doorOpen) {
+            const g = ctx.createLinearGradient(0, -100, 0, 0); g.addColorStop(0, '#0a2a1a'); g.addColorStop(1, '#2a8a5a');
+            ctx.fillStyle = g; ctx.fillRect(-30, -100, 60, 100); ctx.beginPath(); ctx.arc(0, -100, 30, Math.PI, 0); ctx.fill();
+            ctx.fillStyle = `rgba(150,255,170,${0.25 + 0.15 * Math.sin(time * 3)})`; ctx.fillRect(-30, -100, 60, 100);
+          } else {
+            ctx.fillStyle = '#6a6e7c'; ctx.fillRect(-30, -100, 60, 100); ctx.beginPath(); ctx.arc(0, -100, 30, Math.PI, 0); ctx.fill();
+            ctx.fillStyle = '#4a4e5c'; ctx.fillRect(-2, -100, 4, 100);
+            ctx.fillStyle = '#e8c860'; ctx.fillRect(-10, -62, 20, 6); ctx.fillStyle = '#2a2230'; ctx.fillRect(-6, -60, 12, 2); // 동전 구멍
+            ctx.fillStyle = '#c0a040'; ctx.beginPath(); ctx.arc(0, -36, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2a2230'; ctx.fillRect(-1.5, -36, 3, 8); // 자물쇠
+          }
+          ctx.restore();
+          if (G.TextLayer) { G.TextLayer.add(doorOpen ? '해일의 방' : '해일의 문 (10000 G)', dx, dy - 130, 'bold 14px sans-serif', '#ffffff'); }
+        }
       }
       // 공기 동굴: 큰 공기방울이 차 있는 바위 속 방
       if (caveBase === null && curLevel && curLevel.crack) { // 금 간 바위와 비밀의 방

@@ -235,6 +235,13 @@
       ctx.beginPath(); ctx.moveTo(36, -3.5); ctx.lineTo(50, 0); ctx.lineTo(36, 3.5); ctx.closePath(); ctx.fill();
       rect(ctx, blade[1], 36, 0, 10, 1.4);
       rect(ctx, '#c0504d', 33, -2.2, 3, 4.4);
+    } else if (weaponType === 'pick') { // 곡괭이: 자루 끝에 가로로 휘어진 쇠머리
+      rect(ctx, '#6b4423', -6, -1.5, 34, 3);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = blade[1]; ctx.lineWidth = 5.5; ctx.beginPath(); ctx.moveTo(22, -14); ctx.quadraticCurveTo(38, 0, 22, 14); ctx.stroke();
+      ctx.strokeStyle = blade[0]; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(22, -14); ctx.quadraticCurveTo(37, 0, 22, 14); ctx.stroke();
+      ctx.lineCap = 'butt';
+      rect(ctx, '#e0b12f', 24, -1.8, 3, 3.6);
     } else if (weaponType === 'axe') { // 도끼: 자루 끝의 넓은 날
       rect(ctx, '#6b4423', -6, -1.5, 34, 3);
       ctx.fillStyle = blade[0];

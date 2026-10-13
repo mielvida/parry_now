@@ -88,7 +88,7 @@
       ctx.translate(-camX, -camY);
       this.theme.drawCeiling(ctx, camera, this.viewW);
       if (this.theme.drawDecor) this.theme.drawDecor(ctx, terrain, camera, time); // 집/짐더미 (테마에 있을 때만): 땅과 캐릭터 뒤에 깔리는 장식
-      if (extras.boss) extras.boss.drawBack(ctx); // 땅 뒤: 용암에서 올라오는 목
+      if (extras.boss) { this._radAura(ctx, extras.boss, time); this._withRad(ctx, extras.boss, () => extras.boss.drawBack(ctx)); } // 땅 뒤: 용암에서 올라오는 목
       this._drawTerrain(ctx, terrain, camera);
       this._drawGroundDecor(ctx, terrain, camera, time);
       this._drawCrystalSpots(ctx, terrain, time);
@@ -100,7 +100,7 @@
       if (extras.stranger) G.Stranger.drawCloak(ctx, extras.stranger.x, extras.stranger.y, extras.stranger.facing, time, {}); // 군단 요새 문 앞에서 기다리는 의문의 사람 // 군단 요새: 전기 대포와 체크포인트
       if (extras.ores) extras.ores.draw(ctx, time, { x: camX, y: camY, w: this.viewW, h: this.viewH }); // 광물 동굴의 광석 덩어리
       if (extras.enemyShots) for (const f of extras.enemyShots) this._drawEnemyShot(ctx, f);
-      if (extras.boss) extras.boss.drawFront(ctx); // 머리, 꼬리, 화염구
+      if (extras.boss) this._withRad(ctx, extras.boss, () => extras.boss.drawFront(ctx)); // 머리, 꼬리, 화염구 (방사능에 오염된 모습)
       this._drawShadows(ctx, terrain, monsters, player, camera);
       const crisp = !G.Config.SMOOTH_SPRITES;
       this.snapOn = crisp; // 몬스터와 플레이어: 반 도트 단위로 부드럽게 움직인다
@@ -162,6 +162,42 @@
       if (!windowOpen && hud && hud.boss) this._drawBossBars(main, hud.boss, hud.weakText);
       this._bottomBusy = !!(hud && (hud.dialog || hud.prompt)); // 자막이 겹치지 않게
       if (hud && hud.banner) this._drawStageBanner(main, hud.banner);
+    }
+
+    // 보스는 방사능에 오염된 모습: 병든 초록빛으로 물들고, 몸 둘레가 형광 초록으로 빛나며, 방울이 떠오르고 뚝뚝 떨어진다
+    _withRad(ctx, boss, fn) {
+      if (!boss || (boss.kind !== 'sealord' && boss.kind !== 'dark')) { fn(); return; } // 해일의 군주와 던전(어둠의 탑) 보스만 방사능에 오염된 모습
+      ctx.save();
+      ctx.filter = boss.kind === 'dark' ? 'hue-rotate(78deg) saturate(1.8) brightness(1.08) contrast(1.05)' : 'sepia(0.85) hue-rotate(72deg) saturate(2.6) brightness(1.1) contrast(1.05)'; // 던전 보스: 원래 색을 살린 형광 초록빛 / 해일의 군주: 병든 초록빛
+      fn();
+      ctx.restore();
+    }
+    _radAura(ctx, boss, time) {
+      if ((boss.kind !== 'sealord' && boss.kind !== 'dark') || boss.done) return;
+      const list = boss.heads && boss.heads.length ? boss.heads : [];
+      ctx.save();
+      list.forEach((h, i) => {
+        if (h.alive === false && h.dead !== false) return;
+        const cx = h.cx !== undefined ? h.cx : h.x + h.w / 2, cy = h.cy !== undefined ? h.cy : h.y + h.h / 2;
+        const w = h.w || 80, hh = h.h || 80, R = Math.max(w, hh) * 0.95 + 18 * Math.sin(time * 2.2 + i);
+        const g = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 1.5);
+        g.addColorStop(0, 'rgba(150,255,70,0.38)'); g.addColorStop(0.6, 'rgba(110,255,60,0.16)'); g.addColorStop(1, 'rgba(110,255,60,0)');
+        ctx.fillStyle = g; ctx.fillRect(cx - R * 1.5, cy - R * 1.5, R * 3, R * 3);
+        for (let k = 0; k < 7; k++) { // 떠오르는 형광 방울
+          const ph = (time * 0.5 + k * 0.143 + i * 0.31) % 1, bx = cx + Math.sin(k * 2.7 + i) * w * 0.55, by = cy + hh * 0.4 - ph * hh * 1.5;
+          ctx.fillStyle = `rgba(170,255,90,${0.7 * (1 - ph)})`; ctx.beginPath(); ctx.arc(bx, by, 2 + (k % 3), 0, Math.PI * 2); ctx.fill();
+        }
+        if (i === 0) { // 방사능 표시 (삼엽 마크)가 몸 위에서 천천히 돈다
+          const ix = cx, iy = cy - hh * 0.75 - 22, rr = 11;
+          ctx.save(); ctx.translate(ix, iy); ctx.rotate(time * 0.8);
+          ctx.fillStyle = 'rgba(255,230,40,0.92)'; ctx.beginPath(); ctx.arc(0, 0, rr + 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1a1a1a';
+          for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, rr, k * 2.094 - 0.52, k * 2.094 + 0.52); ctx.closePath(); ctx.fill(); }
+          ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+      });
+      ctx.restore();
     }
 
     // 보스 체력: 머리마다 막대 (맞을 수 있는 머리는 노랗게)
@@ -1992,7 +2028,7 @@
       const { x, y, w, h } = geo.panel;
       const eq = e.inv.equipped;
       const defs = G.Shop.ITEMS;
-      const isEquipped = (id) => !!id && (defs[id].pickaxe ? eq.pick === id : eq[defs[id].slot] === id);
+      const isEquipped = (id) => !!id && eq[defs[id].slot] === id;
       const cats = G.Shop.CATEGORIES;
       const entries = G.Shop.gridEntries(e.inv, e.cat);
       const cols = geo.cols;
@@ -3744,7 +3780,8 @@
       const flash = m.flying && Math.floor(m.flightTime / 0.05) % 2 === 0;
       const v = m.variant;
       const pal = { ally: ['#3a4a7a', '#c9d2dc', '#e8b98a'], sword: ['#7a3a3a', '#d4a017', '#e8b98a'], spear: ['#4a5a82', '#c0273a', '#e8b98a'], shield: ['#6a707e', '#2a56b8', '#e8b98a'], archer: ['#3a6a3a', '#7a5a2a', '#e8b98a'], rusher: ['#8a3a3a', '#f2f2f2', '#e8b98a'], ogre: ['#5e7a3e', '#7a4a2a', '#7e9a56'], hero: ['#2a56b8', '#e8e8f4', '#e8b98a'], mage: ['#5a2a8a', '#ffd54a', '#e8b98a'] }[v];
-      const body = flash ? '#ffffff' : pal[0], acc = flash ? '#ffffff' : pal[1], skin = flash ? '#ffffff' : pal[2];
+      const BL = !!m.legion; // 군단 요새의 병사들은 새까만 갑옷
+      const body = flash ? '#ffffff' : BL ? '#16161d' : pal[0], acc = flash ? '#ffffff' : BL ? (v === 'hero' ? '#6a1a1a' : '#4a4a5c') : pal[1], skin = flash ? '#ffffff' : BL ? (v === 'ogre' ? '#3a3a44' : '#b89a84') : pal[2];
       const k = m.h / 40;
       const walking = Math.abs(m.vx) > 5;
       const bob = walking ? Math.abs(Math.sin(m.time * (v === 'rusher' ? 14 : 7))) * 1.6 : 0;
@@ -3768,12 +3805,12 @@
       if (v === 'archer') { ctx.fillStyle = body; ctx.fillRect(-9, -41, 18, 7); ctx.fillStyle = skin; ctx.fillRect(-5, -36, 10, 8); }
       if (v === 'rusher') { ctx.fillStyle = acc; ctx.fillRect(-8, -35, 16, 3); ctx.fillRect(6, -36, 6, 2); }
       if (v === 'hero') { // 적국 용사: 파란 갑옷에 흰 투구깃, 빨간 목도리 (나와 비슷하게 생겼다)
-        ctx.fillStyle = flash ? '#fff' : '#d02a2a'; ctx.fillRect(-12, -27, 24, 4); ctx.fillRect(-14, -26, 5, 12);
-        ctx.fillStyle = flash ? '#fff' : '#f4f4ff'; ctx.fillRect(-2, -47, 4, 8); ctx.fillRect(-4, -44, 8, 4);
+        ctx.fillStyle = flash ? '#fff' : BL ? '#7a1414' : '#d02a2a'; ctx.fillRect(-12, -27, 24, 4); ctx.fillRect(-14, -26, 5, 12);
+        ctx.fillStyle = flash ? '#fff' : BL ? '#8a1a1a' : '#f4f4ff'; ctx.fillRect(-2, -47, 4, 8); ctx.fillRect(-4, -44, 8, 4);
       }
       if (v === 'mage') { // 마법사: 뾰족한 보랏빛 모자와 로브
-        ctx.fillStyle = flash ? '#fff' : '#3a1a5a'; ctx.beginPath(); ctx.moveTo(-10, -39); ctx.lineTo(0, -58); ctx.lineTo(10, -39); ctx.closePath(); ctx.fill(); ctx.fillRect(-12, -41, 24, 4);
-        ctx.fillStyle = flash ? '#fff' : '#5a2a8a'; ctx.fillRect(-11, -14, 22, 14);
+        ctx.fillStyle = flash ? '#fff' : BL ? '#0e0814' : '#3a1a5a'; ctx.beginPath(); ctx.moveTo(-10, -39); ctx.lineTo(0, -58); ctx.lineTo(10, -39); ctx.closePath(); ctx.fill(); ctx.fillRect(-12, -41, 24, 4);
+        ctx.fillStyle = flash ? '#fff' : BL ? '#16101f' : '#5a2a8a'; ctx.fillRect(-11, -14, 22, 14);
       }
       if (v === 'ogre') { ctx.fillStyle = '#e8e0c8'; ctx.fillRect(2, -33, 3, 5); ctx.fillRect(-6, -33, 3, 5); }
       if (v === 'ally') { // 성의 병사: 왕 옆 호위병과 같은 은빛 투구와 갈색 머리, 눈은 평범하게
@@ -3801,8 +3838,8 @@
         const tipX = strike ? 64 : wind ? -12 : 10, tipY = strike ? -22 : wind ? -22 : -48;
         ctx.beginPath(); ctx.moveTo(tipX, tipY - 4); ctx.lineTo(tipX + 12, tipY); ctx.lineTo(tipX, tipY + 4); ctx.closePath(); ctx.fill();
       } else if (v === 'shield') {
-        ctx.fillStyle = flash ? '#fff' : '#2a56b8'; ctx.fillRect(strike ? 8 : 10, -30, 11, 24);
-        ctx.fillStyle = flash ? '#fff' : '#ffd54a'; ctx.fillRect(strike ? 11 : 13, -22, 5, 8);
+        ctx.fillStyle = flash ? '#fff' : BL ? '#1a1a24' : '#2a56b8'; ctx.fillRect(strike ? 8 : 10, -30, 11, 24);
+        ctx.fillStyle = flash ? '#fff' : BL ? '#a02020' : '#ffd54a'; ctx.fillRect(strike ? 11 : 13, -22, 5, 8);
         ctx.strokeStyle = '#c9d2dc'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, -22); ctx.lineTo(-14, -42); ctx.stroke();
       } else if (v === 'mage') { // 지팡이와 빛나는 구슬
         ctx.strokeStyle = '#7a5a2a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(14, -4); ctx.lineTo(14, -46); ctx.stroke();

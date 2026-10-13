@@ -17,7 +17,8 @@
     { id: 'pick3', name: '강철 곡괭이', price: 2000, pickaxe: 3, look: ['#9fb4cc', '#4a5a72'], desc: '3단계 광석(미스릴·흑요석·티타늄·폭렬석)까지 캔다' },
     { id: 'pick4', name: '미스릴 곡괭이', price: 5000, pickaxe: 4, look: ['#7fd8e8', '#3a8fa8'], desc: '4단계 광석(별철·심연석·백금·암흑강)까지, 가장 빨리 캔다' },
   ];
-  for (const p of PICKS) ITEMS[p.id] = { id: p.id, name: p.name, price: p.price, tool: true, pickaxe: p.pickaxe, look: p.look, desc: p.desc };
+  // 곡괭이도 무기다: 인벤토리·빠른 칸(1~5)에서 손에 들면 광물 동굴에서 E를 눌러 광석을 캘 수 있다. 검을 든 채로는 캘 수 없다. 무기로도 쓸 수 있고, 주괴(채굴 능력 포함)를 붙일 수 있다
+  for (const p of PICKS) ITEMS[p.id] = { id: p.id, slot: 'weapon', type: 'pick', name: p.name, price: p.price, reach: 0.3, throwTiles: 0, cd: 0.1, look: p.look, pickaxe: p.pickaxe, baseDmg: 2 + p.pickaxe, desc: p.desc, note: p.desc + ' · 손에 들고 광물 동굴에서 E (검으로는 못 캔다)' };
 
   // ======================= 광석과 주괴 =======================
   // cls = 'sword'(근접 무기용) | 'gun'(쏘는 무기용), tier = 필요한 곡괭이 단계(1~4), weight = 나올 확률 비중
@@ -30,8 +31,8 @@
     { id: 'gold', name: '금', cls: 'sword', tier: 2, weight: 5, look: ['#ffe27a', '#d4a017'], bonus: { dmg: 3, coin: 0.12 } },
     { id: 'mythril', name: '미스릴', cls: 'sword', tier: 3, weight: 3, look: ['#9fe8ff', '#3a8fa8'], bonus: { dmg: 12, reach: 0.1, cd: -0.05 } },
     { id: 'obsidian', name: '흑요석', cls: 'sword', tier: 3, weight: 3, look: ['#6a4fb0', '#1a1030'], bonus: { dmg: 16, boss: 16 } },
-    { id: 'starsteel', name: '별철', cls: 'sword', tier: 4, weight: 1.6, look: ['#fff2a8', '#7a8ae8'], bonus: { dmg: 40, hit: 1, crit: 0.03 } },
-    { id: 'abyss', name: '심연석', cls: 'sword', tier: 4, weight: 1.4, look: ['#c07aff', '#2a1250'], bonus: { dmg: 30, boss: 60, hit: 1 } },
+    { id: 'starsteel', name: '별철', cls: 'sword', tier: 4, weight: 1.6, look: ['#fff2a8', '#7a8ae8'], bonus: { dmg: 40, hit: 10, crit: 0.03 } },
+    { id: 'abyss', name: '심연석', cls: 'sword', tier: 4, weight: 1.4, look: ['#c07aff', '#2a1250'], bonus: { dmg: 30, boss: 60, hit: 10 } },
     // 원소 광석: 붙이면 그 속성이 무기에 같이 적용된다 (무기 자체 속성에 더해진다). elem = 맞힐 때 일어나는 원소 효과
     { id: 'flame', name: '화염석', cls: 'sword', tier: 3, weight: 2.2, look: ['#ff9a4a', '#b02a10'], bonus: { dmg: 12, elem: 'fire' } },
     { id: 'frost', name: '서리석', cls: 'sword', tier: 3, weight: 2.2, look: ['#bfeaff', '#3a8fd0'], bonus: { dmg: 12, elem: 'ice' } },
@@ -41,6 +42,13 @@
     { id: 'umbra', name: '그림자석', cls: 'sword', tier: 4, weight: 1.2, look: ['#9a8ab0', '#1a1428'], bonus: { dmg: 32, elem: 'shadow' } },
     // 균열 무시 광석: 단단한 몬스터(금이 가는 몬스터)를 금이 가는 단계 없이 한 번에 쓰러뜨린다
     { id: 'cleaver', name: '균열석', cls: 'sword', tier: 3, weight: 2.2, look: ['#ff6a8a', '#7a1030'], bonus: { dmg: 14, crack: true } },
+    // 속도 광석: 때리는 속도(쿨다운 감소)가 빨라진다 (cd 는 음수일수록 빠르다)
+    { id: 'galestone', name: '질풍석', cls: 'sword', tier: 3, weight: 2.2, look: ['#bfffe0', '#2a9a7a'], bonus: { dmg: 10, cd: -0.08 } },
+    { id: 'lightspeed', name: '광속석', cls: 'sword', tier: 4, weight: 1.2, look: ['#fffbd0', '#e8a82a'], bonus: { dmg: 26, cd: -0.14 } },
+    // 곡괭이 광석(곡괭이에만 붙인다): dig 채굴 속도(한 번에 더 파는 양), drop 광석이 더 많이 떨어질 확률
+    { id: 'diggerstone', name: '채굴석', cls: 'pick', tier: 2, weight: 5, look: ['#ffe9a0', '#b8861a'], bonus: { dig: 1 } },
+    { id: 'borestone', name: '굴착석', cls: 'pick', tier: 3, weight: 3, look: ['#ffc07a', '#a8501a'], bonus: { dig: 2, drop: 0.15 } },
+    { id: 'bountystone', name: '풍요석', cls: 'pick', tier: 4, weight: 1.4, look: ['#c8ffa0', '#3a9a2a'], bonus: { dig: 1, drop: 0.4 } },
     // 갑옷 광석(방어구 어디에든 붙인다): hp 최대 피(칸), inv 피격 후 무적(초), spd 이동 속도, coin 코인, perk 속성 능력 (같은 속성이 많을수록 강해진다)
     { id: 'ironplate', name: '철갑석', cls: 'armor', tier: 1, weight: 9, look: ['#b8c0cc', '#5a6272'], bonus: { hp: 1 } },
     { id: 'swiftstone', name: '날쌘석', cls: 'armor', tier: 1, weight: 8, look: ['#9ae8c0', '#2a8a60'], bonus: { hp: 1, spd: 0.03 } },
@@ -61,11 +69,14 @@
     { id: 'titanium', name: '티타늄', cls: 'gun', tier: 3, weight: 3, look: ['#bfc9d8', '#5a6a82'], bonus: { gdmg: 8, st: -3 } },
     { id: 'blastite', name: '폭렬석', cls: 'gun', tier: 3, weight: 3, look: ['#ff8a4a', '#8a2a10'], bonus: { gdmg: 10, radius: 0.4 } },
     { id: 'platinum', name: '백금', cls: 'gun', tier: 4, weight: 1.6, look: ['#f4f4ff', '#a0a8c8'], bonus: { gdmg: 25, crit: 0.04 } },
+    // 총 빠르기 광석: 쏘는 속도가 빨라진다
+    { id: 'rapidstone', name: '속사석', cls: 'gun', tier: 3, weight: 2.4, look: ['#ffd0a0', '#c85a1a'], bonus: { gdmg: 6, cd: -0.1 } },
+    { id: 'burststone', name: '연사석', cls: 'gun', tier: 4, weight: 1.2, look: ['#ff9a9a', '#a01a2a'], bonus: { gdmg: 20, cd: -0.18 } },
     // 왕국의 광물 동굴에서만 나오는 새 광석 (kingdom: true): 가장 높은 단계
-    { id: 'royal', name: '왕철', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#ffe9a0', '#b8860b'], bonus: { dmg: 60, boss: 40, hit: 2 } },
+    { id: 'royal', name: '왕철', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#ffe9a0', '#b8860b'], bonus: { dmg: 60, boss: 40, hit: 10 } },
     { id: 'crownstone', name: '왕관석', cls: 'armor', tier: 4, weight: 1, kingdom: true, look: ['#fff0c8', '#c9961a'], bonus: { hp: 8, inv: 0.6, spd: 0.05 } },
     { id: 'thunderiron', name: '천둥철', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#fff6a0', '#4a6ae8'], bonus: { dmg: 45, elem: 'light', crit: 0.04 } },
-    { id: 'frostking', name: '서리왕석', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#d8f4ff', '#3a7ad0'], bonus: { dmg: 40, elem: 'ice', hit: 1 } },
+    { id: 'frostking', name: '서리왕석', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#d8f4ff', '#3a7ad0'], bonus: { dmg: 40, elem: 'ice', hit: 10 } },
     { id: 'cinderking', name: '재불왕석', cls: 'sword', tier: 4, weight: 1, kingdom: true, look: ['#ffb070', '#b02a10'], bonus: { dmg: 40, elem: 'fire', crit: 0.03 } },
     { id: 'chainshot', name: '연쇄탄석', cls: 'gun', tier: 4, weight: 1, kingdom: true, look: ['#c0ffd0', '#2a8a50'], bonus: { gdmg: 40, radius: 0.5, crit: 0.05 } },
     { id: 'ironhail', name: '철우석', cls: 'gun', tier: 4, weight: 1, kingdom: true, look: ['#d0d8e8', '#4a5a78'], bonus: { gdmg: 55, st: -5 } },
@@ -87,9 +98,11 @@
     if (b.cd) t.push(`쿨다운 ${b.cd > 0 ? '+' : ''}${fmt(b.cd)}초`);
     if (b.crit) t.push(`치명타 +${Math.round(b.crit * 100)}%`);
     if (b.coin) t.push(`코인 +${Math.round(b.coin * 100)}%`);
-    if (b.hit) t.push(`단단한 몬스터 +${b.hit}`);
+    if (b.hit) t.push(`딴딴함 -${b.hit} (한 번 때릴 때마다 딴딴한 몬스터에게서 ${b.hit}이 사라져요)`);
     if (b.st) t.push(`스태미나 ${b.st > 0 ? '+' : ''}${b.st}`);
     if (b.radius) t.push(`폭발 범위 +${fmt(b.radius)}칸`);
+    if (b.dig) t.push(`채굴 속도 +${b.dig}`);
+    if (b.drop) t.push(`광석이 더 떨어질 확률 +${Math.round(b.drop * 100)}%`);
     if (b.pierce) t.push('관통');
     if (b.crack) t.push('균열 무시 (단단한 몬스터도 한 방)');
     if (b.hp) t.push(`최대 피 +${b.hp}칸`);
@@ -99,7 +112,7 @@
     if (b.elem) t.push(`${ELEM_NAME[b.elem]} 속성`);
     return t.join(', ');
   }
-  const CLS_NAME = { sword: '검', gun: '총', armor: '갑옷' };
+  const CLS_NAME = { sword: '검', gun: '총', armor: '갑옷', pick: '곡괭이' };
   const PERK_NAME = { thorn: '가시', fire: '화염', ice: '얼음', volt: '번개', toxic: '독가시', regen: '재생', gold: '탐욕' };
   for (const o of ORES) {
     ITEMS['ore_' + o.id] = { id: 'ore_' + o.id, name: `${o.name} 광석`, ore: o.id, quest: true, look: o.look, desc: `${o.tier}단계 광석 · ${CLS_NAME[o.cls]}용. 3개를 용광로에서 제련하면 주괴 1개` };
@@ -198,7 +211,7 @@
   }
 
   // 붙인 주괴가 주는 능력 합계 (shop.js stats/powerOf/homeBonuses가 부른다)
-  const ZERO = () => ({ dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false, crack: false, elems: [], elemLv: {}, hp: 0, inv: 0, spd: 0, perkList: [] });
+  const ZERO = () => ({ dig: 0, drop: 0, dmg: 0, boss: 0, reach: 0, cd: 0, crit: 0, coin: 0, hit: 0, gdmg: 0, st: 0, radius: 0, pierce: false, crack: false, elems: [], elemLv: {}, hp: 0, inv: 0, spd: 0, perkList: [] });
   function attachBonus(inv, w) {
     const out = ZERO();
     const list = inv.attach && w ? inv.attach[w.id] : null;
@@ -416,7 +429,7 @@
     ensure(inv);
     const w = targetItem(inv);
     const o = ORE[oreId];
-    if (classOf(w) !== o.cls) return { ok: false, msg: `${o.name} 주괴는 ${CLS_NAME[o.cls]}에만 붙일 수 있어요.` };
+    if (o.cls === 'pick' ? !w.pickaxe : classOf(w) !== o.cls) return { ok: false, msg: `${o.name} 주괴는 ${CLS_NAME[o.cls]}에만 붙일 수 있어요.` };
     const list = inv.attach[w.id] || [];
     if (list.length >= slotsOf(w)) return { ok: false, msg: `${w.name}은(는) 더 붙일 칸이 없어요 (${list.length}/${slotsOf(w)}).${w.slot === 'weapon' ? ' 무기를 합치면 칸이 늘어요.' : ''}` };
     if ((inv.ingots[oreId] || 0) < 1) return { ok: false, msg: `${o.name} 주괴가 없어요.` };
@@ -509,7 +522,7 @@
       label: () => '안내', afford: () => false, run: () => ({ ok: false, msg: '붙일 주괴를 아래에서 고르세요.' }),
     });
     const out = [head];
-    const ingots = ORES.filter((o) => o.cls === cls && (inv.ingots[o.id] || 0) > 0);
+    const ingots = ORES.filter((o) => (o.cls === cls || (w.pickaxe && o.cls === 'pick')) && (inv.ingots[o.id] || 0) > 0); // 곡괭이는 검용 주괴와 곡괭이 주괴를 붙일 수 있다
     for (const o of ingots) {
       out.push(card({
         id: `attach:${o.id}`, kind: 'attach', icon: ITEMS['ingot_' + o.id],
@@ -584,13 +597,13 @@
   }
 
   // 지금 가진 곡괭이 중 가장 좋은 단계 (0 = 없음)
-  const bestPick = (inv) => {
-    const id = inv.equipped && inv.equipped.pick;
-    return id && inv.items.includes(id) && ITEMS[id] ? ITEMS[id].pickaxe : 0;
+  const bestPick = (inv) => { // 지금 손에 든 곡괭이의 단계 (검 등 다른 무기를 들고 있으면 0 = 캘 수 없다)
+    const w = inv.equipped && ITEMS[inv.equipped.weapon];
+    return w && w.pickaxe ? w.pickaxe : 0;
   };
   // 가진 곡괭이 중 가장 좋은 것을 낀다 (사거나 받았을 때 낀 게 없으면 자동으로)
   const bestOwnedPick = (inv) => inv.items.filter((id) => ITEMS[id] && ITEMS[id].pickaxe).sort((a, b) => ITEMS[b].pickaxe - ITEMS[a].pickaxe)[0] || null;
-  const autoEquipPick = (inv) => { if (!bestPick(inv)) inv.equipped.pick = bestOwnedPick(inv); };
+  const autoEquipPick = () => {}; // (곡괭이는 이제 무기: 직접 손에 든다)
   const togglePick = (inv, id) => { // 인벤토리에서 누르면 끼고, 끼고 있으면 뺀다
     if (inv.equipped.pick === id) { inv.equipped.pick = null; return false; }
     inv.equipped.pick = id;
