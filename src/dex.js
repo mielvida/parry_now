@@ -11,6 +11,12 @@
     { id: 'goldbat', name: '황금박쥐', desc: '반짝이는 가루를 흘리는 희귀한 박쥐. 다섯 대를 맞아야 쓰러진다.' },
     { id: 'crab', name: '꽃게', desc: '해변의 꽃게. 집게를 치켜들면 조심!' },
     { id: 'golem', name: '흙괴물', desc: '설산의 진흙과 바위 덩어리. 몸을 던진다.' },
+    { id: 'subject_brute', name: '우람한 실험체', desc: '방사능 공장에서 만들어진 돌연변이. 일반 몬스터보다 20배 세다. 쫓아와서 뛰어올라 덮친다. 닿으면 목숨 4개.' },
+    { id: 'subject_spitter', name: '마른 실험체', desc: '부푼 배에 방사능을 가득 채운 실험체. 거리를 두고 초록 덩어리를 뱉는다 (패링하면 되돌아간다). 20배 세다.' },
+    { id: 'employee_sprayer', name: '분사기 직원', desc: '방호복을 입은 공장 직원. 방사능 액을 두 줄기로 뿜고, 가까이 가면 물러선다.' },
+    { id: 'employee_guard', name: '경비 직원', desc: '곤봉을 든 공장 경비. 곧장 달려들어 덮친다. 아주 단단하다.' },
+    { id: 'mimic', name: '방긋이', desc: '하수구에 사는 분홍빛 동글이. 처음엔 귀엽게 웃고 있지만, 가까이 다가가거나 때리면 갑자기 무섭고 징그러운 괴물로 변해 달려든다. 변하기 전에는 닿아도 안전하다.' },
+    { id: 'worm', name: '하수구 지렁이', desc: '하수구 천장에서 가끔 떨어지는 징그러운 지렁이. 때리면 둘로 갈라지고, 또 때리면 한 번 더 갈라진다 (딱 2번까지). 아주 단단하다.' },
     { id: 'darkstone', name: '어둠돌', desc: '다크월드의 돌 몬스터. 단단하다.' },
     { id: 'shade', name: '그림자', desc: '어둠 속을 떠다니며 구슬을 쏜다.' },
     { id: 'raider_sword', name: '검병', desc: '왕국에 쳐들어오는 적군. 검을 치켜들었다 크게 벤다.' },
@@ -27,7 +33,7 @@
     { id: 'boss_sikner', name: '시크너', desc: '[보스] 어둠의 탑 100층에서 기다리는 어둠의 기사.' },
     { id: 'boss_sealord', name: '해일의 군주', desc: '[보스] 바다 위 맨 오른쪽 끝 문 안의 방에 사는 거대한 심해 괴물. 약점은 얼음.' },
   ];
-  const mobKey = (s) => (s.kind === 'slime' ? 'slime_' + (s.variant || 'green') : s.kind === 'bat' ? (s.golden ? 'goldbat' : 'bat') : s.kind === 'raider' ? 'raider_' + s.variant : s.kind);
+  const mobKey = (s) => (s.kind === 'subject' ? 'subject_' + s.variant : s.kind === 'employee' ? 'employee_' + s.variant : s.kind === 'slime' ? 'slime_' + (s.variant || 'green') : s.kind === 'bat' ? (s.golden ? 'goldbat' : 'bat') : s.kind === 'raider' ? 'raider_' + s.variant : s.kind);
 
   // 몬스터 그림 (원점이 가운데, 크기 약 ±22). sil = 까만 실루엣
   function drawMob(ctx, id, k, sil) {
@@ -62,6 +68,25 @@
         ctx.fillStyle = c('#e0503a'); ctx.beginPath(); ctx.ellipse(0, 4, 15, 10, 0, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(-18, -8, 6, 0, Math.PI * 2); ctx.arc(18, -8, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(-16, -6, 4, 10); ctx.fillRect(12, -6, 4, 10);
         ctx.strokeStyle = c('#b0301a'); ctx.lineWidth = 2; for (const x of [-10, -4, 4, 10]) { ctx.beginPath(); ctx.moveTo(x, 12); ctx.lineTo(x * 1.3, 20); ctx.stroke(); } eye(-5, -4); eye(5, -4); break;
+      }
+      case 'subject_brute': case 'subject_spitter': {
+        ctx.fillStyle = c('#8aa56a'); ctx.beginPath(); ctx.ellipse(0, 4, id === 'subject_brute' ? 16 : 11, id === 'subject_brute' ? 13 : 15, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = c('#7dff5a'); ctx.lineWidth = 1.5; for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(k * 5, -6); ctx.lineTo(k * 5 + 2, 12); ctx.stroke(); }
+        ctx.fillStyle = c('#e8ffd0'); ctx.beginPath(); ctx.arc(-4, -2, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = c('#20c020'); ctx.beginPath(); ctx.arc(-4, -2, 2, 0, Math.PI * 2); ctx.fill(); break;
+      }
+      case 'employee_sprayer': case 'employee_guard': {
+        const sc = id === 'employee_guard' ? '#e0a21c' : '#e8d020';
+        ctx.fillStyle = c(sc); ctx.fillRect(-9, -4, 18, 20); ctx.beginPath(); ctx.ellipse(0, -9, 9, 9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = c('#1c2024'); ctx.beginPath(); ctx.ellipse(2, -9, 6, 5.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = c('#7dff6a'); ctx.beginPath(); ctx.arc(0, -10, 2, 0, Math.PI * 2); ctx.arc(5, -10, 2, 0, Math.PI * 2); ctx.fill(); break;
+      }
+      case 'mimic': {
+        ctx.fillStyle = c('#ffc4dd'); ctx.beginPath(); ctx.ellipse(0, 2, 15, 13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = c('#fff'); ctx.beginPath(); ctx.ellipse(-6, 0, 4.5, 6, 0, 0, Math.PI * 2); ctx.ellipse(6, 0, 4.5, 6, 0, 0, Math.PI * 2); ctx.fill(); eye(-6, 1, 2.2); eye(6, 1, 2.2);
+        ctx.strokeStyle = c('#6a2a3a'); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, 7, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); break;
+      }
+      case 'worm': {
+        for (let i = 0; i < 6; i++) { ctx.fillStyle = c(i % 2 ? '#d98a86' : '#c4706c'); ctx.beginPath(); ctx.ellipse(-15 + i * 6, 6 - Math.sin(i * 0.9) * 3, 6, 6 - i * 0.2, 0, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = c('#3a0a14'); ctx.fillRect(16, 3, 5, 4); eye(14, 0, 1.6); break;
       }
       case 'golem': {
         ctx.fillStyle = c('#8a6a4a'); ctx.fillRect(-14, -16, 28, 30); ctx.fillRect(-22, -8, 9, 20); ctx.fillRect(13, -8, 9, 20);

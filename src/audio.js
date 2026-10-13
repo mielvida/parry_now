@@ -436,11 +436,20 @@
     },
   };
 
-  // 첫 입력 때 오디오를 깨운다. M = 음소거 토글
+  // 음악은 클릭 없이 자동으로 시작한다: 켜자마자 오디오를 만들어 재생을 시도한다.
+  // 브라우저가 입력 전 소리를 막으면(자동재생 정책) 어떤 입력(키·마우스·터치)이든 처음 들어오는 순간 바로 깨운다.
+  // M = 음소거 토글
   window.addEventListener('keydown', (e) => {
     ensure();
     if (e.code === 'KeyM' && !e.repeat) Audio.toggleMute();
   });
+  const WAKE = ['pointerdown', 'mousedown', 'touchstart', 'click', 'wheel', 'keyup'];
+  const wake = () => { if (ensure() && ctx.state === 'running') WAKE.forEach((n) => window.removeEventListener(n, wake, true)); };
+  WAKE.forEach((n) => window.addEventListener(n, wake, true));
+  try { ensure(); } catch (e) { /* 자동재생 불가: 첫 입력 때 깨운다 */ }
+  // 마우스를 움직이거나 창을 눌러 주기만 해도 (일부 브라우저는 포커스만으로 허용) 다시 시도한다
+  window.addEventListener('focus', () => { if (ctx && ctx.state === 'suspended') ctx.resume(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx && ctx.state === 'suspended') ctx.resume(); });
 
   G.Audio = Audio;
 })(window.Game);

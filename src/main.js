@@ -105,9 +105,21 @@
     seaboss: { // 해일의 방: 바다 위 맨 오른쪽 끝 문(10000 G) 안. 지금까지 없던 패턴의 보스 해일의 군주
       music: 'cave', label: '해일의 방', level: G.Levels.seaboss, theme: G.Beach, monsterless: true, repeatChest: true, returnNear: 'bossdoor', exitTo: 'sea',
       boss: { col: 2, kind: 'sea' },
-      goal: '해일의 군주! 해일은 점프로 넘고, 해파리 사이의 번개 줄과 촉수 휘두르기를 피하고, 먹물 속에서는 쫓아오는 거품을 쳐내자. 약점은 얼음',
-      chest: { mode: 'mine', coins: 30000, exp: 3000, next: 'sea', near: 'bossdoor' },
+      goal: '해일의 방: 보스 3마리! 아귀(해일·해파리·먹물) → 집게왕(집게·거품·모래 구멍) → 크라켄(촉수·응시·조류). 딴딴함을 깎아야 체력이 닳는다',
+      chest: { mode: 'mine', coins: 30000, exp: 3000, next: 'sewer' }, // 보스 3마리를 모두 쓰러뜨리면 그 앞의 하수구로 이어진다
       banner: { title: '해일의 방', sub: '해일의 군주', dur: 3.5, caption: '…바닷물이 벽을 타고 울린다. 방 안쪽에서 거대한 그림자가 몸을 일으킨다.' },
+    },
+    sewer: { // 하수구: 해일의 방 보스를 쓰러뜨린 뒤 이어지는 지역. 오수 구덩이와 슬라임, 박쥐. 끝의 상자를 먹으면 바다로 돌아온다
+      music: 'cave', label: '하수구', level: G.Levels.sewer, theme: G.Sewer, summon: true, repeatChest: true, returnNear: 'bossdoor', exitTo: 'sea', slimeVariant: 'green', exitLabel: '바다',
+      goal: '하수구: 오수 구덩이를 건너고 지렁이와 방긋이를 조심해 맨 끝의 보물 상자까지 (+6000 G, 경험치 400). 상자를 열면 방사능 공장으로 이어진다. 왼쪽 출구에서 E: 바다로',
+      chest: { mode: 'mine', coins: 6000, exp: 400, next: 'factory' },
+      banner: { title: '하수구', sub: '해일의 방 너머', dur: 3.5, caption: '…문 너머로 퀴퀴한 물 냄새가 난다. 어둠 속에서 무언가 꿈틀거린다.' },
+    },
+    factory: { // 방사능 공장: 하수구 끝. 방사능을 만들어 내는 공장. 20배 센 실험체와 강한 직원들. 끝의 상자를 먹으면 바다로 돌아온다
+      music: 'cave', label: '방사능 공장', level: G.Levels.factory, theme: G.Factory, monsterless: false, repeatChest: true, returnNear: null, exitTo: 'sewer', exitLabel: '하수구',
+      goal: '방사능 공장: 방호복 직원과 20배 센 실험체를 헤치고 맨 끝의 보물 상자까지 (+20000 G, 경험치 1500). 실험체는 방사능 덩어리를 뱉는다 (패링!). 왼쪽 출구에서 E: 하수구로',
+      chest: { mode: 'mine', coins: 20000, exp: 1500, next: 'sea', near: 'bossdoor' },
+      banner: { title: '방사능 공장', sub: '하수구 끝의 비밀 공장', dur: 3.5, caption: '…초록빛 통 속에서 무언가 꿈틀거린다. 방호복을 입은 직원들이 이쪽을 보고 있다.' },
     },
     duelarena: { // 결투장: 보스전처럼 AI 용사와 싸운다
       music: 'cave', label: '결투장', level: G.Levels.duelarena, theme: G.Beach, monsterless: true, returnNear: 'village', exitTo: 'village',
@@ -391,6 +403,7 @@
   // 보스 이벤트: 보스 모듈은 판정만 하고, 피해/이펙트/소리는 여기서 처리한다
   const bossEv = {
     hurt(d) { loseLife(player.x + player.w / 2, player.y + player.h / 2, d || 1); },
+    hitPower() { return equipStats.hitPower || 1; }, // 무기에 붙인 딴딴함 광석: 딴딴한 보스를 한 번에 깎는 양
     sound(n) { G.Audio.play(n); },
     shake(m, d) { effects.shake(m, d); },
     fx(type, x, y) {
@@ -430,6 +443,19 @@
       if (duelRun) { duelWin(); return; }
       inv.bossTotal = (inv.bossTotal || 0) + 1; // 처치한 보스 수 (현상금)
       if (boss && stageName !== 'legion') dexSee('boss_' + (boss.dkind || boss.kind)); // 도감에 기록
+      if (boss && boss.kind === 'sealord' && boss.tier < 3) { // 해일의 방: 보스 3마리가 차례로 나온다. 한 마리를 쓰러뜨리면 바로 다음 보스
+        const old = boss, prize = 3000 * old.tier;
+        const nb = new G.SeaLord(old.left, old.right - old.left, old.groundY, bossEv);
+        nb.setTier(old.tier + 1);
+        nb.started = true;
+        boss = nb;
+        coins += prize;
+        lives = Math.min(maxLives(), lives + 2); // 숨 돌릴 만큼만 회복
+        popups.push({ x: player.x + player.w / 2, y: player.y - 100, text: `${old.name} 격파! +${prize} G`, t: 2.6, color: 'rgba(255,213,74,A)' });
+        popups.push({ x: player.x + player.w / 2, y: player.y - 60, text: `${nb.name} 출현! (${nb.tier}/3)`, t: 2.8, color: 'rgba(255,120,80,A)' });
+        effects.shake(12, 0.7); G.Audio.play('treasure');
+        return;
+      }
       chest = makeChest();
       const drop = STAGES[stageName].boss && STAGES[stageName].boss.drop; // 보스가 떨어뜨리는 소중한 물건 (이미 있으면 다시 주지 않는다)
       const key = stageName === 'dungeon' ? 'dungeon' + darkFloor : stageName === 'legion' ? 'legion' + legionFloor : stageName;
@@ -1436,6 +1462,35 @@
       const dp = terrain.placeOnTile(160, 14, 30, 56);
       monsters.push(new G.Dummy(dp.x, dp.y));
     }
+    if (name === 'sewer') { // 방긋이: 귀여운 척하다 다가가면 괴물로 변하는 몬스터 (하수구 곳곳에 숨어 있다)
+      for (let col = 20; col < terrain.cols - 26; col += 26) {
+        let row = -1;
+        for (let r = 1; r < terrain.rows; r++) if (terrain.isSolid(col, r) && !terrain.isSolid(col, r - 1)) { row = r - 1; break; }
+        if (row < 0) continue;
+        const p = terrain.placeOnTile(col, row, G.Mimic.CUTE.w, G.Mimic.CUTE.h);
+        const mo = new G.Mimic(p.x, p.y); mo.stageSpeed = 1; mo.immune = {};
+        monsters.push(mo);
+      }
+    }
+    if (name === 'factory') { // 방사능 공장: 실험체(20배 세다)와 직원이 곳곳에 있다
+      const put = (col, mk) => {
+        let row = -1;
+        for (let r = 1; r < terrain.rows; r++) if (terrain.isSolid(col, r) && !terrain.isSolid(col, r - 1)) { row = r - 1; break; }
+        if (row < 0) return;
+        const mo = mk(col, row); mo.stageSpeed = 1; mo.immune = {};
+        monsters.push(mo);
+      };
+      let k = 0;
+      for (let col = 26; col < terrain.cols - 16; col += 19, k++) { // 실험체
+        const v = k % 2 ? 'spitter' : 'brute', d = G.Subject.SIZE[v];
+        put(col, (c, r) => { const p = terrain.placeOnTile(c, r, d.w, d.h); return new G.Subject(p.x, p.y, v); });
+      }
+      k = 0;
+      for (let col = 17; col < terrain.cols - 12; col += 14, k++) { // 직원
+        const v = k % 2 ? 'guard' : 'sprayer', d = G.Employee.SIZE[v];
+        put(col, (c, r) => { const p = terrain.placeOnTile(c, r, d.w, d.h); return new G.Employee(p.x, p.y, v); });
+      }
+    }
     baseMonsterCount = monsters.length;
     spots = terrain.standingSpots();
 
@@ -1504,9 +1559,9 @@
   let slot = null;     // 지금 하고 있는 저장 칸 (0~2). 처음 화면에서 고른다
   let playSec = 0;     // 이 칸의 플레이 시간 (초)
   let titleUI = null;  // 처음 화면 {cur, slots:[meta|null x3], del, copy, quit, t}
-  const AREA_NAMES = { meadow: '성 밖 숲', abyss: '심연 동굴', palace: '왕궁', cave: '시작 동굴', beach: '낯선 해변', village: '해변 마을', mine: '마을 동굴', orecave: '광물 동굴', home: '우리 집', forest: '속삭이는 숲', snow: '얼음 산', volcano: '불꽃 화산', darkhub: '다크월드 입구', kingdom: '왕이 다스리는 도시', duelarena: '결투장', seaboss: '해일의 방' };
+  const AREA_NAMES = { meadow: '성 밖 숲', abyss: '심연 동굴', palace: '왕궁', cave: '시작 동굴', beach: '낯선 해변', village: '해변 마을', mine: '마을 동굴', orecave: '광물 동굴', home: '우리 집', forest: '속삭이는 숲', snow: '얼음 산', volcano: '불꽃 화산', darkhub: '다크월드 입구', kingdom: '왕이 다스리는 도시', duelarena: '결투장', seaboss: '해일의 방', sewer: '하수구', factory: '방사능 공장' };
   const areaNameOf = (st, fl) => (st === 'dungeon' ? `어둠의 탑 ${fl || 1}층` : AREA_NAMES[st] || (STAGES[st] && STAGES[st].label) || st);
-  const areaImgOf = (st, fl) => (st === 'dungeon' ? 'd' + ([1, 3, 10, 33, 50, 66, 90, 100].filter((x) => x <= (fl || 1)).pop() || 1) : ({ duelarena: 'mg_duel', palace: 'kingdom', abyss: 'cave', meadow: 'forest', seaboss: 'sea' }[st] || st)); // 지역 그림 (assets/regions)
+  const areaImgOf = (st, fl) => (st === 'dungeon' ? 'd' + ([1, 3, 10, 33, 50, 66, 90, 100].filter((x) => x <= (fl || 1)).pop() || 1) : ({ duelarena: 'mg_duel', palace: 'kingdom', abyss: 'cave', meadow: 'forest', seaboss: 'sea', sewer: 'cave', factory: 'cave' }[st] || st)); // 지역 그림 (assets/regions)
   const noSave = () => window.NO_SAVE || /[?&](nosave|stage=)/.test(window.location.search);
   let saveBlocked = false; // 처음부터 다시하기 중에는 창을 닫을 때 다시 저장하지 않는다
   function buildSave() {
@@ -1536,9 +1591,9 @@
     } catch (e) { /* 저장소 없음 */ }
   }
   const replaceObj = (dst, src) => { for (const k of Object.keys(dst)) delete dst[k]; Object.assign(dst, JSON.parse(JSON.stringify(src || {}))); };
-  const RESTORABLE = ['village', 'kingdom', 'palace', 'meadow', 'darkhub', 'beach', 'cave', 'forest', 'snow', 'volcano', 'home', 'sea', 'legion']; // 같은 모양으로 다시 만들 수 있는 곳 (바다·군단 요새 포함)
+  const RESTORABLE = ['village', 'kingdom', 'palace', 'meadow', 'darkhub', 'beach', 'cave', 'forest', 'snow', 'volcano', 'home', 'sea', 'legion', 'sewer', 'factory']; // 같은 모양으로 다시 만들 수 있는 곳 (바다·군단 요새 포함)
   // 매번 새로 만들어지는 곳은 그곳으로 들어가는 입구 앞으로 돌아온다 [스테이지, 입구]
-  const RESUME_NEAR = () => ({ seacave: ['sea', 'seacave'], mine: [story.mineFrom || 'village', 'D'], orecave: [story.oreFrom || 'village', 'orecave'], abyss: ['kingdom', 'abyss'], dungeon: ['darkhub', null], duelarena: ['village', null], seaboss: ['sea', 'bossdoor'] });
+  const RESUME_NEAR = () => ({ seacave: ['sea', 'seacave'], mine: [story.mineFrom || 'village', 'D'], orecave: [story.oreFrom || 'village', 'orecave'], abyss: ['kingdom', 'abyss'], dungeon: ['darkhub', null], duelarena: ['village', null], seaboss: ['sea', 'bossdoor'], sewer: ['sea', 'bossdoor'], factory: ['sea', 'bossdoor'] });
   // 저장 내용을 게임에 적용한다. exact = 저장한 자리(스테이지와 위치) 그대로, 아니면 마을에서 시작
   function applySave(d, exact = true) {
     coins = d.coins || 0; exp = d.exp || 0;
@@ -3060,6 +3115,9 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       { head: '바다' },
       { label: '바다로 가기', hint: '항구 마을 오른쪽 부두 끝', run: goto(() => { story.cleared = true; loadStage('sea', true); player.placeAt((seaLv.left + 14) * C.TILE, (G.Sea.SURFACE - 3) * C.TILE); }) },
       { label: '수중 마을 (1500m)로 가기', hint: '', run: goto(() => { story.cleared = true; loadStage('sea', true); const c = G.Sea.TOWN_DEPTH + G.Sea.SURFACE; player.placeAt((seaLv.left + 36) * C.TILE, (c + 18) * C.TILE); }) },
+      { label: '하수구로 가기', hint: '보스 3마리 뒤의 지역 · 지렁이', run: goto(() => { story.cleared = true; loadStage('sewer', true); }) },
+      { label: '방사능 공장으로 가기', hint: '하수구 끝 · 실험체(20배)와 직원', run: goto(() => { story.cleared = true; loadStage('factory', true); }) },
+      { label: '해일의 방으로 가기', hint: '보스 3마리 (아귀 → 게 → 문어)', run: goto(() => { story.cleared = true; story.seaBossOpen = true; loadStage('seaboss', true); }) },
       { label: '다이빙 장비 최대', hint: '산소통·오리발·잠수복·랜턴 Lv 10', run: give('다이빙 장비 최대', () => { inv.dive = { tank: 10, fins: 10, suit: 10, lamp: 10 }; }) },
       { label: '수중 마을 방문 처리', hint: '항구 마을 포털이 열린다', run: give('수중 마을 방문 처리', () => { story.seaTownVisited = true; G.Sea.Theme.setVisited(true); }) },
       { head: '의문의 사람' },
@@ -3418,6 +3476,61 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     G.Audio.play('parry');
     if (crit) critFx(s.x + s.w / 2, s.y + s.h * 0.4);
   }
+  // 하수구 지렁이: 가끔 천장에서 떨어지고, 갈라진 지렁이는 두 마리가 된다
+  let wormT = 6, wormStage = '';
+  function updateWorms(dt) {
+    for (const m of monsters) {
+      if (m.kind === 'mimic' && m.revealed) { // 방긋이가 정체를 드러냈다
+        m.revealed = false;
+        effects.shake(14, 0.55); effects.fireBurst(m.x + m.w / 2, m.y + m.h / 2); G.Audio.play('hurt');
+        popups.push({ x: m.x + m.w / 2, y: m.y - 30, text: '으아악?!', t: 1.6, color: 'rgba(255,70,70,A)' });
+      }
+    }
+    for (let k = monsters.length - 1; k >= 0; k--) {
+      const w = monsters[k];
+      if (w.kind !== 'worm') continue;
+      if (w.splitReq) { // 둘로 갈라진다: 양쪽으로 튀어 나가고, 잠깐 맞아도 무시한다
+        w.splitReq = false;
+        const g = w.gen + 1, d = G.Worm.GEN[g], cx = w.x + w.w / 2, by = w.y + w.h;
+        for (const sd of [-1, 1]) { // 두 조각이 서로 겹치지 않게 양옆에 나란히 놓는다 (벽에 끼면 가운데에서 시작해 아래에서 떼어 놓는다)
+          let nx = sd < 0 ? cx - 4 - d.w : cx + 4;
+          if (terrain.solidTilesIn(nx, by - d.h - 2, d.w, d.h).length) nx = cx - d.w / 2;
+          const nw = new G.Worm(nx, by - d.h - 2, g);
+          nw.lane = (w.lane || 0) + sd * (d.w * 1.4 + 10); nw.vx = sd * 150; nw.vy = -260; nw.onGround = false; nw.dir = sd; nw.hitGrace = 0.5; nw.stageSpeed = 1; nw.immune = {};
+          monsters.push(nw);
+        }
+        effects.spawn(cx, by); G.Audio.play('spawn');
+      }
+      if (w.gone) monsters.splice(monsters.indexOf(w), 1);
+    }
+    const ws = monsters.filter((m) => m.kind === 'worm' && m.alive && !m.flying); // 지렁이끼리 겹치지 않게 서로 밀어낸다
+    for (let i = 0; i < ws.length; i++) {
+      for (let j = i + 1; j < ws.length; j++) {
+        const a = ws[i], b = ws[j];
+        if (!a.overlaps(b)) continue;
+        const ca = a.x + a.w / 2, cb = b.x + b.w / 2, dir = ca <= cb ? -1 : 1;
+        const sh = Math.min(360 * dt, (a.w + b.w) / 2 - Math.abs(ca - cb) + 0.5) / 2;
+        for (const [m, sg] of [[a, dir], [b, -dir]]) {
+          const ox = m.x; m.x += sg * sh;
+          if (terrain.solidTilesIn(m.x, m.y, m.w, m.h).length) m.x = ox; // 벽이면 밀지 않는다
+        }
+      }
+    }
+    if (stageName !== wormStage) { wormStage = stageName; wormT = 6 + Math.random() * 5; }
+    if (stageName !== 'sewer' || won || cutscene) return;
+    wormT -= dt;
+    if (wormT > 0) return;
+    const col = Math.max(3, Math.min(terrain.cols - 4, Math.floor((player.x + player.w / 2 + (Math.random() - 0.5) * 600) / C.TILE)));
+    let land = -1;
+    if (!terrain.isSolid(col, 0)) for (let r = 1; r < terrain.rows; r++) if (terrain.isSolid(col, r)) { land = r; break; } // 떨어질 땅이 있는 칸만 (구덩이나 천장 위는 피한다)
+    if (land < 0) { wormT = 0.3; return; }
+    wormT = 14 + Math.random() * 10;
+    const w = new G.Worm(col * C.TILE + C.TILE / 2 - G.Worm.GEN[0].w / 2, Math.max(2, camera.y + 2), 0); // 맵 위쪽 바깥은 벽이라, 맵 맨 위(화면 맨 위)에서 떨어뜨린다
+    w.stageSpeed = 1; w.immune = {};
+    monsters.push(w);
+    popups.push({ x: col * C.TILE, y: Math.max(10, camera.y + 30), text: '천장에서 뭔가 떨어진다!', t: 1.6, color: 'rgba(255,170,190,A)' });
+    G.Audio.play('spawn');
+  }
   function hitMonster(s, fromX, fallbackDir) {
     if (s.dummy) { dummyHit(s); return; }
     s.byAlly = false; // 내가 친 것이니 처치 보상은 나에게
@@ -3436,6 +3549,13 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
       if (s.alive && s.stagger && !s.dummy && s.extraHits <= 0) { s.stagger(away); s.staggered = Math.max(s.staggered, 1.1); } // 아직 단단하면 기절하지 않는다. 금이 갔을 때만: 뒤로 밀려나 잠깐 기절한다 (닿아도 해롭지 않아 지나갈 수 있다)
       effects.parryHit(s.x + s.w / 2, s.y + s.h / 2);
       popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: s.extraHits > 0 ? `단단하다! (${s.extraHits})` : '금이 갔다!', t: 0.9, color: 'rgba(200,170,255,A)' });
+      return;
+    }
+    if (s.kind === 'mimic' && s.state !== 'scary') { s.reveal(true); effects.parryHit(s.x + s.w / 2, s.y + s.h / 2); return; } // 방긋이: 귀여운 모습은 맞으면 바로 정체를 드러낸다
+    if (s.kind === 'worm' && s.gen < 2 && !s.flying) { // 하수구 지렁이: 딴딴함을 다 깎은 뒤 때리면 두 마리로 갈라진다 (딱 2번까지)
+      s.splitDir = away; s.split();
+      popups.push({ x: s.x + s.w / 2, y: s.y - 20, text: '둘로 갈라졌다!', t: 1, color: 'rgba(255,170,190,A)' });
+      effects.parryHit(s.x + s.w / 2, s.y + s.h / 2);
       return;
     }
     if (rollCrit()) { // 치명타: 일반 몬스터는 한 방에 쓰러진다
@@ -5024,7 +5144,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
         effects.parryHit((player.x + player.w / 2 + s.x + s.w / 2) / 2, (player.y + player.h / 2 + s.y + s.h / 2) / 2);
         effects.shake(finisher ? 8 : 6, 0.18);
         hitStop = C.HIT_STOP;
-      } else if (player.invuln === 0 && !player.dashing && !s.staggered && !s.dummy && s.overlaps(player)) { // 기절한 몬스터는 해롭지 않다 (허수아비도)
+      } else if (player.invuln === 0 && !player.dashing && !s.staggered && !s.dummy && !s.harmless && s.overlaps(player)) { // 기절한 몬스터는 해롭지 않다 (허수아비도)
         loseLife(player.x + player.w / 2, player.y + player.h / 2, s.contactDmg || 1); // 패링하지 못하고 닿으면 목숨 -1 (설산은 -2)
         armorHurtPerk(s);
         break;
@@ -5035,6 +5155,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (stageName === 'home' && !gameOver) { // 집 안에서는 0.5초마다 피가 한 칸씩 찬다
       if (lives < maxLives()) { homeHealT += dt; if (homeHealT >= 0.5) { homeHealT -= 0.5; lives = Math.min(maxLives(), lives + 1); effects.sparkle(player.x + player.w / 2, player.y + 6); G.Audio.play('pickup'); } } else homeHealT = 0;
     } else homeHealT = 0;
+    updateWorms(dt);
     updateMissions(dt);
     recordHistory(dt);
     playSec += dt;
