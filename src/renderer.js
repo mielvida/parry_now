@@ -424,8 +424,8 @@
         return;
       }
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = 'bold 44px sans-serif'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillText('PARRY NOW', W / 2 + 3, 36);
-      ctx.fillStyle = '#ffd54a'; ctx.fillText('PARRY NOW', W / 2, 33);
+      ctx.font = 'bold 44px sans-serif'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillText('일단하라 재밌다!', W / 2 + 3, 36);
+      ctx.fillStyle = '#ffd54a'; ctx.fillText('일단하라 재밌다!', W / 2, 33);
       ctx.font = '14px sans-serif'; ctx.fillStyle = '#b8c0dc';
       ctx.fillText(t.copy !== null ? `칸 ${t.copy + 1}을 어느 칸에 복사할까요? (1·2·3 또는 칸 클릭, Esc 취소)` : '이어서 할 저장 칸을 고르세요', W / 2, 66);
       const cards = Renderer.titleCards(W, H);
