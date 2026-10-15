@@ -121,8 +121,8 @@ R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene(); scene.fog = new THREE.Fog('#bfe6f5', 40, 170);
 const cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 400);
 const SUN_DIR = new THREE.Vector3(0.57, 0.5, -0.65).normalize();   // 해가 있는 방향 (낮은 오후 해: 그림자가 길게 늘어진다)
-scene.add(new THREE.HemisphereLight('#c4e6ff', '#7a9a62', 0.54));   // 하늘빛(푸른 그늘)과 땅 반사광
-const sun = new THREE.DirectionalLight('#fff0cc', 1.55); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+scene.add(new THREE.HemisphereLight('#b8e2ff', '#8fb66a', 0.72));   // 하늘빛(푸른 그늘)과 땅 반사광
+const sun = new THREE.DirectionalLight('#fff4d2', 2.15); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 90 }); sun.shadow.bias = -0.0006; scene.add(sun, sun.target);
 
 // 하늘 (위는 진한 파랑, 지평선은 연한 색)
