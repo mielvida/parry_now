@@ -53,7 +53,7 @@
 <body>
 <canvas id="gl"></canvas>
 <div id="hud">
-  <div class="box" id="help">🏝️ 바다 위의 섬<br><span id="keys">WASD / 방향키 이동 · Shift 달리기 · Space 점프 · Q 넘어지기 · Enter 채팅 · V 마이크<br>우클릭+마우스: 시점 · 1~4: 아래 칸 · 2번 총: 클릭 발사, R 장전</span></div>
+  <div class="box" id="help">🏝️ 바다 위의 섬<br><span id="keys">WASD / 방향키 이동 · Shift 달리기 · Space 점프 · Q 넘어지기 · Enter 채팅 · V 마이크 · G 이모티콘<br>우클릭+마우스: 시점 · 1~4: 아래 칸 · 2번 총: 클릭 발사, R 장전</span></div>
   <div style="display:flex;gap:8px"><button id="fpb" class="hb" aria-label="1인칭 보기">👁️</button><button id="mus" class="hb" aria-label="소리 켜기/끄기">🔊</button></div>
 </div>
 <div id="ammo">🔫 12 / 12</div>
@@ -408,6 +408,7 @@ function animatePerson(dt, run, inWater) {
   animateHands(dt);
   if (BOAT.carry && BOAT.on) { P.arL.rotation.x = -1.3; P.arR.rotation.x = -1.3; P.arL.rotation.z = 0.3; P.arR.rotation.z = -0.3; }
   if (BOAT.climb && BOAT.on && BOAT.climb.t / 2.0 > 0.0 && (BOAT.climb.dir === 'up' ? BOAT.climb.t / 2.0 : 1 - BOAT.climb.t / 2.0) < 0.72) { const ph = BOAT.climb.t * 7; P.arL.rotation.x = -2.45 + Math.sin(ph) * 0.45; P.arR.rotation.x = -2.45 - Math.sin(ph) * 0.45; P.arL.rotation.z = -0.15; P.arR.rotation.z = 0.15; P.thL.rotation.x = -0.75 - Math.sin(ph) * 0.55; P.thR.rotation.x = -0.75 + Math.sin(ph) * 0.55; P.shL.rotation.x = 0.9 + Math.sin(ph) * 0.4; P.shR.rotation.x = 0.9 - Math.sin(ph) * 0.4; }
+  if (EMO.me && !BOAT.helm && !BOAT.carry) applyEmote(P, EMO.me.i, EMO.me.t, emoWeight(EMO.me, dt), dt);
   if (BOAT.helm && BOAT.on) { P.arL.rotation.x = -1.15; P.arR.rotation.x = -1.15; P.arL.rotation.z = -0.15; P.arR.rotation.z = 0.15; }
   if (SW.k > 0.02) { const k = SW.k * SW.m, k2 = SW.k * (1 - SW.m), ph = t * (run ? 9 : 6.2), sw = (o, ax, v, w) => { o.rotation[ax] += (v - o.rotation[ax]) * w; };   // 헤엄: 움직이면 엎드려 팔을 휘젓고, 멈추면 서서 손을 휘저으며 떠 있는다
     sw(P.thL, 'x', 0.15 + Math.sin(ph) * 0.4, k); sw(P.thR, 'x', 0.15 - Math.sin(ph) * 0.4, k); sw(P.shL, 'x', 0.2 + 0.25 * Math.max(0, -Math.sin(ph)), k); sw(P.shR, 'x', 0.2 + 0.25 * Math.max(0, Math.sin(ph)), k);
@@ -531,10 +532,11 @@ function fireGun() {
   const hs = bulletRay.intersectObjects(SH, true); let dummy = null; if (hs.length) { hit = hs[0].point.clone(); kind = hs[0].object === land ? 'ground' : 'thing'; if (hs[0].object.userData.tester) { dummy = hs[0].object.userData; kind = 'dummy'; } }
   if (dir.y < -0.0001) { const tw = -o.y / dir.y; if (tw > 0 && (!hit || tw < hit.distanceTo(o))) { hit = o.clone().addScaledVector(dir, tw); kind = 'water'; } }
   if (!hit) hit = o.clone().addScaledVector(dir, 120);
-  { const pr = rayRemotes(o, dir, hit.distanceTo(o)); if (pr) { hit = o.clone().addScaledVector(dir, pr.dist); kind = 'player'; hitRemote(pr); } }
+  let fxz = null, fxd = 0; { const pr = rayRemotes(o, dir, hit.distanceTo(o)); if (pr) { hit = o.clone().addScaledVector(dir, pr.dist); kind = 'player'; fxz = pr.zone; fxd = hitRemote(pr); } }
   const muzzle = gunHand.localToWorld(new THREE.Vector3(0, 0.022, 0.31)); tracer(muzzle, hit); netFire(muzzle, hit);
   if (kind === 'water') { ring(hit); puff(hit, '#cfefff', 8, 3, 9); } else if (kind === 'ground') puff(hit, hmap(hit.x, hit.z) < 0.6 ? '#f0dca0' : '#6fae5a', 9, 3.2, 9); else if (kind === 'thing') puff(hit, '#b89a6a', 8, 3.4, 9);
-  if (dummy) hitTester(dummy.tester, dummy.zone, hit, dir);
+  if (dummy) { hitTester(dummy.tester, dummy.zone, hit, dir); hitFeel(hit, dummy.zone === 'head', 0, dir); }
+  if (kind === 'player') hitFeel(hit, fxz === 'head', fxd, dir); else if (kind === 'thing' || kind === 'ground') puff(hit, '#fff0b0', 4, 5.5, 9);
   { const mag = 0.031 + Math.random() * 0.017; GUN.kdp = 1; GUN.kdy = 0; GUN.rcP = (GUN.rcP || 0) + mag; }   // 반동은 위로만 튄다 (좌우로는 안 흔들린다)
   GUN.flash = 0.07; ejectShell(); st.yaw = view.yaw + Math.PI; GUN.lockT = 1.4;   // 총구 불꽃 / 탄피가 튀어나온다 / 쏠 때는 쏘는 쪽을 본다
   updateAmmo();
@@ -807,11 +809,13 @@ function animRemote(r, dt) {   // 내 캐릭터와 같은 동작 공식으로 �
   B.ftL.rotation.x = -(B.thL.rotation.x + B.shL.rotation.x); B.ftR.rotation.x = -(B.thR.rotation.x + B.shR.rotation.x);
   // 쓰러지면 몸 전체를 앞으로 눕힌다
   r.root.rotation.x = r.liedK * 1.5; r.root.rotation.order = 'YXZ';   // 앞으로 엎드려 눕는다
-  r.gun.visible = !!aim;
+  r.gun.visible = !!aim && !r.emo;
+  if (r.emo && !r.rag && !r.sw) applyEmote(B, r.emo.i, r.emo.t, emoWeight(r.emo, dt), dt);
   if (r.sw) { const m = spd > 0.6 ? 1 : 0; r.swm = (r.swm || 0) + (m - (r.swm || 0)) * k; const ph = performance.now() / 1000 * (spd > 3 ? 9 : 6.2), pt = performance.now() / 1000 * 5.5, sm = r.swm; r.liedK += (0 - r.liedK) * k; B.hips.rotation.x = 0; r.root.rotation.x += (1.38 * sm - r.root.rotation.x) * k; rp.y -= (1 - sm) * 1.05;
     if (sm > 0.5) { L(B.thL, 'x', 0.15 + Math.sin(ph) * 0.4); L(B.thR, 'x', 0.15 - Math.sin(ph) * 0.4); L(B.arL, 'x', -2.55 - Math.cos(ph) * 0.95); L(B.arR, 'x', -2.55 + Math.cos(ph) * 0.95); L(B.arL, 'z', -0.25); L(B.arR, 'z', 0.25); L(B.head, 'x', -1.0); }
     else { L(B.arL, 'z', -1.15 + Math.sin(pt) * 0.4); L(B.arR, 'z', 1.15 - Math.sin(pt) * 0.4); L(B.arL, 'x', -0.35 + Math.cos(pt) * 0.35); L(B.arR, 'x', -0.35 - Math.cos(pt) * 0.35); L(B.thL, 'x', 0.1 + Math.sin(pt) * 0.3); L(B.thR, 'x', 0.1 - Math.sin(pt) * 0.3); L(B.shL, 'x', 0.5); L(B.shR, 'x', 0.5); L(B.head, 'x', 0); } }
   r.mo += (r.mt - r.mo) * Math.min(1, dt * 18); setMouth(r.mouth, r.mo);
+  if (r.emo) { if (r.emo.t > EMO.DUR || r.sp > 1.8 || r.rag || r.sw) r.emo = null; }
   r.blinkT -= dt; if (r.blinkT < -2.8 - (r.id * 0.37 % 1.5)) r.blinkT = 0.14;   // 사람마다 다른 때에 깜빡인다
   const lid = (r.blinkT > 0 || (r.rag && r.liedK > 0.5)) ? 0.08 : 1, ke = Math.min(1, dt * 30); r.eyes.forEach((e) => { e.scale.y += (lid * (e.userData.by || 1) - e.scale.y) * ke; }); r.pupils.forEach((e) => { e.scale.y += (lid - e.scale.y) * ke; });
 }
@@ -819,7 +823,7 @@ function animRemote(r, dt) {   // 내 캐릭터와 같은 동작 공식으로 �
 function raySphere(o, d, c, rad) { const ox = o.x - c.x, oy = o.y - c.y, oz = o.z - c.z, b = ox * d.x + oy * d.y + oz * d.z, cc = ox * ox + oy * oy + oz * oz - rad * rad, disc = b * b - cc; if (disc < 0) return null; const s = -b - Math.sqrt(disc); return s > 0 ? s : null; }
 function rayRemotes(o, dir, maxD) { let best = null; REM.forEach((r) => { if (r.rag) return; const p = r.root.position;
   for (const [zone, y, rad] of [['head', 1.98, 0.27], ['body', 1.38, 0.4], ['legs', 0.62, 0.34]]) { const s = raySphere(o, dir, { x: p.x, y: p.y + y, z: p.z }, rad); if (s !== null && s < maxD && (!best || s < best.dist)) best = { id: r.id, dist: s, zone }; } }); return best; }
-function hitRemote(pr) { let dmg = pr.zone === 'head' ? 45 : pr.zone === 'body' ? 20 : 12; if (BUFF.power > 0) dmg = Math.round(dmg * 1.5); { const rt = REM.get(pr.id); if (rt && rt.shield) dmg = Math.round(dmg * 0.5); } const r = REM.get(pr.id); if (r) { puff(r.root.position.clone().add(new THREE.Vector3(0, pr.zone === 'head' ? 2 : 1.3, 0)), '#ff4a3a', 8, 3, 9); } if (NET.active) { if (NET.host) hostDamage(pr.id, dmg, NET.id); else netSendHost({ t: 'dmg', to: pr.id, dmg }); } }
+function hitRemote(pr) { let dmg = pr.zone === 'head' ? 45 : pr.zone === 'body' ? 20 : 12; if (BUFF.power > 0) dmg = Math.round(dmg * 1.5); { const rt = REM.get(pr.id); if (rt && rt.shield) dmg = Math.round(dmg * 0.5); } const r = REM.get(pr.id); if (r) { puff(r.root.position.clone().add(new THREE.Vector3(0, pr.zone === 'head' ? 2 : 1.3, 0)), '#ff4a3a', 8, 3, 9); r.flash = 1; r.hk = 1; } if (NET.active) { if (NET.host) hostDamage(pr.id, dmg, NET.id); else netSendHost({ t: 'dmg', to: pr.id, dmg }); } return dmg; }
 function netFire(from, to) { if (NET.active) netSendAll({ t: 'f', a: [from.x, from.y, from.z], b: [to.x, to.y, to.z] }); }
 
 // ---------- 체력 · 음식 ----------
@@ -917,6 +921,7 @@ function handleMsg(from, m) {   // 방장이든 손님이든 같은 처리 (from
     case 'f': { const a = new THREE.Vector3(...m.a), b = new THREE.Vector3(...m.b); tracer(a, b); const d = a.distanceTo(cam.position); if (d < 70) { try { const ac = snd.ac; if (ac) { const g = snd.on ? Math.max(0.03, 0.5 / (1 + d * 0.12)) : 0; const o = ac.createOscillator(), gg = ac.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(220, ac.currentTime); o.frequency.exponentialRampToValueAtTime(60, ac.currentTime + 0.12); gg.gain.setValueAtTime(g * 0.4, ac.currentTime); gg.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.14); o.connect(gg); gg.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.16); } } catch (e) {} } puff(b, '#ffdca0', 4, 2, 8); break; }
     case 'hp': applyHp(m.id, m.hp); break;
     case 'fuel': if (!NET.active || NET.host) startPour(false); break;
+    case 'emo': { const r = REM.get(m.id); if (r && m.e >= 0 && m.e < EMOS.length) showEmote(r, m.e); break; }
     case 'chat': chatAdd(m.n, m.m, false); break;
     case 'helm': if (NET.host) { BOAT.rin = { s: m.s, th: m.th }; BOAT.rinT = performance.now(); } break;
     case 'boat': if (BOAT.on && !(!NET.active || NET.host)) { BOAT.x += (m.x - BOAT.x) * 0.6; BOAT.z += (m.z - BOAT.z) * 0.6; let dy = m.yaw - BOAT.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); BOAT.yaw += dy * 0.6; BOAT.v = m.v; if (m.s !== BOAT.state) { if (m.s === 'pour') BOAT.pourT = m.p; if (m.s === 'dead1' || m.s === 'dead2') engineDying(); if (m.s === 'sail2') engineStart(); BOAT.state = m.s; } BOAT.fuel = m.f; } break;
@@ -1268,7 +1273,7 @@ function nearInlet() { if (!BOAT.on || MODE !== 'game' || BOAT.state !== 'dead1'
 function nearLadder() { if (!BOAT.on || MODE !== 'game' || !st.swim || BOAT.climb) return false; const q = bw(2.5, -3.05); return Math.hypot(st.x - q.x, st.z - q.z) < 2.4; }
 function nearHelm() { if (!BOAT.on || MODE !== 'game' || st.swim || BOAT.carry || BOAT.climb || st.rag > 0 || BOAT.state === 'pour') return false; if (BOAT.helm) return true; const q = bw(-0.3, 0.55); return Math.hypot(st.x - q.x, st.z - q.z) < 1.9 && Math.abs(st.y - BOAT.deckY) < 1.2; }
 function toggleHelm() { BOAT.helm = !BOAT.helm; if (!BOAT.helm && NET.active) netSendAll({ t: 'helm', s: 0, th: 0 }); tone(BOAT.helm ? 420 : 300, BOAT.helm ? 560 : 220, 0.1, 0.08, 'triangle'); }
-function nearLadderTop() { if (!BOAT.on || MODE !== 'game' || st.swim || BOAT.climb || BOAT.helm || BOAT.carry || st.rag > 0) return false; const q = bw(1.0, -3.05); return Math.hypot(st.x - q.x, st.z - q.z) < 1.7 && Math.abs(st.y - BOAT.deckY) < 1.0; }
+function nearLadderTop() { if (!BOAT.on || MODE !== 'game' || st.swim || BOAT.climb || BOAT.helm || BOAT.carry || st.rag > 0) return false; const q = bw(1.55, -3.05); return Math.hypot(st.x - q.x, st.z - q.z) < 1.15 && Math.abs(st.y - BOAT.deckY) < 1.0; }
 function startClimb(dir) { dir = dir || 'up'; const q = bw(2.45, -3.05); BOAT.climb = { t: 0, dir, x0: st.x, z0: st.z, y0: st.y, yw: dir === 'up' ? st.y : waveH(q.x, q.z, t, 9) - 0.15 }; }
 function pickCan() { BOAT.carry = true; tone(300, 200, 0.12, 0.1, 'triangle'); }
 function startPour(local) { if (BOAT.state !== 'dead1') return; BOAT.pourFrom = local && BOAT.carry ? BOAT.can.position.clone() : BOAT.canRest.clone(); BOAT.carry = false; BOAT.state = 'pour'; BOAT.pourT = 0; if (local && NET.active) netSendAll({ t: 'fuel' }); }
@@ -1281,12 +1286,12 @@ function updateBoat(dt) {
   const running = B.state === 'sail' || B.state === 'sail2';
   if (auth) {
     if (running) {
-      B.fuel = Math.max(0, B.fuel - dt * inp.th * (B.state === 'sail' ? 0.0455 : 0.0333));
-      const lowF = B.state === 'sail' ? 0.22 : 0.1, sp = B.fuel < lowF ? (0.45 + 0.55 * Math.abs(Math.sin(B.t * 8.3))) * (Math.random() < 0.15 ? 0.3 : 1) : 1, vmax = B.state === 'sail' ? 7.2 : 5.2;
+      B.fuel = Math.max(0, B.fuel - dt * inp.th * 0.0455);
+      const lowF = 0.22, sp = B.fuel < lowF ? (0.45 + 0.55 * Math.abs(Math.sin(B.t * 8.3))) * (Math.random() < 0.15 ? 0.3 : 1) : 1, vmax = 7.2;
       B.v += (vmax * inp.th * sp - B.v) * Math.min(1, dt * (inp.th > 0 ? 1.1 : 0.7));
       B.yaw += inp.s * 0.32 * Math.min(1, B.v / 2.5) * dt;
       if (B.fuel <= 0) { B.state = B.state === 'sail' ? 'dead1' : 'dead2'; engineDying(); }
-    } else if (B.state === 'pour') { B.v *= Math.exp(-dt * 0.8); B.pourT += dt; if (B.pourT > 3.6) { B.state = 'sail2'; B.fuel = 0.2; engineStart(); } }
+    } else if (B.state === 'pour') { B.v *= Math.exp(-dt * 0.8); B.pourT += dt; if (B.pourT > 3.6) { B.state = 'sail2'; B.fuel = 0.5; engineStart(); } }
     else B.v *= Math.exp(-dt * 0.6);
     if (B.v < 0.03 && !running) B.v = 0;
     B.sync -= dt; if (NET.active && B.sync <= 0) { B.sync = 0.3; netSendAll({ t: 'boat', x: B.x, z: B.z, yaw: B.yaw, v: B.v, s: B.state, f: B.fuel, p: B.pourT }); }
@@ -1320,7 +1325,7 @@ function updateBoat(dt) {
     st.vx = st.vz = st.vy = 0; st.ground = true; st.yaw = Math.atan2(-Math.cos(B.yaw), Math.sin(B.yaw));
     if (k >= 1) { B.climb = null; if (up) { st.x = dk.x; st.z = dk.z; st.y = B.deckY + 0.4; st.vy = 0; st.ground = false; } else { const o = bw(3.0, -3.05); st.x = o.x; st.z = o.z; st.y = c.yw; } } }
   // 연기 · 물보라 · 소리
-  const sput = (B.state === 'sail' && B.fuel < 0.22) || (B.state === 'sail2' && B.fuel < 0.1); B.puff -= dt;
+  const sput = running && B.fuel < 0.22; B.puff -= dt;
   const dead = B.state === 'dead1' || B.state === 'dead2';
   if (dead && B.puff <= 0) { B.puff = 0.1; const sm = new THREE.Vector3(); BG.localToWorld(sm.set((Math.random() - 0.5) * 0.3, 2.35, -6.35)); puff(sm, Math.random() < 0.6 ? '#222222' : '#5a5a5a', 2, 1.1, -3.2); }   // 엔진이 멈추면 연기가 계속 피어오른다
   if (B.puff <= 0 && (running || (B.v > 0.4))) { B.puff = running ? 0.07 : 0.2; const ex = new THREE.Vector3(); BG.localToWorld(ex.copy(B.exhaust)); puff(ex, sput || !running ? '#1a1a1a' : '#8a8f98', sput ? 3 : 1, 1.2, -1.5);
@@ -1334,6 +1339,23 @@ function updateBoat(dt) {
     const fw = new THREE.Vector3(); cam.getWorldDirection(fw); const rel = Math.atan2(dxd, dzd) - Math.atan2(fw.x, fw.z); $('darr').style.transform = 'rotate(' + rel + 'rad)'; $('ddist').textContent = Math.round(dd) + 'm'; }
 }
 window.__story = { nearLadderTop, nearLadder, startClimb, nearInlet, nearHelm, toggleHelm, pickCan, enterGame: (i) => enterGame(i), BOAT, DEST, startStory, updateBoat, startPour, nearCan, BG, bw, bl };
+// ---- 타격감: 십자 표시가 번쩍 · 불꽃 · 묵직한 소리 · 숫자 · 화면이 살짝 튄다 (화면은 멈추지 않는다) ----
+const hitMk = document.createElement('div'); hitMk.style.cssText = 'position:fixed;left:50%;top:50%;width:0;height:0;z-index:6;pointer-events:none;opacity:0';
+for (let i = 0; i < 4; i++) { const b = document.createElement('i'); b.style.cssText = 'position:absolute;left:-2px;top:-14px;width:4px;height:9px;background:#fff;border-radius:2px;box-shadow:0 0 0 1.5px #000c,0 0 6px #000a;transform-origin:2px 14px;transform:rotate(' + (45 + i * 90) + 'deg) translateY(-6px)'; hitMk.appendChild(b); } document.body.appendChild(hitMk);
+const HITFX = { t: 0, head: false, fov: 0 };
+function hitSound(head) { tone(head ? 1500 : 900, 300, 0.05, 0.1, 'square'); tone(head ? 180 : 130, 55, 0.12, 0.2, 'sawtooth'); nz(0.07, 1200, 0.13); if (head) setTimeout(() => tone(2100, 1500, 0.1, 0.1, 'triangle'), 35); }
+function hitFeel(pt, head, dmg, dir) {
+  HITFX.t = 0.18; HITFX.head = head; HITFX.fov = head ? 3.2 : 1.8; hitSound(head);
+  puff(pt, head ? '#ff6a4a' : '#ffe8a0', head ? 12 : 8, 6, 8); puff(pt, '#ffffff', 3, 8, 9);
+  if (dmg) dmgText(pt, (head ? '💥' : '') + dmg, head ? '#ff5a3a' : '#ffffff', head);
+  if (GUN) GUN.rcP = (GUN.rcP || 0) + 0.004;
+}
+function updateHitFx(dt) {
+  if (HITFX.t > 0) { HITFX.t -= dt; const k = Math.max(0, HITFX.t / 0.18); hitMk.style.opacity = k.toFixed(2); hitMk.style.transform = 'scale(' + (1 + (1 - k) * 0.5 + (HITFX.head ? 0.3 : 0)) + ')'; hitMk.querySelectorAll('i').forEach((b) => { b.style.background = HITFX.head ? '#ff4a3a' : '#fff'; }); } else hitMk.style.opacity = 0;
+  HITFX.fov += (0 - HITFX.fov) * Math.min(1, dt * 14); const f = 60 + HITFX.fov * 0.0; if (Math.abs(HITFX.fov) > 0.02) { cam.fov = 60 - HITFX.fov; cam.updateProjectionMatrix(); } else if (cam.fov !== 60 && !(typeof fpFovBusy !== 'undefined')) { cam.fov = 60; cam.updateProjectionMatrix(); }
+  REM.forEach((r) => { if (r.flash > 0) { r.flash = Math.max(0, r.flash - dt * 6); if (!r.allMats) { r.allMats = []; r.root.traverse((o) => { if (o.isMesh && o.material && o.material.emissive && !r.allMats.includes(o.material)) r.allMats.push(o.material); }); } r.allMats.forEach((m) => m.emissive.setRGB(r.flash * 0.9, r.flash * 0.15, r.flash * 0.1)); }
+    if (r.hk > 0) { r.hk = Math.max(0, r.hk - dt * 5); r.root.rotation.x -= Math.sin(r.hk * Math.PI) * 0.28; } });
+}
 // ====================== 말하기: 채팅(Enter) · 음성(V) · 입 벌어짐 ======================
 const MOUTH = { v: 0, talkT: 0 }, VO = { on: false, stream: null, ac: null, an: null, buf: null, lvl: 0, calls: new Map(), audios: new Map(), vt: 0 };
 function setMouth(m, v) { if (!m) return; m.scale.set(1 + v * 0.3, 1 + v * 7, 1 + v * 2.5); m.position.y = 0.17 - v * 0.022; m.material.color.setRGB(0.478 - 0.19 * v, 0.29 - 0.24 * v, 0.188 - 0.14 * v); }
@@ -1365,6 +1387,42 @@ function updateVoice(dt) {
   VO.vt -= dt; if (VO.vt <= 0) { VO.vt = 0.25; VO.audios.forEach((a, pid) => { let pl = null; NET.players.forEach((p) => { if (p.pid === pid) pl = p; }); const r = pl && REM.get(pl.id); let vol = 1; if (r && MODE === 'game') { const d = Math.hypot(r.root.position.x - st.x, r.root.position.z - st.z); vol = Math.max(0.12, Math.min(1, 1 - (d - 8) / 60)); } a.volume = vol; }); }
 }
 window.__voice = { VO, MOUTH, sendChat, chatAdd, setMouth, toggleMic };
+// ====================== 이모티콘: G 키(누르고 있기) 또는 😀 버튼 → 도넛 모양 선택판 ======================
+const EMOS = ['👋', '😂', '😮', '😢', '😡', '👍', '👏', '💃'], EMO = { open: false, hover: -1, me: null, DUR: 2.8 };   // 인사 · 웃음 · 놀람 · 슬픔 · 화남 · 최고 · 박수 · 춤
+const emoWheel = document.createElement('div'); emoWheel.style.cssText = 'position:fixed;left:50%;top:50%;width:300px;height:300px;margin:-150px 0 0 -150px;z-index:9;display:none;touch-action:none';
+{ const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', '-150 -150 300 300'); svg.style.cssText = 'width:100%;height:100%;filter:drop-shadow(0 6px 14px #0006)'; emoWheel.appendChild(svg);
+  const R1 = 140, R0 = 58, n = EMOS.length, pt = (r, a) => (r * Math.cos(a)).toFixed(2) + ' ' + (r * Math.sin(a)).toFixed(2); EMO.seg = [];
+  for (let i = 0; i < n; i++) { const a0 = -Math.PI / 2 + (i - 0.5) * 2 * Math.PI / n + 0.02, a1 = a0 + 2 * Math.PI / n - 0.04, am = (a0 + a1) / 2, d = document.createElementNS(NS, 'path');
+    d.setAttribute('d', 'M ' + pt(R1, a0) + ' A ' + R1 + ' ' + R1 + ' 0 0 1 ' + pt(R1, a1) + ' L ' + pt(R0, a1) + ' A ' + R0 + ' ' + R0 + ' 0 0 0 ' + pt(R0, a0) + ' Z'); d.setAttribute('fill', '#ffffffd9'); d.setAttribute('stroke', '#fff'); d.setAttribute('stroke-width', '2'); d.style.cssText = 'cursor:pointer;transition:fill .08s'; svg.appendChild(d);
+    const tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', ((R0 + R1) / 2 * Math.cos(am)).toFixed(2)); tx.setAttribute('y', ((R0 + R1) / 2 * Math.sin(am) + 11).toFixed(2)); tx.setAttribute('text-anchor', 'middle'); tx.setAttribute('font-size', '32'); tx.style.pointerEvents = 'none'; tx.textContent = EMOS[i]; svg.appendChild(tx); EMO.seg.push(d);
+    d.addEventListener('mouseenter', () => emoHover(i)); d.addEventListener('click', (e) => { e.stopPropagation(); emoPick(i); }); }
+  const mid = document.createElementNS(NS, 'text'); mid.setAttribute('x', 0); mid.setAttribute('y', 9); mid.setAttribute('text-anchor', 'middle'); mid.setAttribute('font-size', '26'); mid.style.pointerEvents = 'none'; mid.textContent = '🙂'; svg.appendChild(mid); EMO.mid = mid; }
+document.body.appendChild(emoWheel);
+const emoBtn = document.createElement('button'); emoBtn.textContent = '😀'; emoBtn.setAttribute('aria-label', '이모티콘 (G)'); emoBtn.style.cssText = micBtn.style.cssText; $('mus').parentNode.appendChild(emoBtn);
+function emoHover(i) { EMO.hover = i; EMO.seg.forEach((d, k) => d.setAttribute('fill', k === i ? '#ffd84a' : '#ffffffd9')); EMO.mid.textContent = i >= 0 ? EMOS[i] : '🙂'; }
+function emoShow(on) { EMO.open = on; emoWheel.style.display = on ? 'block' : 'none'; emoHover(-1); }
+function emoPick(i) { emoShow(false); if (i < 0) return; showEmote(null, i); if (NET.active) netSendAll({ t: 'emo', e: i, id: NET.id }); tone(700 + i * 40, 1000 + i * 40, 0.08, 0.08, 'triangle'); }
+emoBtn.onclick = (e) => { e.stopPropagation(); emoBtn.blur(); emoShow(!EMO.open); };
+addEventListener('keydown', (e) => { if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; if (e.code === 'KeyG' && !e.repeat && MODE !== 'menu') emoShow(true); });
+addEventListener('keyup', (e) => { if (e.code === 'KeyG' && EMO.open && EMO.hover >= 0) emoPick(EMO.hover); else if (e.code === 'KeyG' && EMO.open) emoShow(false); });
+addEventListener('mousemove', (e) => { if (!EMO.open) return; const dx = e.clientX - innerWidth / 2, dy = e.clientY - innerHeight / 2, r = Math.hypot(dx, dy) / (emoWheel.clientWidth / 300); if (r < 58 || r > 150) { if (EMO.hover >= 0) emoHover(-1); return; } let a = Math.atan2(dy, dx) + Math.PI / 2 + Math.PI / EMOS.length; a = (a + 4 * Math.PI) % (2 * Math.PI); const i = Math.floor(a / (2 * Math.PI / EMOS.length)); if (i !== EMO.hover) emoHover(i); });
+function showEmote(r, i) { const e = { i, t: 0 }; if (r) r.emo = e; else EMO.me = e; }   // 이모티콘은 몸동작으로 보여 준다
+function applyEmote(B, i, tt, w, dt) {
+  const L = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * w; }, s = Math.sin, hip = B.hips.position;
+  switch (i) {
+    case 0: L(B.arR, 'x', -2.5); L(B.arR, 'z', 0.55 + s(tt * 13) * 0.45); L(B.foR, 'x', -0.5 + s(tt * 13) * 0.3); L(B.arL, 'x', 0.05); L(B.head, 'x', -0.05); L(B.head, 'y', s(tt * 3) * 0.2); break;   // 손 흔들며 인사
+    case 1: L(B.spine, 'x', 0.22 + s(tt * 22) * 0.09); L(B.head, 'x', -0.45 + s(tt * 22) * 0.1); L(B.arL, 'x', -0.9); L(B.arR, 'x', -0.9); L(B.arL, 'z', 0.5); L(B.arR, 'z', -0.5); hip.y -= Math.abs(s(tt * 11)) * 0.035 * w; break;   // 배를 잡고 웃는다
+    case 2: L(B.arL, 'x', -1.1); L(B.arR, 'x', -1.1); L(B.arL, 'z', -1.0); L(B.arR, 'z', 1.0); L(B.spine, 'x', -0.18); L(B.head, 'x', -0.25); hip.y += Math.max(0, s(Math.min(tt, 0.3) / 0.3 * Math.PI)) * 0.1 * w; break;   // 깜짝 놀란다
+    case 3: L(B.head, 'x', 0.65); L(B.spine, 'x', 0.38); L(B.arR, 'x', -2.25 + s(tt * 9) * 0.06); L(B.arR, 'z', 0.25); L(B.foR, 'x', -1.6); L(B.arL, 'x', 0.1); L(B.spine, 'z', s(tt * 7) * 0.04); break;   // 고개 숙여 눈물을 닦는다
+    case 4: { const k = s(tt * 14); L(B.thL, 'x', Math.max(0, k) * -0.55); L(B.thR, 'x', Math.max(0, -k) * -0.55); L(B.arL, 'x', -0.35); L(B.arR, 'x', -0.35); L(B.arL, 'z', -0.3); L(B.arR, 'z', 0.3); L(B.spine, 'x', 0.18); L(B.head, 'x', 0.18); L(B.head, 'y', s(tt * 26) * 0.12); hip.y -= Math.abs(k) * 0.04 * w; break; }   // 발을 쿵쿵 구른다
+    case 5: L(B.arR, 'x', -1.45); L(B.arR, 'z', 0.2); L(B.foR, 'x', -1.1); L(B.head, 'x', -0.1 + s(tt * 8) * 0.1); L(B.arL, 'x', 0.05); L(B.spine, 'x', -0.05); break;   // 엄지 척
+    case 6: { const c = 0.5 + 0.5 * s(tt * 15); L(B.arL, 'x', -1.4); L(B.arR, 'x', -1.4); L(B.arL, 'z', 0.55 - c * 0.5); L(B.arR, 'z', -0.55 + c * 0.5); L(B.foL, 'x', -0.3); L(B.foR, 'x', -0.3); L(B.head, 'x', -0.1); hip.y -= c * 0.02 * w; break; }   // 박수
+    case 7: { const k = s(tt * 5); L(B.spine, 'y', k * 0.5); L(B.spine, 'z', k * 0.14); L(B.arL, 'x', -2.5 + s(tt * 10) * 0.45); L(B.arR, 'x', -2.5 - s(tt * 10) * 0.45); L(B.arL, 'z', -0.5); L(B.arR, 'z', 0.5); L(B.thL, 'x', -Math.max(0, s(tt * 10)) * 0.5); L(B.thR, 'x', -Math.max(0, -s(tt * 10)) * 0.5); L(B.head, 'y', -k * 0.25); hip.y -= Math.abs(s(tt * 10)) * 0.07 * w; break; }   // 신나게 춤춘다
+  }
+}
+function emoWeight(e, dt) { e.t += dt; return Math.max(0, Math.min(1, e.t / 0.25, (EMO.DUR - e.t) / 0.3)); }
+function updateEmotes(dt) { if (EMO.me) { if (EMO.me.t > EMO.DUR || st.speed > 1.8 || st.rag > 0 || st.swim || !st.ground) EMO.me = null; } if (MODE === 'menu') { EMO.me = null; if (EMO.open) emoShow(false); } }
+window.__emo = { showEmote, EMO };
 // ---------- 소리: 잔잔한 파도 소리 ----------
 const snd = { on: true, ac: null, started: false, gain: null };
 const VOL = 0.07;   // 파도 소리는 아주 작게
@@ -1395,7 +1453,7 @@ function groundAt(x, z) { if (inLobby(x, z)) return LOBBY.y;   // 대기실 바�
   if (TOWER.on) { const u = x - TOWER.x0; if (Math.abs(z - TOWER.z) < TOWER.w) { if (u >= 0 && u <= TOWER.len) h = Math.max(h, TOWER.h0 + u / TOWER.len * TOWER.H); else if (u > TOWER.len && u < TOWER.len + TOWER.plat && Math.abs(z - TOWER.z) < TOWER.plat / 2) h = Math.max(h, TOWER.h0 + TOWER.H); } else if (u > TOWER.len && u < TOWER.len + TOWER.plat && Math.abs(z - TOWER.z) < TOWER.plat / 2) h = Math.max(h, TOWER.h0 + TOWER.H); }
   return h; }
 function update(dt) {
-  t += dt; updateBoat(dt); updateVoice(dt);
+  t += dt; updateBoat(dt); updateVoice(dt); updateHitFx(dt); updateEmotes(dt);
   // 입력 방향 (카메라 기준)
   let ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.x, iz = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + joy.y;
   if (MODE === 'menu' || BOAT.helm || BOAT.climb) { ix = 0; iz = 0; }
@@ -1475,7 +1533,7 @@ function update(dt) {
     const dx = -Math.sin(view.yaw) * Math.cos(view.pitch), dy = -Math.sin(view.pitch), dz = -Math.cos(view.yaw) * Math.cos(view.pitch);
     cam.position.set(eye.x + dx * 0.12, eye.y + dy * 0.12, eye.z + dz * 0.12); cam.lookAt(eye.x + dx, eye.y + dy, eye.z + dz); }
   else {
-  const hw = P_.head.getWorldPosition(new THREE.Vector3()); view.mk = (view.mk || 0) + ((st.speed > 0.5 || st.swim ? 1 : 0) - (view.mk || 0)) * Math.min(1, dt * 4); const mk = view.mk, tx = hw.x + (person.position.x - hw.x) * mk, ty = hw.y + 0.27 + (person.position.y + 1.05 - hw.y - 0.27) * mk, tz = hw.z + (person.position.z - hw.z) * mk, cd = view.dist, cp = view.pitch, cy = view.yaw;   // 시점의 중심은 머리
+  const hw = P_.head.getWorldPosition(new THREE.Vector3()); view.mk = (view.mk || 0) + ((st.speed > 0.5 ? 1 : 0) - (view.mk || 0)) * Math.min(1, dt * 4); const mk = view.mk, bcx = st.swim ? (person.position.x + hw.x) / 2 : person.position.x, bcy = st.swim ? (person.position.y + hw.y) / 2 : person.position.y + 1.05, bcz = st.swim ? (person.position.z + hw.z) / 2 : person.position.z, tx = hw.x + (bcx - hw.x) * mk, ty = hw.y + 0.27 + (bcy - hw.y - 0.27) * mk, tz = hw.z + (bcz - hw.z) * mk, cd = view.dist, cp = view.pitch, cy = view.yaw;   // 시점의 중심은 머리
   let cx2 = tx + Math.sin(cy) * Math.cos(cp) * cd, cz2 = tz + Math.cos(cy) * Math.cos(cp) * cd, cy2 = ty + Math.sin(cp) * cd;
   const gh = groundAt(cx2, cz2) + 0.5; if (cy2 < gh) cy2 = gh; // 땅속으로 들어가지 않게
   if (MODE === 'game') cy2 = Math.max(cy2, waveH(cx2, cz2, t, 9) + 0.4);   // 물속으로도
