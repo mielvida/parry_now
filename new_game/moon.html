@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>달 청소부</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f24; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; user-select: none; -webkit-user-select: none; }
+  canvas { position: fixed; inset: 0; display: block; touch-action: none; }
+  .ov { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; box-sizing: border-box; color: #fff; text-align: center; background: rgba(8, 10, 28, 0.62); overflow: auto; }
+  .ov.on { display: flex; }
+  .ov h1 { margin: 0; font: 900 clamp(34px, 8vw, 64px) 'Malgun Gothic', sans-serif; text-shadow: 3px 3px 0 #000; letter-spacing: 2px; }
+  .ov h2 { margin: 0; font: 900 clamp(26px, 5vw, 40px) 'Malgun Gothic', sans-serif; text-shadow: 2px 2px 0 #000; }
+  .ov .sub { font: 700 clamp(14px, 2.4vw, 20px) 'Malgun Gothic', sans-serif; color: #cfd6ff; }
+  .btn { border: 4px solid #111; border-radius: 16px; background: #fff; color: #111; padding: 10px 26px; font: 900 clamp(18px, 3vw, 26px) 'Malgun Gothic', sans-serif; cursor: pointer; }
+  .btn:hover { background: #ffd23a; }
+  .btn.small { padding: 5px 14px; font-size: 16px; border-width: 3px; border-radius: 12px; }
+  .btn[disabled] { opacity: 0.35; cursor: default; background: #fff; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .help { text-align: left; background: rgba(255,255,255,0.1); border: 3px solid #fff; border-radius: 16px; padding: 12px 18px; font: 700 clamp(13px, 2vw, 17px) 'Malgun Gothic', sans-serif; line-height: 1.7; max-width: 92vw; }
+  .up { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 12px; align-items: center; background: rgba(255,255,255,0.1); border: 3px solid #fff; border-radius: 16px; padding: 12px 16px; font: 800 17px 'Malgun Gothic', sans-serif; text-align: left; }
+  .pips { letter-spacing: 2px; color: #ffd23a; }
+  #tc { position: fixed; left: 0; right: 0; bottom: 0; display: none; justify-content: space-between; padding: 10px 14px; pointer-events: none; }
+  #tc .g { display: flex; gap: 12px; pointer-events: auto; }
+  #tc button { width: 68px; height: 68px; border-radius: 50%; border: 4px solid #111; background: rgba(255,255,255,0.7); font: 900 26px sans-serif; touch-action: none; }
+  #tc button:active { background: #ffd23a; }
+  #fin { position: fixed; left: 50%; bottom: 14%; transform: translateX(-50%); display: none; z-index: 5; }
+  #top { position: fixed; right: 10px; top: 8px; display: flex; gap: 8px; z-index: 4; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="top"><button class="btn small" id="bPause">II</button></div>
+<button class="btn" id="fin"></button>
+<div id="tc"><div class="g"><button id="tL">◀</button><button id="tR">▶</button></div><div class="g"><button id="tC">🧹</button><button id="tJ">▲</button></div></div>
+<div class="ov on" id="title"></div>
+<div class="ov" id="how"></div>
+<div class="ov" id="pause"></div>
+<div class="ov" id="result"></div>
+<script>
+(() => {
+'use strict';
+// ===== 언어 (9개) =====
+const LANGS = ['ko', 'en', 'ja', 'zh', 'es', 'fr', 'de', 'pt', 'ru'];
+const TX = {
+  title: ['달 청소부', 'Moon Cleaner', '月のそうじ屋', '月球清洁工', 'Limpiador lunar', 'Nettoyeur lunaire', 'Mondreiniger', 'Limpador da Lua', 'Лунный уборщик'],
+  sub: ['달 표면을 깨끗이 청소해요', 'Clean up the surface of the Moon', '月の表面をきれいに掃除しよう', '把月球表面打扫干净', 'Limpia la superficie de la Luna', 'Nettoyez la surface de la Lune', 'Säubere die Mondoberfläche', 'Limpe a superfície da Lua', 'Очистите поверхность Луны'],
+  start: ['시작', 'Start', 'スタート', '开始', 'Empezar', 'Commencer', 'Start', 'Iniciar', 'Старт'],
+  cont: ['이어하기', 'Continue', 'つづき', '继续', 'Continuar', 'Continuer', 'Weiter', 'Continuar', 'Продолжить'],
+  how: ['하는 법', 'How to play', 'あそびかた', '玩法', 'Cómo jugar', 'Comment jouer', 'Spielanleitung', 'Como jogar', 'Как играть'],
+  back: ['← 다른 게임', '← Other games', '← 他のゲーム', '← 其他游戏', '← Otros juegos', '← Autres jeux', '← Andere Spiele', '← Outros jogos', '← Другие игры'],
+  lvl: ['레벨 ', 'Level ', 'レベル ', '关卡 ', 'Nivel ', 'Niveau ', 'Level ', 'Nível ', 'Уровень '],
+  h1: ['← → / A D : 걷기', '← → / A D : Walk', '← → / A D : 歩く', '← → / A D : 行走', '← → / A D : Caminar', '← → / A D : Marcher', '← → / A D : Gehen', '← → / A D : Andar', '← → / A D : Ходьба'],
+  h2: ['↑ / W / Space : 점프 (달은 중력이 약해요)', '↑ / W / Space : Jump (the Moon has low gravity)', '↑ / W / Space : ジャンプ(月は重力が弱いよ)', '↑ / W / Space : 跳跃(月球重力很小)', '↑ / W / Space : Saltar (la Luna tiene poca gravedad)', '↑ / W / Space : Sauter (la Lune a une faible gravité)', '↑ / W / Space : Springen (der Mond hat wenig Schwerkraft)', '↑ / W / Space : Pular (a Lua tem pouca gravidade)', '↑ / W / Space : Прыжок (на Луне слабая гравитация)'],
+  h3: ['E / J / 마우스 꾹 : 청소기 (쓰레기를 빨아들이고 먼지를 치워요)', 'E / J / hold mouse : Vacuum (sucks up trash and sweeps dust)', 'E / J / マウス長押し : 掃除機(ゴミを吸い込み、ほこりを掃除)', 'E / J / 按住鼠标 : 吸尘器(吸走垃圾、清扫灰尘)', 'E / J / mantener ratón : Aspiradora (aspira basura y limpia polvo)', 'E / J / maintenir la souris : Aspirateur (aspire les déchets et la poussière)', 'E / J / Maus halten : Staubsauger (saugt Müll und Staub)', 'E / J / segurar o mouse : Aspirador (suga lixo e poeira)', 'E / J / удерживать мышь : Пылесос (всасывает мусор и пыль)'],
+  h4: ['가방이 가득 차면 로켓으로 돌아가 비워요 · 산소도 채워져요', 'When the bag is full, return to the rocket to empty it · Oxygen refills there too', 'かばんがいっぱいになったらロケットで空にしよう · 酸素も補給できるよ', '背包满了就回火箭清空 · 氧气也会补充', 'Cuando la bolsa esté llena, vuelve al cohete para vaciarla · También recargas oxígeno', "Quand le sac est plein, retournez à la fusée pour le vider · L'oxygène se recharge aussi", 'Ist der Beutel voll, kehre zur Rakete zurück · Dort füllt sich auch der Sauerstoff', 'Quando a bolsa encher, volte ao foguete para esvaziá-la · O oxigênio também recarrega', 'Когда мешок полон, вернитесь к ракете, чтобы опустошить его · Там же пополняется кислород'],
+  h5: ['빨간 표시가 나타나면 운석이 떨어져요 · 피하세요!', 'A red mark means a meteor is coming · Dodge it!', '赤いマークが出たら隕石が落ちてくるよ · よけて!', '出现红色标记就有陨石落下 · 快躲开!', 'Una marca roja avisa de un meteorito · ¡Esquívalo!', 'Un repère rouge annonce une météorite · Esquivez-la !', 'Eine rote Markierung kündigt einen Meteor an · Weich aus!', 'Uma marca vermelha indica um meteoro · Desvie!', 'Красная метка — упадёт метеорит · Уклоняйтесь!'],
+  h6: ['산소가 떨어지기 전에 85% 이상 청소하면 클리어!', 'Clean up 85% or more before the oxygen runs out!', '酸素が切れる前に85%以上掃除したらクリア!', '在氧气耗尽前清扫到85%以上就过关!', '¡Limpia al menos el 85% antes de que se acabe el oxígeno!', "Nettoyez au moins 85 % avant la fin de l'oxygène !", 'Säubere mindestens 85 %, bevor der Sauerstoff ausgeht!', 'Limpe pelo menos 85% antes que o oxigênio acabe!', 'Очистите не менее 85% до того, как кончится кислород!'],
+  clean: ['청소', 'Clean', '掃除', '清洁', 'Limpio', 'Propre', 'Sauber', 'Limpo', 'Чисто'],
+  o2: ['산소', 'Oxygen', '酸素', '氧气', 'Oxígeno', 'Oxygène', 'Sauerstoff', 'Oxigênio', 'Кислород'],
+  bag: ['가방', 'Bag', 'かばん', '背包', 'Bolsa', 'Sac', 'Beutel', 'Bolsa', 'Мешок'],
+  coins: ['코인', 'Coins', 'コイン', '金币', 'Monedas', 'Pièces', 'Münzen', 'Moedas', 'Монеты'],
+  full: ['가방이 가득 찼어요! 로켓으로 가요', 'Bag full! Go to the rocket', 'かばんがいっぱい!ロケットへ行こう', '背包满了!去火箭那里', '¡Bolsa llena! Ve al cohete', 'Sac plein ! Allez à la fusée', 'Beutel voll! Geh zur Rakete', 'Bolsa cheia! Vá ao foguete', 'Мешок полон! К ракете'],
+  hit: ['운석에 맞았어요!', 'Hit by a meteor!', '隕石に当たった!', '被陨石击中了!', '¡Un meteorito te golpeó!', 'Touché par une météorite !', 'Von einem Meteor getroffen!', 'Atingido por um meteoro!', 'Попал метеорит!'],
+  low: ['산소가 부족해요! 로켓으로 가요', 'Low oxygen! Go to the rocket', '酸素が少ない!ロケットへ行こう', '氧气不足!去火箭那里', '¡Poco oxígeno! Ve al cohete', "Peu d'oxygène ! Allez à la fusée", 'Wenig Sauerstoff! Geh zur Rakete', 'Pouco oxigênio! Vá ao foguete', 'Мало кислорода! К ракете'],
+  finish: ['Enter : 청소 끝내기 (로켓 앞)', 'Enter : Finish cleaning (at the rocket)', 'Enter : そうじを終える(ロケットの前)', 'Enter : 结束清洁(在火箭旁)', 'Enter : Terminar limpieza (junto al cohete)', 'Enter : Terminer le nettoyage (près de la fusée)', 'Enter : Reinigung beenden (an der Rakete)', 'Enter : Terminar a limpeza (no foguete)', 'Enter : Закончить уборку (у ракеты)'],
+  win: ['청소 완료!', 'Cleaning complete!', 'そうじ完了!', '清洁完成!', '¡Limpieza completada!', 'Nettoyage terminé !', 'Reinigung abgeschlossen!', 'Limpeza concluída!', 'Уборка завершена!'],
+  lose: ['산소가 떨어졌어요', 'Out of oxygen', '酸素が切れた', '氧气耗尽了', 'Sin oxígeno', "Plus d'oxygène", 'Sauerstoff alle', 'Sem oxigênio', 'Кислород кончился'],
+  rate: ['청소율', 'Cleaned', '掃除率', '清洁度', 'Limpieza', 'Propreté', 'Sauberkeit', 'Limpeza', 'Чистота'],
+  earned: ['얻은 코인', 'Coins earned', '獲得コイン', '获得金币', 'Monedas ganadas', 'Pièces gagnées', 'Verdiente Münzen', 'Moedas ganhas', 'Получено монет'],
+  next: ['다음 레벨', 'Next level', '次のレベル', '下一关', 'Siguiente nivel', 'Niveau suivant', 'Nächstes Level', 'Próximo nível', 'Следующий уровень'],
+  retry: ['다시 하기', 'Retry', 'もう一度', '重玩', 'Reintentar', 'Réessayer', 'Nochmal', 'Tentar de novo', 'Ещё раз'],
+  home: ['처음으로', 'Main menu', '最初へ', '回主菜单', 'Menú principal', 'Menu principal', 'Hauptmenü', 'Menu principal', 'В меню'],
+  shop: ['업그레이드', 'Upgrades', 'アップグレード', '升级', 'Mejoras', 'Améliorations', 'Upgrades', 'Melhorias', 'Улучшения'],
+  u0: ['흡입력', 'Suction', '吸引力', '吸力', 'Succión', 'Aspiration', 'Saugkraft', 'Sucção', 'Мощность'],
+  u1: ['가방 크기', 'Bag size', 'かばんの大きさ', '背包容量', 'Tamaño de bolsa', 'Taille du sac', 'Beutelgröße', 'Tamanho da bolsa', 'Размер мешка'],
+  u2: ['산소 탱크', 'Oxygen tank', '酸素タンク', '氧气罐', 'Tanque de oxígeno', "Réservoir d'oxygène", 'Sauerstofftank', 'Tanque de oxigênio', 'Кислородный баллон'],
+  u3: ['점프 부츠', 'Jump boots', 'ジャンプブーツ', '跳跃靴', 'Botas de salto', 'Bottes de saut', 'Sprungstiefel', 'Botas de pulo', 'Ботинки для прыжков'],
+  u4: ['이동 속도', 'Speed', '移動速度', '移动速度', 'Velocidad', 'Vitesse', 'Tempo', 'Velocidade', 'Скорость'],
+  max: ['최대', 'MAX', '最大', '已满', 'MÁX', 'MAX', 'MAX', 'MÁX', 'МАКС'],
+  pause: ['일시정지', 'Paused', '一時停止', '暂停', 'Pausa', 'Pause', 'Pausiert', 'Pausado', 'Пауза'],
+  resume: ['계속하기', 'Resume', 'つづける', '继续', 'Reanudar', 'Reprendre', 'Weiter', 'Continuar', 'Продолжить'],
+  sound: ['소리', 'Sound', 'サウンド', '声音', 'Sonido', 'Son', 'Ton', 'Som', 'Звук'],
+  on: ['켜짐', 'On', 'オン', '开', 'Sí', 'Oui', 'An', 'Sim', 'Вкл'],
+  off: ['꺼짐', 'Off', 'オフ', '关', 'No', 'Non', 'Aus', 'Não', 'Выкл'],
+  goal: ['목표', 'Goal', '目標', '目标', 'Meta', 'Objectif', 'Ziel', 'Meta', 'Цель']
+};
+const LNAMES = ['한국어', 'English', '日本語', '中文', 'Español', 'Français', 'Deutsch', 'Português', 'Русский'];
+let SAVE = { coins: 0, level: 1, stars: {}, up: [0, 0, 0, 0, 0], snd: 1, lang: 'ko' };
+try { const o = JSON.parse(localStorage.getItem('moon_save') || 'null'); if (o && typeof o === 'object') { SAVE = Object.assign(SAVE, o); if (!Array.isArray(SAVE.up) || SAVE.up.length !== 5) SAVE.up = [0, 0, 0, 0, 0]; } } catch (e) {}
+try { const gl = localStorage.getItem('ng_lang'); if (!localStorage.getItem('moon_save') && gl && LANGS.includes(gl)) SAVE.lang = gl; } catch (e) {}
+const save = () => { try { localStorage.setItem('moon_save', JSON.stringify(SAVE)); } catch (e) {} };
+const li = () => Math.max(0, LANGS.indexOf(SAVE.lang));
+const T = (k) => (TX[k] || [k])[li()] || (TX[k] || [k])[1] || k;
+const $ = (id) => document.getElementById(id);
+
+// ===== 기본 =====
+const cv = $('c'), g = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, S = 1, OX = 0, OY = 0;
+function resize() { DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); S = Math.min(H / 520, W / 700); S = Math.max(S, 0.35); OX = 0; OY = (H - 520 * S) / 2; }
+addEventListener('resize', resize); resize();
+const GY = 440, GRAV = 520, INK = '#111';
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const mul32 = (s) => () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const wob = (x, s) => Math.sin(x * 0.07 + s) * 1.3 + Math.sin(x * 0.19 + s * 2) * 0.8;
+
+// ===== 소리 =====
+let AC = null, master = null, vacG = null, musicT = null;
+function audInit() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = SAVE.snd ? 0.5 : 0; master.connect(AC.destination);
+    const buf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = AC.createBufferSource(); src.buffer = buf; src.loop = true; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 0.9; vacG = AC.createGain(); vacG.gain.value = 0; src.connect(bp); bp.connect(vacG); vacG.connect(master); src.start();
+    musicT = setInterval(music, 2200);
+  } catch (e) { AC = null; }
+}
+function tone(f, dur, type, vol, slide) { if (!AC) return; const o = AC.createOscillator(), gn = AC.createGain(), t = AC.currentTime; o.type = type || 'sine'; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur); gn.gain.setValueAtTime(vol || 0.2, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(gn); gn.connect(master); o.start(t); o.stop(t + dur + 0.02); }
+function noise(dur, vol, fq) { if (!AC) return; const n = Math.floor(AC.sampleRate * dur), b = AC.createBuffer(1, n, AC.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n); const s = AC.createBufferSource(); s.buffer = b; const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = fq || 600; const gn = AC.createGain(); gn.gain.value = vol || 0.3; s.connect(f); f.connect(gn); gn.connect(master); s.start(); }
+const sfx = {
+  jump: () => tone(300, 0.18, 'sine', 0.12, 520), land: () => noise(0.08, 0.12, 400), pick: () => tone(660 + Math.random() * 120, 0.09, 'triangle', 0.14, 990),
+  coin: () => { tone(880, 0.08, 'square', 0.07); setTimeout(() => tone(1320, 0.12, 'square', 0.07), 70); }, warn: () => tone(520, 0.12, 'square', 0.06, 420),
+  boom: () => { noise(0.5, 0.5, 300); tone(90, 0.4, 'sawtooth', 0.2, 40); }, full: () => tone(150, 0.2, 'sawtooth', 0.12), win: () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.25, 'triangle', 0.16), i * 120)),
+  lose: () => [392, 330, 262].forEach((f, i) => setTimeout(() => tone(f, 0.3, 'triangle', 0.14), i * 180)), buy: () => { tone(740, 0.1, 'square', 0.08); setTimeout(() => tone(988, 0.14, 'square', 0.08), 90); }
+};
+const PENTA = [262, 294, 330, 392, 440, 523];
+function music() { if (!AC || !SAVE.snd) return; const f = PENTA[Math.floor(Math.random() * PENTA.length)] / 2; tone(f, 2.4, 'sine', 0.05); if (Math.random() < 0.6) setTimeout(() => tone(PENTA[Math.floor(Math.random() * PENTA.length)], 1.4, 'triangle', 0.03), 600); }
+function setSound(on) { SAVE.snd = on ? 1 : 0; if (master) master.gain.value = on ? 0.5 : 0; save(); }
+
+// ===== 입력 =====
+const keys = {}, touch = { l: 0, r: 0, j: 0, c: 0 };
+let mouseDown = 0;
+addEventListener('keydown', (e) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault(); audInit(); if (!keys[e.code]) { if (['ArrowUp', 'KeyW', 'Space'].includes(e.code)) P.jbuf = 0.14; if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); if (e.code === 'Enter') tryFinish(); } keys[e.code] = 1; });
+addEventListener('keyup', (e) => { keys[e.code] = 0; });
+cv.addEventListener('pointerdown', (e) => { audInit(); if (e.pointerType === 'mouse') mouseDown = 1; });
+addEventListener('pointerup', () => { mouseDown = 0; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = 0; mouseDown = 0; if (ST === 'play') togglePause(); });
+const tbind = (id, k) => { const b = $(id); const on = (e) => { e.preventDefault(); audInit(); touch[k] = 1; if (k === 'j') P.jbuf = 0.14; }, off = (e) => { e.preventDefault(); touch[k] = 0; }; b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off); };
+tbind('tL', 'l'); tbind('tR', 'r'); tbind('tJ', 'j'); tbind('tC', 'c');
+if (window.matchMedia && matchMedia('(pointer:coarse)').matches) $('tc').style.display = 'flex';
+
+// ===== 레벨 =====
+const KINDS = { can: { w: 1, v: 3, cv: 2 }, box: { w: 1, v: 4, cv: 3 }, tire: { w: 2, v: 7, cv: 4 }, sat: { w: 3, v: 14, cv: 6 } };
+const up = (i) => SAVE.up[i] || 0, UMAX = [8, 8, 8, 5, 5], UCOST = [30, 25, 25, 30, 30];
+const bagCap = () => 6 + 3 * up(1), o2Max = () => 100 + 15 * up(2), suckR = () => 95 + 14 * up(0), spd = () => 170 * (1 + 0.07 * up(4)), jumpV = () => 350 * (1 + 0.08 * up(3));
+let ST = 'title', L = null, P = null, G = null, cam = { x: 0, sh: 0 };
+const surfY = (x) => { let y = GY; for (const r of L.rocks) if (x > r.x0 && x < r.x1 && r.top < y) y = r.top; return y; };
+function genLevel(lvl) {
+  const rnd = mul32(lvl * 7919 + 13), R = (a, b) => a + rnd() * (b - a), world = 2200 + Math.min(lvl, 12) * 420;
+  L = { lvl, world, rocks: [], items: [], dust: [], craters: [], stars: [], meteors: [], rocket: 130 };
+  let x = 520; const nr = 4 + Math.floor(lvl * 0.9) + Math.floor(world / 900);
+  for (let i = 0; i < nr && x < world - 300; i++) { const w = R(70, 130), h = R(30, 66); L.rocks.push({ x0: x, x1: x + w, top: GY - h, h, seed: rnd() * 100 }); x += w + R(260, Math.max(300, (world - 900) / nr + 140)); }
+  const inRock = (px, pad) => L.rocks.some((r) => px > r.x0 - pad && px < r.x1 + pad);
+  const nItems = Math.min(60, 10 + lvl * 3), nDust = Math.min(36, 8 + lvl * 2);
+  for (let i = 0; i < nItems; i++) { const px = R(300, world - 80), r = rnd(), tp = r < 0.38 - lvl * 0.01 ? 'can' : r < 0.68 ? 'box' : r < 0.86 ? 'tire' : 'sat', k = KINDS[tp]; L.items.push({ x: px, y: surfY(px), tp, w: k.w, v: k.v, cv: k.cv, vy: 0, st: 'g', ph: rnd() * 6 }); }
+  for (let i = 0; i < nDust; i++) { let px = R(280, world - 60), tries = 0; while (inRock(px, 20) && tries++ < 20) px = R(280, world - 60); const r = R(18, 38); L.dust.push({ x: px, r, amt: r, cv: r / 6, seed: rnd() * 50 }); }
+  for (let i = 0; i < 40; i++) L.craters.push({ x: R(0, world), w: R(40, 120), dy: 16 + (i % 4) * 10 });
+  for (let i = 0; i < 150; i++) L.stars.push({ x: rnd(), y: rnd() * 0.75, r: 0.6 + rnd() * 1.6, ph: rnd() * 6 });
+  let tot = 0; for (const it of L.items) tot += it.cv; for (const d of L.dust) tot += d.cv; L.total = tot;
+}
+function newPlayer() { return { x: 190, y: GY, vx: 0, vy: 0, hw: 10, ph: 40, face: 1, ground: true, coy: 0, jbuf: 0, stun: 0, squash: 0, wob: 0, step: 0, hold: false, cleaning: false }; }
+function startLevel(lvl) {
+  audInit(); genLevel(lvl); P = Object.assign(P || {}, newPlayer());
+  G = { t: 0, cleaned: 0, coinsRun: 0, o2: o2Max(), bag: [], bagW: 0, parts: [], pops: [], toasts: [], foot: [], mTimer: lvl === 1 ? 14 : 8, unT: 0, fullT: 0, lowT: 0, over: 0, cleanSnd: 0, craterNew: [], ready: false, shake: 0 };
+  cam.x = 0; ST = 'play'; show(null); $('top').style.display = 'flex'; $('fin').style.display = 'none';
+}
+const pct = () => (L && L.total ? G.cleaned / L.total : 0);
+
+// ===== 업데이트 =====
+function pop(x, y, txt, col) { G.pops.push({ x, y, txt, col: col || '#ffd23a', t: 0 }); }
+function puff(x, y, n, sp, col) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = Math.random() * sp; G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - sp * 0.4, life: 0.5 + Math.random() * 0.4, max: 0.9, col: col || '#cfcfca', r: 1.5 + Math.random() * 2.5, g: 260 }); } }
+function toast(txt, col) { G.toasts.length = 0; G.toasts.push({ txt, t: 0, col: col || '#fff' }); }
+function overlapRock(p, r) { return p.x + p.hw > r.x0 && p.x - p.hw < r.x1 && p.y > r.top && p.y - p.ph < GY; }
+function update(dt) {
+  if (ST !== 'play') return; G.t += dt; const p = P, left = keys.ArrowLeft || keys.KeyA || touch.l, right = keys.ArrowRight || keys.KeyD || touch.r, jump = keys.ArrowUp || keys.KeyW || keys.Space || touch.j, clean = (keys.KeyE || keys.KeyJ || keys.KeyK || mouseDown || touch.c) && p.stun <= 0;
+  p.jbuf = Math.max(0, p.jbuf - dt); p.coy = p.ground ? 0.1 : Math.max(0, p.coy - dt); p.stun = Math.max(0, p.stun - dt); p.squash = Math.max(0, p.squash - dt * 3);
+  const dir = (right ? 1 : 0) - (left ? 1 : 0); if (dir) p.face = dir; const slow = clean ? 0.75 : 1, tv = p.stun > 0 ? 0 : dir * spd() * slow; p.vx += (tv - p.vx) * Math.min(1, dt * (p.ground ? 9 : 4));
+  if (p.jbuf > 0 && p.coy > 0 && p.stun <= 0) { p.vy = -jumpV(); p.ground = false; p.coy = 0; p.jbuf = 0; p.hold = true; sfx.jump(); puff(p.x, p.y, 5, 60); }
+  if (!jump && p.hold && p.vy < -140) { p.vy *= 0.55; p.hold = false; } if (p.vy >= 0) p.hold = false;
+  // 이동 · 충돌
+  p.x += p.vx * dt; p.x = clamp(p.x, 14, L.world - 14); for (const r of L.rocks) if (overlapRock(p, r)) { if (p.x < (r.x0 + r.x1) / 2) p.x = r.x0 - p.hw; else p.x = r.x1 + p.hw; p.vx = 0; }
+  const wasG = p.ground, pvy = p.vy; p.vy = Math.min(560, p.vy + GRAV * dt); p.y += p.vy * dt; p.ground = false;
+  if (p.y >= GY) { p.y = GY; p.vy = 0; p.ground = true; }
+  for (const r of L.rocks) if (overlapRock(p, r) && p.vy >= 0 && p.y - p.vy * dt <= r.top + 2) { p.y = r.top; p.vy = 0; p.ground = true; }
+  if (p.ground && !wasG && pvy > 200) { p.squash = 0.5; sfx.land(); puff(p.x, p.y, 7, 70); }
+  if (p.ground && Math.abs(p.vx) > 30) { p.step += Math.abs(p.vx) * dt; p.wob += dt * 12; if (p.step > 26) { p.step = 0; G.foot.push({ x: p.x, y: p.y, f: p.face, t: 0 }); if (G.foot.length > 40) G.foot.shift(); if (Math.random() < 0.5) puff(p.x - p.face * 8, p.y, 1, 25); } }
+  // 산소
+  G.o2 -= dt * (1.5 + (clean ? 0.4 : 0)); const rk = Math.abs(p.x - L.rocket) < 80, base = rk && p.y >= GY - 4;
+  if (base) G.o2 = Math.min(o2Max(), G.o2 + dt * 24); G.lowT -= dt; if (G.o2 < o2Max() * 0.25 && G.lowT <= 0 && !base) { toast(T('low'), '#ff8a8a'); G.lowT = 6; }
+  if (G.o2 <= 0) { finish(false); return; }
+  // 청소기
+  p.cleaning = clean; const nz = { x: p.x + p.face * 20, y: p.y - 19 }, R = suckR(); let sucking = false;
+  if (clean) {
+    for (const it of L.items) { if (it.st === 'done') continue; const cx = it.x, cy = it.y - 8, dx = (cx - nz.x) * p.face, dy = cy - nz.y, dist = Math.hypot(cx - nz.x, dy); if (dx > -8 && dist < R && Math.abs(dy) <= Math.max(72, dx * 1.4 + 26)) { it.st = 'pull'; sucking = true; const sp = 130 + 28 * up(0) + (R - dist) * 2.2; if (dist < 13) { if (G.bagW + it.w <= bagCap()) { it.st = 'done'; G.bag.push(it); G.bagW += it.w; G.cleaned += it.cv; sfx.pick(); pop(it.x, it.y - 30, '+' + it.w, '#9be5ff'); puff(it.x, it.y - 8, 4, 50); } else { it.vy = -140; it.x -= p.face * 14; it.st = 'g'; if (G.fullT <= 0) { toast(T('full'), '#ffb86a'); sfx.full(); G.fullT = 1.6; } } } else { it.x += (nz.x - cx) / dist * sp * dt; it.y += (nz.y + 8 - it.y) / Math.max(1, dist) * sp * dt; if (Math.random() < 0.35) G.parts.push({ x: cx, y: cy, vx: (nz.x - cx) * 2, vy: (nz.y - cy) * 2, life: 0.18, max: 0.18, col: '#fff', r: 1.3, g: 0 }); } } else if (it.st === 'pull') it.st = 'g'; }
+    for (let i = L.dust.length - 1; i >= 0; i--) { const d = L.dust[i], dx = (d.x - nz.x) * p.face, dist = Math.hypot(d.x - nz.x, (GY - 6) - nz.y); if (dx > -d.r && dist < R + d.r * 0.6) { sucking = true; d.amt -= (50 + 16 * up(0)) * dt; if (Math.random() < 0.6) G.parts.push({ x: d.x + (Math.random() - 0.5) * d.r, y: GY - 8 - Math.random() * 10, vx: (nz.x - d.x) * 2.2, vy: (nz.y - GY) * 2.2, life: 0.25, max: 0.25, col: '#a7a7a1', r: 2, g: 0 }); if (d.amt <= 0) { L.dust.splice(i, 1); G.cleaned += d.cv; const c = Math.max(1, Math.round(d.r / 12)); G.coinsRun += c; sfx.pick(); pop(d.x, GY - 30, '+' + c, '#ffd23a'); puff(d.x, GY - 6, 8, 60, '#b4b4ae'); } } }
+  } else for (const it of L.items) if (it.st === 'pull') it.st = 'g';
+  G.fullT -= dt; if (vacG) vacG.gain.setTargetAtTime(sucking ? 0.35 : 0, AC.currentTime, 0.05);
+  // 아이템 떨어지기
+  for (const it of L.items) { if (it.st !== 'g') continue; const sy = surfY(it.x); if (it.y < sy || it.vy < 0) { it.vy += GRAV * dt; it.y += it.vy * dt; if (it.y >= sy) { it.y = sy; it.vy = 0; } } else it.y = sy; }
+  // 로켓에 내려놓기
+  if (base && G.bag.length) { G.unT -= dt; if (G.unT <= 0) { G.unT = 0.1; const it = G.bag.shift(); G.bagW -= it.w; G.coinsRun += it.v; sfx.coin(); pop(L.rocket, GY - 120, '+' + it.v, '#ffd23a'); } }
+  // 운석
+  G.mTimer -= dt; const mi = Math.max(3.2, 9 - L.lvl * 0.5); if (G.mTimer <= 0 && L.meteors.length < 3) { G.mTimer = mi * (0.7 + Math.random() * 0.6); const vw = W / S, mx = clamp(cam.x + 80 + Math.random() * (vw - 160), 400, L.world - 40); L.meteors.push({ x: mx, y: -60, warn: 1.3, vy: 0, fall: false }); sfx.warn(); }
+  for (let i = L.meteors.length - 1; i >= 0; i--) { const m = L.meteors[i]; if (!m.fall) { m.warn -= dt; if (m.warn <= 0) { m.fall = true; m.vy = 640; } } else { m.y += m.vy * dt; if (m.y >= GY - 10) { L.meteors.splice(i, 1); sfx.boom(); G.shake = 0.5; puff(m.x, GY - 6, 22, 160, '#9a9a96'); L.craters.push({ x: m.x, w: 90, dy: 14 }); const dx = Math.abs(p.x - m.x), dy = Math.abs((p.y - 18) - (GY - 20)); if (dx < 42 && dy < 70 && p.stun <= 0) hitPlayer(m.x); const k = KINDS.can; if (Math.random() < 0.8) L.items.push({ x: m.x + (Math.random() - 0.5) * 30, y: GY, tp: 'can', w: k.w, v: k.v, cv: k.cv, vy: -200, st: 'g', ph: 0 }), L.total += k.cv; } } }
+  // 상태 업데이트
+  for (let i = G.parts.length - 1; i >= 0; i--) { const q = G.parts[i]; q.life -= dt; if (q.life <= 0) { G.parts.splice(i, 1); continue; } q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.g && q.y > GY) { q.y = GY; q.vy *= -0.3; q.vx *= 0.6; } }
+  for (let i = G.pops.length - 1; i >= 0; i--) { const q = G.pops[i]; q.t += dt; q.y -= 26 * dt; if (q.t > 1) G.pops.splice(i, 1); }
+  for (const f of G.foot) f.t += dt; if (G.toasts[0]) { G.toasts[0].t += dt; if (G.toasts[0].t > 2.4) G.toasts.length = 0; }
+  G.shake = Math.max(0, G.shake - dt);
+  const vw = W / S, tx = clamp(p.x + p.face * 70 - vw * 0.42, 0, Math.max(0, L.world - vw)); cam.x += (tx - cam.x) * Math.min(1, dt * 5);
+  const rdy = pct() >= 0.85 && base && !G.bag.length; if (rdy !== G.ready) { G.ready = rdy; $('fin').style.display = rdy ? 'block' : 'none'; $('fin').textContent = T('finish'); }
+  if (pct() >= 0.9999 && !G.bag.length) finish(true); else if (pct() >= 0.9999 && base) { /* 가방 비우는 중 */ }
+}
+function hitPlayer(mx) { const p = P; p.stun = 0.7; p.vx = (p.x < mx ? -1 : 1) * 260; p.vy = -260; p.ground = false; G.o2 = Math.max(1, G.o2 - 10); toast(T('hit'), '#ff8a8a'); G.shake = 0.6; for (let k = 0; k < 2 && G.bag.length; k++) { const it = G.bag.pop(); G.bagW -= it.w; G.cleaned -= it.cv; it.st = 'g'; it.x = p.x + (Math.random() - 0.5) * 50; it.y = p.y - 30; it.vy = -240; } }
+function tryFinish() { if (ST === 'play' && G && G.ready) finish(true); }
+function finish(ok) {
+  if (ST !== 'play') return; ST = 'result'; if (vacG) vacG.gain.value = 0; $('fin').style.display = 'none'; $('top').style.display = 'none';
+  for (const it of G.bag) G.coinsRun += it.v; G.bag.length = 0; G.bagW = 0; const r = pct(), stars = ok ? (r >= 0.9999 ? 3 : r >= 0.95 ? 2 : 1) : 0, bonus = ok ? stars * 20 + Math.round(Math.max(0, G.o2) * 0.4) : 0, total = G.coinsRun + bonus;
+  SAVE.coins += total; if (ok) { SAVE.stars[L.lvl] = Math.max(SAVE.stars[L.lvl] || 0, stars); SAVE.level = Math.max(SAVE.level, L.lvl + 1); } save();
+  G.res = { ok, stars, r, total }; ok ? sfx.win() : sfx.lose(); setTimeout(() => { if (ST === 'result') showResult(); }, 600);
+}
+
+// ===== 그리기 =====
+const X = (x) => (x - cam.x) * S + OX, Y = (y) => y * S + OY;
+function sline(pts, col, lw) { g.strokeStyle = col; g.lineWidth = lw; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); }
+function drawSky(t) {
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#05071a'); gr.addColorStop(1, '#1a2150'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  if (!L) return; for (const s of L.stars) { const sx = ((s.x * (W + 400) - cam.x * 0.04 * S) % (W + 400) + W + 400) % (W + 400) - 200, sy = s.y * H; g.globalAlpha = 0.55 + 0.45 * Math.sin(t * 1.6 + s.ph); g.fillStyle = '#fff'; g.beginPath(); g.arc(sx, sy, s.r * Math.max(0.8, S * 0.9), 0, 7); g.fill(); } g.globalAlpha = 1;
+  const ex = W * 0.8 - cam.x * 0.02 * S, ey = OY + 85 * S, er = 46 * S; g.fillStyle = '#3a78d8'; g.strokeStyle = '#cfe6ff'; g.lineWidth = 3; g.beginPath(); g.arc(ex, ey, er, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#4fae6a'; g.beginPath(); g.moveTo(ex - er * 0.5, ey - er * 0.3); g.quadraticCurveTo(ex - er * 0.1, ey - er * 0.7, ex + er * 0.1, ey - er * 0.3); g.quadraticCurveTo(ex - er * 0.2, ey, ex - er * 0.5, ey - er * 0.3); g.fill(); g.beginPath(); g.moveTo(ex + er * 0.2, ey + er * 0.1); g.quadraticCurveTo(ex + er * 0.7, ey, ex + er * 0.5, ey + er * 0.5); g.quadraticCurveTo(ex + er * 0.2, ey + er * 0.6, ex + er * 0.2, ey + er * 0.1); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 2; g.beginPath(); g.arc(ex, ey, er * 0.75, 3.6, 4.6); g.stroke();
+  for (const [par, col, amp, base] of [[0.12, '#262d63', 70, 330], [0.25, '#323a78', 48, 370]]) { g.fillStyle = col; g.strokeStyle = '#6a73b8'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, H); for (let sx = 0; sx <= W + 20; sx += 12) { const wx = sx / S + cam.x * par, h = (Math.sin(wx * 0.006 + par * 20) * 0.5 + Math.sin(wx * 0.017 + par * 7) * 0.3 + 0.8) * amp; g.lineTo(sx, Y(base) + (amp - h) * S * 0.6 - amp * 0.3 * S); } g.lineTo(W, H); g.closePath(); g.fill(); g.stroke(); }
+}
+function drawGround() {
+  g.fillStyle = '#d6d6d2'; g.fillRect(0, Y(GY), W, H - Y(GY)); const pts = []; for (let sx = -10; sx <= W + 10; sx += 12) { const wx = sx / S + cam.x; pts.push([sx, Y(GY) + wob(wx, 1) * S]); } sline(pts, '#f2f2ee', 5 * S); sline(pts, INK, 3);
+  for (const c of L.craters) { const sx = X(c.x); if (sx < -150 || sx > W + 150) continue; g.strokeStyle = '#9a9a96'; g.lineWidth = 2; g.fillStyle = '#c8c8c3'; g.beginPath(); g.ellipse(sx, Y(GY + c.dy), c.w / 2 * S, 7 * S, 0, 0, 7); g.fill(); g.stroke(); }
+  const gap = 70 * S, o = -((cam.x * S) % gap); g.strokeStyle = '#a9a9a4'; g.lineWidth = 2; for (let sx = o - gap; sx < W + gap; sx += gap) { const wi = Math.round((sx + cam.x * S) / gap), r1 = ((wi * 2654435761) >>> 0) % 100; g.beginPath(); g.moveTo(sx + 10, Y(GY) + (50 + r1 % 25) * S); g.lineTo(sx + (22 + r1 % 18) * S, Y(GY) + (50 + r1 % 25) * S); g.stroke(); }
+  g.fillStyle = 'rgba(0,0,0,0.12)'; for (const f of G.foot) { g.globalAlpha = Math.max(0, 1 - f.t / 6) * 0.9; g.beginPath(); g.ellipse(X(f.x), Y(f.y) + 4 * S, 6 * S, 2 * S, 0, 0, 7); g.fill(); } g.globalAlpha = 1;
+}
+function drawRock(r) {
+  const sx0 = X(r.x0), sx1 = X(r.x1); if (sx1 < -20 || sx0 > W + 20) return; const top = Y(r.top), bot = Y(GY) + 2, w = sx1 - sx0;
+  g.fillStyle = '#b9b9b4'; g.strokeStyle = INK; g.lineWidth = 3; g.lineJoin = 'round'; g.beginPath(); g.moveTo(sx0, bot); g.lineTo(sx0 + w * 0.04, top + (bot - top) * 0.45); g.quadraticCurveTo(sx0 + w * 0.18, top - 4 * S, sx0 + w * 0.42, top); g.quadraticCurveTo(sx0 + w * 0.75, top - 5 * S, sx1 - w * 0.05, top + (bot - top) * 0.2); g.lineTo(sx1, bot); g.closePath(); g.fill(); g.stroke();
+  g.strokeStyle = '#8a8a86'; g.lineWidth = 2; g.beginPath(); g.moveTo(sx0 + w * 0.3, top + (bot - top) * 0.3); g.lineTo(sx0 + w * 0.4, top + (bot - top) * 0.55); g.lineTo(sx0 + w * 0.32, bot - 4); g.moveTo(sx0 + w * 0.7, top + (bot - top) * 0.4); g.lineTo(sx0 + w * 0.62, bot - 4); g.stroke();
+}
+function drawDust(d) {
+  const sx = X(d.x); if (sx < -60 || sx > W + 60) return; const s = d.amt / d.r, rr = d.r * (0.35 + 0.65 * s) * S, by = Y(GY) + 2; g.fillStyle = '#8f8f8a'; g.strokeStyle = INK; g.lineWidth = 2.4; g.beginPath(); g.moveTo(sx - rr, by); g.bezierCurveTo(sx - rr, by - rr * 1.1, sx - rr * 0.3, by - rr * 1.5, sx, by - rr * 1.2); g.bezierCurveTo(sx + rr * 0.4, by - rr * 1.5, sx + rr, by - rr, sx + rr, by); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = '#c4c4be'; g.lineWidth = 1.4; g.beginPath(); for (let k = -1; k <= 1; k++) { g.moveTo(sx + k * rr * 0.5 - 4, by - rr * 0.25); g.lineTo(sx + k * rr * 0.5 + 4, by - rr * 0.65); } g.stroke();
+}
+function drawItem(it, t) {
+  if (it.st === 'done') return; const sx = X(it.x); if (sx < -40 || sx > W + 40) return; const by = Y(it.y), u = S, bob = it.st === 'pull' ? Math.sin(t * 30) * 1.5 : 0; g.save(); g.translate(sx, by + bob); g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = INK; g.lineWidth = 2.6; if (it.st === 'pull') g.rotate(Math.sin(t * 20 + it.ph) * 0.3);
+  if (it.tp === 'can') { g.fillStyle = '#e8e8e6'; g.beginPath(); g.rect(-7 * u, -19 * u, 14 * u, 19 * u); g.fill(); g.stroke(); g.fillStyle = '#e04a4a'; g.fillRect(-7 * u, -13 * u, 14 * u, 6 * u); g.beginPath(); g.ellipse(0, -19 * u, 7 * u, 2.5 * u, 0, 0, 7); g.fillStyle = '#c8c8c6'; g.fill(); g.stroke(); }
+  else if (it.tp === 'box') { g.fillStyle = '#d9b98a'; g.beginPath(); g.rect(-12 * u, -21 * u, 24 * u, 21 * u); g.fill(); g.stroke(); g.strokeStyle = '#a07a44'; g.lineWidth = 2; g.beginPath(); g.moveTo(-12 * u, -10 * u); g.lineTo(12 * u, -10 * u); g.moveTo(0, -21 * u); g.lineTo(0, -14 * u); g.stroke(); }
+  else if (it.tp === 'tire') { g.strokeStyle = '#2a2a2a'; g.lineWidth = 7 * u; g.beginPath(); g.arc(0, -13 * u, 10 * u, 0, 7); g.stroke(); g.strokeStyle = INK; g.lineWidth = 2; g.beginPath(); g.arc(0, -13 * u, 4 * u, 0, 7); g.stroke(); }
+  else { g.fillStyle = '#c8d4f0'; g.beginPath(); g.rect(-7 * u, -16 * u, 14 * u, 12 * u); g.fill(); g.stroke(); g.fillStyle = '#6a8ad0'; g.beginPath(); g.rect(-20 * u, -14 * u, 12 * u, 8 * u); g.rect(8 * u, -14 * u, 12 * u, 8 * u); g.fill(); g.stroke(); g.beginPath(); g.moveTo(0, -16 * u); g.lineTo(0, -24 * u); g.stroke(); g.beginPath(); g.arc(0, -25 * u, 2 * u, 0, 7); g.stroke(); }
+  g.restore();
+}
+function drawRocket(t) {
+  const sx = X(L.rocket); if (sx < -120 || sx > W + 120) return; const u = S, by = Y(GY) + 2; g.save(); g.translate(sx, by); g.lineJoin = 'round'; g.strokeStyle = INK; g.lineWidth = 3;
+  g.fillStyle = '#e04a4a'; g.beginPath(); g.moveTo(-18 * u, -30 * u); g.lineTo(-38 * u, 0); g.lineTo(-14 * u, 0); g.closePath(); g.fill(); g.stroke(); g.beginPath(); g.moveTo(18 * u, -30 * u); g.lineTo(38 * u, 0); g.lineTo(14 * u, 0); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#f4f4f2'; g.beginPath(); g.moveTo(-20 * u, 0); g.lineTo(-20 * u, -80 * u); g.quadraticCurveTo(-20 * u, -125 * u, 0, -140 * u); g.quadraticCurveTo(20 * u, -125 * u, 20 * u, -80 * u); g.lineTo(20 * u, 0); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#e04a4a'; g.beginPath(); g.moveTo(-17 * u, -108 * u); g.quadraticCurveTo(0, -150 * u, 17 * u, -108 * u); g.quadraticCurveTo(0, -118 * u, -17 * u, -108 * u); g.fill(); g.fillStyle = '#9bd0ff'; g.beginPath(); g.arc(0, -88 * u, 9 * u, 0, 7); g.fill(); g.stroke(); g.strokeStyle = '#bbb'; g.lineWidth = 2; g.beginPath(); g.moveTo(-20 * u, -60 * u); g.lineTo(20 * u, -60 * u); g.moveTo(-20 * u, -50 * u); g.lineTo(20 * u, -50 * u); g.stroke();
+  g.strokeStyle = INK; g.lineWidth = 3; g.fillStyle = '#9a6a3a'; g.beginPath(); g.rect(-7 * u, -30 * u, 14 * u, 30 * u); g.fill(); g.stroke();
+  if (G.bag.length && Math.abs(P.x - L.rocket) > 80) { const by2 = -165 * u + Math.sin(t * 6) * 5 * u; g.fillStyle = '#ffd23a'; g.beginPath(); g.moveTo(-9 * u, by2 - 10 * u); g.lineTo(9 * u, by2 - 10 * u); g.lineTo(0, by2 + 4 * u); g.closePath(); g.fill(); g.stroke(); }
+  g.restore();
+}
+function drawPlayer(t) {
+  const p = P, sx = X(p.x), by = Y(p.y), u = S, sq = p.squash, sw = 1 + sq * 0.25, sh = 1 - sq * 0.22; if (p.stun > 0 && Math.floor(t * 20) % 2) g.globalAlpha = 0.45;
+  g.save(); g.translate(sx, by); g.scale(p.face * sw, sh); g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = INK; g.lineWidth = 3;
+  const lw = p.ground ? Math.sin(p.wob) * 4 * u * Math.min(1, Math.abs(p.vx) / 100) : 3 * u;
+  g.fillStyle = '#e8e8e6'; g.beginPath(); g.rect(-9 * u + lw, -9 * u, 7 * u, 9 * u); g.rect(2 * u - lw, -9 * u, 7 * u, 9 * u); g.fill(); g.stroke();
+  g.fillStyle = '#9a9aa4'; g.beginPath(); g.rect(-17 * u, -30 * u, 8 * u, 18 * u); g.fill(); g.stroke();
+  g.fillStyle = '#fff'; g.beginPath(); g.rect(-12 * u, -34 * u, 24 * u, 26 * u); g.fill(); g.stroke();
+  g.fillStyle = 'rgba(155,208,255,0.45)'; g.beginPath(); g.arc(0, -36 * u, 15 * u, 0, 7); g.fill(); g.stroke(); g.fillStyle = INK; g.beginPath(); g.arc(3 * u, -37 * u, 1.9 * u, 0, 7); g.arc(9 * u, -37 * u, 1.9 * u, 0, 7); g.fill();
+  g.strokeStyle = '#555'; g.lineWidth = 3 * u; g.beginPath(); g.moveTo(-13 * u, -22 * u); g.quadraticCurveTo(-6 * u, -8 * u, 10 * u, -17 * u); g.stroke(); g.strokeStyle = INK; g.lineWidth = 3; g.fillStyle = '#c8c8c6'; g.beginPath(); g.moveTo(10 * u, -22 * u); g.lineTo(22 * u, -26 * u); g.lineTo(22 * u, -12 * u); g.lineTo(10 * u, -16 * u); g.closePath(); g.fill(); g.stroke();
+  if (p.cleaning) { g.globalAlpha = 0.5; g.strokeStyle = '#fff'; g.lineWidth = 2; const R = suckR() * u; for (let k = 0; k < 3; k++) { const ph = ((t * 3 + k / 3) % 1); g.beginPath(); g.arc(22 * u, -19 * u, R * (1 - ph), -0.7, 0.7); g.stroke(); } g.globalAlpha = 1; }
+  g.restore(); g.globalAlpha = 1;
+}
+function drawMeteors(t) {
+  for (const m of L.meteors) { const sx = X(m.x); if (!m.fall) { const k = 1 - m.warn / 1.3, rr = (22 - 10 * k) * S; g.strokeStyle = '#ff5a5a'; g.lineWidth = 3; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(sx, OY); g.lineTo(sx, Y(GY) - 4); g.stroke(); g.setLineDash([]); g.beginPath(); g.arc(sx, Y(GY) - 6 * S, rr + 8 * S, 0, 7); g.stroke(); g.fillStyle = Math.floor(t * 8) % 2 ? '#ff5a5a' : '#fff'; g.font = '900 ' + Math.round(20 * S) + 'px sans-serif'; g.textAlign = 'center'; g.fillText('!', sx, Y(GY) - 16 * S); }
+    else { const sy = Y(m.y); g.fillStyle = '#ff8a2a'; g.beginPath(); g.moveTo(sx - 12 * S, sy - 20 * S); g.lineTo(sx, sy - 70 * S); g.lineTo(sx + 12 * S, sy - 20 * S); g.closePath(); g.fill(); g.fillStyle = '#8a7a70'; g.strokeStyle = INK; g.lineWidth = 3; g.beginPath(); g.arc(sx, sy, 17 * S, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#6a5a50'; g.beginPath(); g.arc(sx - 5 * S, sy - 3 * S, 4 * S, 0, 7); g.fill(); } }
+}
+function txt(s, x, y, size, col, al) { g.font = '900 ' + size + 'px Malgun Gothic, sans-serif'; g.textAlign = al || 'left'; g.lineWidth = size / 4.5; g.strokeStyle = '#000'; g.lineJoin = 'round'; g.strokeText(s, x, y); g.fillStyle = col || '#fff'; g.fillText(s, x, y); }
+function bar(x, y, w, h, v, col, tick) { g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(x, y, w, h); g.fillStyle = col; g.fillRect(x, y, w * clamp(v, 0, 1), h); g.strokeStyle = '#fff'; g.lineWidth = 2.4; g.strokeRect(x, y, w, h); if (tick) { g.strokeStyle = '#ffd23a'; g.beginPath(); g.moveTo(x + w * tick, y - 3); g.lineTo(x + w * tick, y + h + 3); g.stroke(); } }
+function drawHud() {
+  const k = Math.max(0.8, Math.min(1.25, W / 800)), bw = Math.min(220, W * 0.38) * k, x = 14, fs = Math.round(15 * k);
+  txt(T('lvl') + L.lvl, x, 26 * k, Math.round(20 * k)); txt(T('clean'), x, 52 * k, fs); bar(x + 54 * k, 40 * k, bw, 14 * k, pct(), '#9be5a8', 0.85); txt(Math.floor(pct() * 100) + '%', x + 62 * k + bw, 52 * k, fs, '#fff');
+  txt(T('o2'), x, 76 * k, fs); const om = o2Max(); bar(x + 54 * k, 64 * k, bw, 14 * k, G.o2 / om, G.o2 < om * 0.25 ? '#ff6a6a' : '#6ab8ff'); txt(T('bag'), x, 100 * k, fs); for (let i = 0; i < bagCap(); i++) { g.fillStyle = i < G.bagW ? '#ffd23a' : 'rgba(0,0,0,0.45)'; g.strokeStyle = '#fff'; g.lineWidth = 2; g.fillRect(x + 54 * k + i * 15 * k, 88 * k, 12 * k, 14 * k); g.strokeRect(x + 54 * k + i * 15 * k, 88 * k, 12 * k, 14 * k); }
+  txt('● ' + (SAVE.coins + G.coinsRun), x, 126 * k, fs + 1, '#ffd23a');
+  const t0 = G.toasts[0]; if (t0) { g.globalAlpha = clamp(2.4 - t0.t, 0, 1); txt(t0.txt, W / 2, H * 0.2, Math.round(24 * k), t0.col, 'center'); g.globalAlpha = 1; }
+  for (const q of G.pops) { g.globalAlpha = 1 - q.t; txt(q.txt, X(q.x), Y(q.y), Math.round(18 * S), q.col, 'center'); } g.globalAlpha = 1;
+}
+function render(t) {
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); if (!L) { drawSky(t); return; } const sh = G && G.shake > 0 ? G.shake : 0; if (sh) g.translate((Math.random() - 0.5) * 10 * sh, (Math.random() - 0.5) * 10 * sh);
+  drawSky(t); drawGround(); for (const d of L.dust) drawDust(d); for (const r of L.rocks) drawRock(r); drawRocket(t); for (const it of L.items) drawItem(it, t); drawMeteors(t); drawPlayer(t);
+  for (const q of G.parts) { g.globalAlpha = clamp(q.life / q.max, 0, 1); g.fillStyle = q.col; g.beginPath(); g.arc(X(q.x), Y(q.y), q.r * S, 0, 7); g.fill(); } g.globalAlpha = 1;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); if (ST === 'play' || ST === 'pause') drawHud();
+}
+
+// ===== 화면(DOM) =====
+function show(id) { for (const k of ['title', 'how', 'pause', 'result']) $(k).classList.toggle('on', k === id); }
+function langBtn() { return '<button class="btn small" id="bLang">🌐 ' + LNAMES[li()] + '</button>'; }
+function bindLang() { const b = $('bLang'); if (b) b.onclick = () => { SAVE.lang = LANGS[(li() + 1) % LANGS.length]; try { localStorage.setItem('ng_lang', SAVE.lang); } catch (e) {} save(); document.documentElement.lang = SAVE.lang; document.title = T('title'); rebuild(); }; }
+function rebuild() { if (ST === 'title') showTitle(); else if ($('how').classList.contains('on')) showHow(); else if ($('pause').classList.contains('on')) showPause(); else if ($('result').classList.contains('on')) showResult(); }
+function showTitle() {
+  ST = 'title'; $('top').style.display = 'none'; $('fin').style.display = 'none'; const el = $('title'); const lv = SAVE.level; el.innerHTML = '<h1>🌙 ' + T('title') + '</h1><div class="sub">' + T('sub') + '</div><div class="row"><button class="btn" id="bStart">' + (lv > 1 ? T('cont') + ' · ' + T('lvl') + lv : T('start')) + '</button><button class="btn" id="bHow">' + T('how') + '</button></div><div class="row"><button class="btn small" id="bShop">' + T('shop') + '</button><a class="btn small" id="bBack" href="index.html#games" style="text-decoration:none">' + T('back') + '</a>' + langBtn() + '</div><div class="sub"><span style="color:#ffd23a">●</span> ' + SAVE.coins + '</div>';
+  show('title'); $('bStart').onclick = () => { audInit(); startLevel(SAVE.level); }; $('bHow').onclick = showHow; $('bShop').onclick = () => { showResult(true); }; bindLang();
+}
+function showHow() { $('how').innerHTML = '<h2>' + T('how') + '</h2><div class="help">' + ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map((k) => T(k)).join('<br>') + '</div><div class="row"><button class="btn" id="bOk">' + T('start') + '</button><button class="btn small" id="bBk">' + T('home') + '</button>' + langBtn() + '</div>'; show('how'); $('bOk').onclick = () => { audInit(); startLevel(SAVE.level); }; $('bBk').onclick = showTitle; bindLang(); }
+function togglePause() { if (ST === 'play') { ST = 'pause'; if (vacG) vacG.gain.value = 0; showPause(); } else if (ST === 'pause') { ST = 'play'; show(null); } }
+function showPause() { $('pause').innerHTML = '<h2>' + T('pause') + '</h2><div class="row"><button class="btn" id="bRes">' + T('resume') + '</button><button class="btn small" id="bSnd">' + T('sound') + ': ' + (SAVE.snd ? T('on') : T('off')) + '</button>' + langBtn() + '</div><div class="row"><button class="btn small" id="bRe">' + T('retry') + '</button><button class="btn small" id="bHm">' + T('home') + '</button></div>'; show('pause'); $('bRes').onclick = togglePause; $('bSnd').onclick = () => { setSound(!SAVE.snd); showPause(); }; $('bRe').onclick = () => startLevel(L.lvl); $('bHm').onclick = () => { ST = 'title'; showTitle(); }; bindLang(); }
+$('bPause').onclick = () => { audInit(); togglePause(); };
+function upgradesHtml() {
+  let h = '<div class="up">'; for (let i = 0; i < 5; i++) { const lv = up(i), mx = lv >= UMAX[i], cost = UCOST[i] * (lv + 1); h += '<div>' + T('u' + i) + '</div><div class="pips">' + '●'.repeat(lv) + '○'.repeat(UMAX[i] - lv) + '</div><button class="btn small" data-u="' + i + '" ' + (mx || SAVE.coins < cost ? 'disabled' : '') + '>' + (mx ? T('max') : '● ' + cost) + '</button>'; } return h + '</div>';
+}
+function showResult(shopOnly) {
+  const R = G && G.res; let h = '';
+  if (!shopOnly && R) { h += '<h2>' + (R.ok ? T('win') : T('lose')) + '</h2><div class="sub">' + T('lvl') + L.lvl + ' · ' + T('rate') + ' ' + Math.floor(R.r * 100) + '%</div><div style="font-size:44px;color:#ffd23a;text-shadow:2px 2px 0 #000">' + '★'.repeat(R.stars) + '<span style="color:#555">' + '★'.repeat(3 - R.stars) + '</span></div><div class="sub">' + T('earned') + ' ● ' + R.total + '</div>'; } else h += '<h2>' + T('shop') + '</h2><div class="sub"><span style="color:#ffd23a">●</span> ' + SAVE.coins + '</div>';
+  h += '<div class="sub">' + T('shop') + ' · ● ' + SAVE.coins + '</div>' + upgradesHtml() + '<div class="row">';
+  if (!shopOnly && R) { if (R.ok) h += '<button class="btn" id="bNx">' + T('next') + '</button>'; h += '<button class="btn" id="bRt">' + T('retry') + '</button>'; } else h += '<button class="btn" id="bPl">' + T('start') + '</button>';
+  h += '<button class="btn small" id="bHm">' + T('home') + '</button>' + langBtn() + '</div>'; const el = $('result'); el.innerHTML = h; show('result'); ST = 'result';
+  el.querySelectorAll('[data-u]').forEach((b) => { b.onclick = () => { const i = +b.dataset.u, lv = up(i), cost = UCOST[i] * (lv + 1); if (lv >= UMAX[i] || SAVE.coins < cost) return; SAVE.coins -= cost; SAVE.up[i] = lv + 1; save(); sfx.buy(); showResult(shopOnly); }; });
+  if ($('bNx')) $('bNx').onclick = () => startLevel(L.lvl + 1); if ($('bRt')) $('bRt').onclick = () => startLevel(L.lvl); if ($('bPl')) $('bPl').onclick = () => startLevel(SAVE.level); $('bHm').onclick = showTitle; bindLang();
+}
+$('fin').onclick = tryFinish;
+
+// ===== 루프 =====
+let last = performance.now(), tAcc = 0;
+function frame(now) { const dt = Math.min(0.033, (now - last) / 1000); last = now; tAcc += dt; update(dt); render(tAcc); requestAnimationFrame(frame); }
+P = newPlayer(); genLevel(1); G = { t: 0, cleaned: 0, coinsRun: 0, o2: 100, bag: [], bagW: 0, parts: [], pops: [], toasts: [], foot: [], mTimer: 9, unT: 0, fullT: 0, lowT: 0, shake: 0, ready: false };
+document.documentElement.lang = SAVE.lang; document.title = T('title'); showTitle(); requestAnimationFrame(frame);
+window.__m = { step: (dt) => { update(dt); }, get L() { return L; }, get P() { return P; }, get G() { return G; }, get ST() { return ST; }, keys, start: startLevel, finish, pct, save: () => SAVE, tryFinish, render: () => render(tAcc), T };
+})();
+</script>
+</body>
+</html>
