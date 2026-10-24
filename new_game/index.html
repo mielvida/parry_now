@@ -1570,8 +1570,9 @@ function relayUpdate(dt, me) {
   if (!RL.started) { let go = k === 0; if (!go) { const pid = RL.order[k - 1], r = REMOTES.get(pid); go = !REMOTES.has(pid) || !!(r && r.init && (r.x >= RL.b[k] - 5 || r.out)); } if (go) { RL.started = true; P.freeze = 0; } else { P.freeze = 0.2; P.x = RL.b[k]; P.vx = 0; P.vy = 0; return; } }
   if (k < RL.n - 1 && P.x >= RL.b[k + 1] && !P.done) { onFinish(); RL.done = true; P.freeze = 99; }
 }
-function sabUse() { if (MPM === 'trap') { if (SAB.items <= 0 || P.done || P.y < -6 || P.x < 150 || P.x > GOAL_X - 150) return; const x = Math.round(P.x - 70); SAB.items--; sabAdd(x); netSend({ t: 'sab', id: myId(), x }); sfx('check'); return; } if (MPM !== 'sabo' || SAB.items <= 0 || P.done) return; let best = null; REMOTES.forEach((r) => { if (r.init && r.x > P.x && (!best || r.x > best.x)) best = r; }); if (!best) return; const x = Math.max(200, Math.min(GOAL_X - 300, Math.round(best.x + 240))); SAB.items--; sabAdd(x); netSend({ t: 'sab', id: myId(), x }); }
-function sabAdd(x) { S(x, x + 36); puffs(x + 18, 10, 8, 3); }
+function sabUse() { if (MPM === 'trap') { const why = SAB.items <= 0 ? '함정이 없어요 (잠시 기다리면 생겨요)' : P.done ? '' : !P.ground ? '땅이나 발판 위에 서서 놓아요' : (P.x < 150 || P.x > GOAL_X - 150) ? '출발선과 골 근처에는 못 놓아요' : ''; if (why || P.done) { if (why) TRAPMSG.s = why, TRAPMSG.u = performance.now() + 1800, sfx('hurt'); return; } const x = Math.round(P.x - 70), b = Math.max(0, Math.round(-P.y)); SAB.items--; sabAdd(x, b); netSend({ t: 'sab', id: myId(), x, b }); sfx('check'); return; } if (MPM !== 'sabo' || SAB.items <= 0 || P.done) return; let best = null; REMOTES.forEach((r) => { if (r.init && r.x > P.x && (!best || r.x > best.x)) best = r; }); if (!best) return; const x = Math.max(200, Math.min(GOAL_X - 300, Math.round(best.x + 240))); SAB.items--; sabAdd(x); netSend({ t: 'sab', id: myId(), x }); }
+const TRAPMSG = { s: '', u: 0 };
+function sabAdd(x, b) { S(x, x + 36, b || 0); puffs(x + 18, 10, 8, 3); }
 function teamCheck() { if (MPM !== 'team' || (RACE.winnerTeam !== null && RACE.winnerTeam !== undefined)) return; for (const tm of [0, 1]) { const mem = ORDER.filter((id) => teamOf(id) === tm); if (mem.length && mem.every((id) => RACE.fins.some((f) => (f.id === 'me' ? myId() : f.id) === id))) { RACE.winnerTeam = tm; RACE.winner = { name: tm ? 'B팀' : 'A팀', at: performance.now() }; return; } } }
 function pingAt() { if (!mpActive()) return; const pg = { x: P.x, h: -P.y + 34, t: 0, name: CFG.name || '나' }; PINGS.push(pg); netSend({ t: 'ping', id: myId(), x: pg.x, h: pg.h, name: pg.name }); sfx('check'); }
 function mpxUpdate(dt) {
@@ -1853,7 +1854,7 @@ function onData(from, m) {
   else if (m.t === 'df') { DF.en = m.e.map((a) => ({ id: a[0], x: a[1], k: a[2], hp: a[3] })); DF.core = m.c; DF.wave = m.w; DF.state = m.s; DF.brk = m.b; DF.left = m.l; DF.xp = m.xp; DF.up = { dm: m.u[0], tr: m.u[1], rf: m.u[2] }; DF.max = m.mx; DF.trs = m.tr.map((a) => ({ x: a[0], tx: a[1], th: a[2], fl: a[3] ? 0.1 : 0, ty: a[4] || 'g1' })); if (Array.isArray(m.un)) DF.un = m.un; if (m.s !== 'play' && m.g) { DF.g = m.g; dfPay(m.g); } }
   else if (m.t === 'dh') { if (NET.host) dfDamage(m.id, Math.min(6, +m.d || 1)); }
   else if (m.t === 'dbuy') { if (NET.host) dfBuy(m.k, +m.x || 0, String(m.ty)); }
-  else if (m.t === 'sab') { sabAdd(m.x); if (NET.host) netSend(m, m.id); }
+  else if (m.t === 'sab') { sabAdd(m.x, m.b); if (NET.host) netSend(m, m.id); }
   else if (m.t === 'ping') { PINGS.push({ x: m.x, h: m.h, t: 0, name: m.name }); if (NET.host) netSend(m, m.id); }
   else if (m.t === 'leave') { REMOTES.delete(m.id); updateTag(); if (NET.host) netSend(m, m.id); }
 }
@@ -1884,6 +1885,7 @@ function drawMpHud(txt) {
   if (MPM === 'relay' && RL.on) { txt('주자 ' + (RL.k + 1) + '/' + RL.n, W / 2, 100, 22); if (!RL.started) txt('내 차례를 기다려요', W / 2, H * 0.3 + 60, 28, '#555'); else if (RL.done) txt('다음 주자에게 넘겼어요', W / 2, H * 0.3 + 60, 24, '#1a7'); }
   if (MPM === 'sabo') txt('방해 아이템 ' + SAB.items + ' (F)', W / 2, 100, 20, SAB.items ? '#d33' : '#555');
   if (MPM === 'defense' && DF.on) { txt('웨이브 ' + DF.wave + '/' + DF.total + ' · 남은 몬스터 ' + (DF.left + DF.en.length), W / 2, 100, 20); txt('기지 ' + DF.core + '/' + DF.max + ' · 경험치 ' + DF.xp, W / 2, 124, 17, DF.core <= DF.max / 4 ? '#d33' : '#111'); if (DF.state === 'play' && DF.brk > 0 && RACE.t > 1) txt((DF.wave >= DF.total ? '마지막 웨이브! ' : '다음 웨이브까지 ') + Math.ceil(DF.brk), W / 2, H * 0.3 + 60, 26, '#555'); if (DF.state === 'win') txt('방어 성공!', W / 2, H * 0.2, 40, '#1a7'); if (DF.state === 'lose') txt('기지가 무너졌어요', W / 2, H * 0.2, 36, '#d33'); if (DF.state !== 'play' && DF.gain) txt('연구 포인트 +' + DF.gain, W / 2, H * 0.2 + 44, 22, '#2a6ad0'); }
+  if (MPM === 'trap' && TRAPMSG.u > performance.now()) txt(TRAPMSG.s, W / 2, H * 0.3 + 60, 24, '#d33');
   if (MPM === 'trap') txt('함정 ' + SAB.items + ' (F)', W / 2, 100, 20, SAB.items ? '#d33' : '#555');
   if (MPM === 'crown') { txt('남은 시간 ' + Math.ceil(TAG.tl), W / 2, 100, 22); const rows = allIds().map((id) => ({ id, n: nameOf(id), s: TAG.score[id] || 0 })).sort((a, b) => b.s - a.s); g.textAlign = 'left'; rows.slice(0, 6).forEach((r, i) => txt((r.id === TAG.it ? '👑 ' : '') + r.n + '  ' + r.s.toFixed(1) + 's' + (r.id === TAG.it ? '  (왕관)' : ''), 16, 130 + i * 24, r.id === myId() ? 19 : 16, r.id === TAG.it ? '#c80' : '#111')); g.textAlign = 'center'; }
   if (MPM === 'hide') { const left = allIds().filter((id) => id !== TAG.it && !(id === myId() ? P.out : (REMOTES.get(id) || {}).out)).length; txt('남은 시간 ' + Math.ceil(TAG.tl) + ' · 숨은 사람 ' + left, W / 2, 100, 20); if (RACE.t < 8 && !P.out) txt((TAG.it === myId() ? '술래 출발까지 ' : '숨을 시간 ') + Math.ceil(8 - RACE.t), W / 2, H * 0.3 + 60, 28, '#555'); if (P.out) txt('잡혔어요! 다른 사람을 지켜봐요', W / 2, H * 0.3 + 60, 26, '#d33'); }
