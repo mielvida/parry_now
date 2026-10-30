@@ -1647,6 +1647,7 @@
       popups.push({ x: player.x + player.w / 2, y: player.y - 70, text: `칸 ${i + 1}: ${areaNameOf(stageName, darkFloor)}에서 이어서!`, t: 3, color: 'rgba(160,255,160,A)' });
     } else {
       playSec = 0; // 새 게임
+      if (G.Tutorial) G.Tutorial.start(); // 새 게임을 시작할 때 직접 해 보며 배우는 안내 (H 키로 다시 할 수 있다)
     }
     titleUI = null;
     G.Audio.setMusic((STAGES[stageName] && STAGES[stageName].music) || 'cave'); // 타이틀 노래 -> 그 지역의 노래
@@ -4752,7 +4753,10 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
 
   function step(dt) {
     syncHome();
+    if (G.Tutorial) G.Tutorial.setBlocked(!!(titleUI || cutscene || dialog || mini || settingsUI)); // 컷신·대화 중에는 안내가 키를 세지 않는다
+    if (G.Tutorial && G.Tutorial.isOpen()) { input.endFrame(); return; } // 튜토리얼을 보는 동안 게임은 멈춰 있다
     if (titleUI) { // 처음 화면이 떠 있는 동안 게임은 멈춰 있다 (O: 설정)
+      if (!settingsUI && !titleUI.del && !titleUI.quit && (titleUI.copy === null || titleUI.copy === undefined) && input.wasPressed('KeyH') && G.Tutorial) { G.Tutorial.show(); input.endFrame(); return; } // H: 튜토리얼
       if (settingsUI) updateSettings();
       else if (!titleUI.halted && !titleUI.del && !titleUI.quit && (titleUI.copy === null || titleUI.copy === undefined) && input.wasPressed('KeyO')) { settingsUI = { cur: 0, fromTitle: true }; G.Audio.play('pickup'); }
       else updateTitle(dt);
@@ -4835,6 +4839,7 @@ const agPos = () => 0.5 + 0.5 * Math.sin(ag.phase + ag.harm * Math.sin(ag.phase 
     if (!achUI && input.wasPressed('KeyT') && !shop && !equipUI && !mini && !settingsUI && !dialog && !cutscene && !devUI && !adminUI && !dexUI && !fishUI && !mapUI && !gachaUI && !floorUI && !titleUI && !pwUI) { achUI = { page: 0 }; G.Audio.play('pickup'); input.endFrame(); return; }
     if (floorUI) { updateFloorSelect(dt); input.endFrame(); return; } // 던전 층 고르는 동안 게임이 멈춘다
     if (gachaUI) { updateGacha(dt); input.endFrame(); return; } // 뽑기 창이 열려 있는 동안 게임이 멈춘다
+    if (G.Tutorial && input.wasPressed('KeyH') && !achUI && !shop && !equipUI && !mini && !settingsUI && !dialog && !cutscene && !devUI && !adminUI && !dexUI && !fishUI && !mapUI && !gachaUI && !floorUI && !titleUI && !pwUI && !cookUI) { G.Tutorial.start(); input.endFrame(); return; } // H: 직접 해 보는 안내 다시 하기
     if (mapUI) { if (input.wasPressed('Escape') || input.wasPressed('KeyN')) mapUI = null; input.endFrame(); return; } // 지도를 펴 보는 동안 게임이 멈춘다
     if (!mapUI && input.wasPressed('KeyN') && (stageName === 'village' || stageName === 'kingdom') && !shop && !equipUI && !mini && !settingsUI && !dialog && !cutscene && !devUI && !adminUI && !dexUI && !fishUI) { // N: 마을 지도 (사야 쓸 수 있다)
       if (inv.items.includes('map_' + stageName)) { mapUI = { markers: G.TownMap.markers(terrain, (st) => (STAGES[st] && STAGES[st].label) || ({ darkhub: '다크월드', dungeon: '던전', forest: '숲', snow: '설산', volcano: '화산', orecave: '광물 동굴', meadow: '성 밖 숲', kingdom: '왕국', village: '마을', abyss: '심연 동굴' }[st] || st)) }; G.Audio.play('pickup'); }

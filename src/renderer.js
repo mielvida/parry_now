@@ -475,7 +475,7 @@
         ctx.textAlign = 'center'; ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = col; ctx.fillText(label, b.x + b.w / 2, b.y + b.h / 2);
       }
       ctx.textAlign = 'center'; ctx.font = '12px sans-serif'; ctx.fillStyle = '#8a93a8';
-      ctx.fillText('←→ 칸 고르기 · Enter 시작 · C 복사 · X 삭제 · 마우스로 눌러도 돼요', W / 2, H - 14);
+      ctx.fillText('←→ 칸 고르기 · Enter 시작 · C 복사 · X 삭제 · H 튜토리얼 · 마우스로 눌러도 돼요', W / 2, H - 14);
       if (t.msg) { ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#7dffa0'; ctx.fillText(t.msg, W / 2, H - 82); }
       if (t.del || t.quit) { // 삭제 / 끄기 확인
         ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(0, 0, W, H);
@@ -4352,7 +4352,7 @@
       this._text(ctx, '←/→ 또는 A/D: 이동   Space/↑/W/Z: 점프   Shift(또는 X): 3칸 대시   Enter: 패링 (길게 눌러 게이지 채우고 떼기: 검 던지기)   C: 슬라이딩   F: 막기   R: 처음 위치로', 12, 62);
       ctx.font = '16px sans-serif';
       if (!hud) return;
-      const test = '   F1: 개발 메뉴 (순간이동·아이템)   I 또는 ]: 인벤토리   1~5: 무기 바꾸기';
+      const test = '   H: 안내 다시   I 또는 ]: 인벤토리   1~5: 무기 바꾸기   F1: 개발 메뉴';
       if (hud.summon) this._text(ctx, `슬라임 ${hud.slimeCount}마리  박쥐 ${hud.batCount || 0}마리${test}`, 12, 84);
       else if (hud.monsterless) this._text(ctx, `몬스터가 없는 평화로운 마을${test}`, 12, 84);
       else if (hud.crabCount !== undefined) this._text(ctx, `꽃게 ${hud.crabCount}마리${test}`, 12, 84);
