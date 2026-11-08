@@ -1831,7 +1831,8 @@ function handleMsg(from, m) {   // 방장이든 손님이든 같은 처리 (from
     case 'helm': if (NET.host) { BOAT.rin = { s: m.s, th: m.th }; BOAT.rinT = performance.now(); } break;
     case 'boat': if (BOAT.on && !(!NET.active || NET.host)) { BOAT.x += (m.x - BOAT.x) * 0.6; BOAT.z += (m.z - BOAT.z) * 0.6; let dy = m.yaw - BOAT.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); BOAT.yaw += dy * 0.6; BOAT.v = m.v; if (m.s !== BOAT.state) { if (m.s === 'pour') BOAT.pourT = m.p; if (m.s === 'dead1' || m.s === 'dead2') engineDying(); if (m.s === 'sail2') engineStart(); BOAT.state = m.s; } BOAT.fuel = m.f; if (m.c != null) { BOAT.canFuel = m.c; if (m.c <= 0.001) BOAT.canEmpty = true; } } break;
     case 'pk': { if (m.m === MODE) { const it = ITEMS.find((x) => x.i === m.i); if (it && it.alive) takeItem(it, false); } break; }
-    case 'start': NET.order = m.order; if (NET.id !== 0 || true) enterGame(Math.max(0, m.order.indexOf(NET.id))); break;
+    case 'start': NET.order = m.order; NET.startNew = !!m.new; NET.startDay = m.d; enterGame(Math.max(0, m.order.indexOf(NET.id))); break;
+    case 'dsync': if (!NET.host && MODE === 'game' && !window.__cutOn && typeof m.d === 'number') { if (window.__setDay) window.__setDay(m.d); } break;
   }
 }
 function hostOnConn(conn) {
@@ -1887,7 +1888,7 @@ function joinRoom(codeRaw, tryNo) {
   peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
   peer.on('error', (e) => { NET.lastErr = e.type + ':' + (e.message || ''); if (!joined) fail(e.type === 'peer-unavailable' ? '⚠️ 그 코드의 방이 없어요 (방장이 방을 열어 둔 채인지, 코드가 맞는지 확인해 주세요)' : '⚠️ 연결 실패 (' + e.type + ') · 인터넷을 확인해 주세요'); });
 }
-function startGame() { if (!NET.host) return; const order = [...NET.players.keys()].sort((a, b) => a - b); NET.order = order; netSendAll({ t: 'start', order }); [...NET.players.values()].forEach((p) => { p.hp = 150; }); enterGame(0); }
+function startGame() { if (!NET.host) return; const order = [...NET.players.keys()].sort((a, b) => a - b); NET.order = order; netSendAll({ t: 'start', order, new: (MAPK === 'myisland') ? (() => { try { const s = JSON.parse(localStorage.getItem('myIslandSave_mp')); return !(s && s.v === 1); } catch (e) { return true; } })() : false, d: window.__getDay ? window.__getDay() : 0.56 }); [...NET.players.values()].forEach((p) => { p.hp = 150; }); enterGame(0); }
 // 버튼
 $('bCreate').onclick = () => { goFS(); createRoom(); };
 $('bJoin').onclick = () => { goFS(); joinRoom($('joinCode').value); };
@@ -7148,8 +7149,9 @@ float gN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); 
   cmenu.querySelector('#cmreplay').onclick = () => { musStop(); cmenu.style.display = 'none'; cutPlay(true); };
   window.addEventListener('resize', () => { if (cmenu.style.display !== 'none') bgSize(); });
   window.__title = { show: myStart, drawBg, infoDraw };
-  { const _eg = enterGame; enterGame = function () { _eg.apply(this, arguments); if (MAPK === 'myisland') { try { if (NET.active) { SV.slot = 'mp'; if (slotMeta('mp')) { CUT.on = false; CUT.mode = ''; svLoad('mp'); } else cutPlay(); } else myStart(); } catch (e) { CUT.on = false; } } }; }
-  { const _up = update; update = function (dt) { if (CUT.on) { for (const k in keys) keys[k] = false; if (CUT.mode === 'play') cutTick(dt); } sprTick(dt); if (CUT.deb.length) debTick(dt); if (CUT.wreck) wreckTick(dt); _up.apply(this, arguments); if (!CUT.on && window.__svTick) window.__svTick(dt); }; }
+  { const _eg = enterGame; enterGame = function () { _eg.apply(this, arguments); if (MAPK === 'myisland') { try { if (NET.active) { if (NET.host) { SV.slot = 'mp'; if (slotMeta('mp')) { CUT.on = false; CUT.mode = ''; svLoad('mp'); } else cutPlay(); } else { SV.slot = 'mpg'; if (NET.startNew || !slotMeta('mpg')) cutPlay(); else { CUT.on = false; CUT.mode = ''; svLoad('mpg'); } if (NET.startDay !== undefined) DAY.t = NET.startDay; } } else myStart(); } catch (e) { CUT.on = false; } } }; }   // 같이 할 때: 방장이 새 세계를 시작하면 손님도 함께 첫 컷신을 보고, 시간은 방장 기준으로 맞춰요
+  window.__getDay = () => DAY.t; window.__setDay = (d) => { DAY.t = d; if (window.__dayT !== undefined) window.__dayT = d; };
+  { const DSY = { t: 0 }; const _up = update; update = function (dt) { window.__cutOn = CUT.on; if (NET.active && NET.host && MODE === 'game') { DSY.t -= dt; if (DSY.t <= 0) { DSY.t = 2; try { netSendAll({ t: 'dsync', d: DAY.t }); } catch (e) {} } } if (CUT.on) { for (const k in keys) keys[k] = false; if (CUT.mode === 'play') cutTick(dt); } sprTick(dt); if (CUT.deb.length) debTick(dt); if (CUT.wreck) wreckTick(dt); _up.apply(this, arguments); if (!CUT.on && window.__svTick) window.__svTick(dt); }; }
   { const sw = (e) => { if (!CUT.on) return; if (CUT.mode === 'play' && (e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape') && e.type === 'keydown') { window.__cut.skip(); } if (CUT.mode === 'play' || (e.target && e.target.closest && !e.target.closest('#cmenu'))) { e.stopImmediatePropagation(); e.preventDefault(); } };
     ['keydown', 'keyup', 'mousedown', 'mouseup', 'wheel', 'contextmenu'].forEach((n) => window.addEventListener(n, sw, true)); }
   REQS.push({ ids: ['tomato', 'carrot', 'corn', 'spud'], n: 3, label: '🥕 채소 3개', pay: 3400 });
